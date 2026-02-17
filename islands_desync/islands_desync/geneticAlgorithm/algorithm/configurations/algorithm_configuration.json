@@ -1,0 +1,39 @@
+{
+  "number_of_evaluations" : 8000,
+  "number_of_variables" : 200,
+  "population_size":16,
+  "offspring_population_size": 4,
+
+  "want_create_boxplot": false,
+  "want_create_plot": true,
+  "want_save_migrants_in_txt": true,
+  "want_save_diversity_when_improvement": false,
+  "want_tsne_to2": false,
+  "want_tsne_to3": false,
+  "want_diversity_to_console": false,
+  "want_run_end_communications": false,
+  "type_of_connection": "",
+  "migrant_selection_type": "random",
+  "yMax": 40,
+
+  "how_many_data_intervals": 50,
+  "plot_population_interval": 500,
+
+  "number_of_islands": 5,
+  "number_of_migrants": 5,
+  "migration_interval": 35,
+
+  "island_delays": {
+    "0": [-1,  0, -1, -1, -1, -1, -1, -1, -1,  0],
+    "1": [ 0, -1,  0, -1, -1, -1, -1, -1, -1, -1],
+    "2": [-1,  0, -1,  0, -1, -1, -1, -1, -1, -1],
+    "3": [-1, -1,  0, -1,  0, -1, -1, -1, -1, -1],
+    "4": [-1, -1, -1,  0, -1,  0, -1, -1, -1, -1],
+    "5": [-1, -1, -1, -1,  0, -1,  0, -1, -1, -1],
+    "6": [-1, -1, -1, -1, -1,  0, -1,  0, -1, -1],
+    "7": [-1, -1, -1, -1, -1, -1,  0, -1,  0, -1],
+    "8": [-1, -1, -1, -1, -1, -1, -1,  0, -1,  0],
+    "9": [ 0, -1, -1, -1, -1, -1, -1, -1,  0, -1]
+
+  }
+}

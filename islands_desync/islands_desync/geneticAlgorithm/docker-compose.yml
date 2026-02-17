@@ -1,0 +1,35 @@
+version: "3.2"
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: 'rabbitmq'
+    ports:
+        - 5672:5672
+        - 15672:15672
+#  prepare_queues:
+#    build:
+#      context: ./utils
+#      dockerfile: Dockerfile_prepare_queues
+#    depends_on:
+#      - rabbitmq
+#    links:
+#      - rabbitmq
+#  remove_queues:
+#    build:
+#      context: ./utils
+#      dockerfile: ./utils/Dockerfile_remove
+#    depends_on:
+#      - rabbitmq
+#    links:
+#      - rabbitmq
+
+#  create_queues:
+#    build:
+#      context: ./utils
+#      dockerfile: ./utils/Dockerfile_remove
+#    depends_on:
+#      - rabbitmq
+#      - remove_queues
+#    links:
+#      - rabbitmq
+#      - remove_queues
