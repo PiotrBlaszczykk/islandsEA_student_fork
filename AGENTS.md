@@ -58,8 +58,9 @@ Run from outer `islands_desync/` directory.
 That relative path assumes CWD is outer `islands_desync/`.
 
 ### SLURM script status
-- `run144tr-hpc.sh`, `run150rr-hpc.sh`, `run_smoke_ring.sh` call `start.py` but currently pass only 8 args.
+- `run144tr-hpc.sh`, `run150rr-hpc.sh` call `start.py` but currently pass only 8 args.
 - Several scripts call `start_bm.py`, which is **not present** in this repo.
+- `run_smoke_ring.sh` is **not present** in this repository snapshot (it may exist only in local/HPC-side working copies).
 - Many scripts contain cluster-specific hardcoded grant/env paths; treat as templates, not ready-to-run defaults.
 
 ---
@@ -223,6 +224,58 @@ Likely required extras for the current code path (based on imports and current r
 - `scikit-learn` (imported by `utils/tsne.py` at module import time, even if TSNE output flags are false)
 
 If environment setup changes, validate imports before submitting jobs.
+
+---
+
+## HPC Dashboard and Plotting Playbook (Ares/SLURM)
+
+This section captures operational knowledge from validated HPC runs and common failures.
+
+### Dashboard prerequisites
+- Submit through SLURM (`sbatch ...`), not `sh run_*.sh`. Running directly misses SLURM env vars (`SLURM_JOB_ID`, node list, etc.).
+- In interactive/login shell, load module before venv:
+  - `module load python/3.10.4-gcccore-11.3.0`
+  - `source $HOME/venvs/islands-ray/bin/activate`
+- If Ray starts but `http://<head>:8265` is refused, install dashboard extras:
+  - `pip install "ray[default]==2.54.1"`
+  - then verify: `python -c "import ray, aiohttp, prometheus_client; print(ray.__version__)"`
+
+### Dashboard quick workflow
+1. Submit job (optional keep-alive if wrapper supports it):
+   - `sbatch --export=ALL,KEEP_DASHBOARD_SECONDS=600 <script>.sh`
+2. Check if still running:
+   - `squeue -j <JOBID>`
+   - `sacct -j <JOBID> --format=JobID,State,ExitCode,Elapsed,NodeList -X`
+3. Get head node from SLURM log:
+   - `HEAD=$(grep -m1 "Starting HEAD at" slurm-<JOBID>.out | awk '{print $4}')`
+4. Validate dashboard from login node:
+   - `curl -sS -m 5 http://$HEAD:8265/api/version`
+5. From **laptop/local terminal**, open SSH tunnel:
+   - `ssh -N -L 18265:$HEAD:8265 <user>@login01.ares.cyfronet.pl`
+6. Open browser:
+   - `http://localhost:18265`
+
+### Dashboard caveats
+- Ray UI `Overview/Jobs/Actors` may work while `Metrics` look empty; this is expected without Prometheus/Grafana integration.
+- If dashboard still fails, inspect Ray logs on head node:
+  - `/tmp/$USER/<JOBID>/session_latest/logs/dashboard.log`
+  - `/tmp/$USER/<JOBID>/session_latest/logs/dashboard.err`
+
+### Quick plot from experiment logs
+For per-island fitness curves, read `resultsEveryStepW*.json` in run directory and generate PNG with matplotlib.
+
+Required pattern:
+1. Set and **export** run directory variable (spaces are common in path names):
+   - `export RUN_DIR="logs/<date>/<prob4><dim>/<time> <tag>"`
+2. Run plotting snippet (inline Python or helper script) that saves:
+   - `$RUN_DIR/fitness_all_islands.png`
+
+### File transfer gotchas
+- `scp ... .` copies into the current shell location. If run on Ares, file stays on Ares.
+- To download to laptop, run `scp` from laptop terminal.
+- With space-heavy paths, easiest method:
+  1. on cluster: `cp "$RUN_DIR/fitness_all_islands.png" "$HOME/fitness_all_islands.png"`
+  2. on laptop: `scp <user>@login01.ares.cyfronet.pl:~/fitness_all_islands.png .`
 
 ---
 
