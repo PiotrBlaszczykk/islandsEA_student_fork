@@ -12,7 +12,10 @@ class RingTopology(Topology):
         if self.size == 1:
             return {0: []}
         if self.size == 2:
-            return {0: [1], 1: [0]}
+            return {
+                0: [self.create_object_method(1)],
+                1: [self.create_object_method(0)],
+            }
 
         res = {i: self.connected_to_i(i) for i in range(0, self.size)}
         """res[0] = [
