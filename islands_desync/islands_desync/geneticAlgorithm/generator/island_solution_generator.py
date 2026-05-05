@@ -32,9 +32,17 @@ class IslandSolutionGenerator(Generator):
                 from_island=self.island_number,
                 from_evaluation=0,
             )
+        elif isinstance(solution, BinarySolution):
+            return BinaryIslandSolution(
+                solution.number_of_variables,
+                solution.number_of_objectives,
+                solution.number_of_constraints,
+                solution.variables,
+                solution.objectives,
+                solution.constraints,
+                from_island=self.island_number,
+                from_evaluation=0,
+                bits_per_variable=getattr(solution, "bits_per_variable", None),
+            )
         else:
             return solution
-        """elif isinstance(solution, BinarySolution):
-                    return BinaryIslandSolution(solution.number_of_variables, solution.number_of_objectives, solution.number_of_constraints,
-                                              solution.variables, solution.objectives, solution.constraints,
-                                              from_island=self.island_number, from_evaluation=0)"""

@@ -412,6 +412,12 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
     def wytnij(self, lancuchZnakow):
         return lancuchZnakow.replace("\n", "")
 
+    def operatorName(self, operator):
+        get_name = getattr(operator, "get_name", None)
+        if callable(get_name):
+            return get_name()
+        return operator.__class__.__name__
+
     def paramJson(self):
         self.uzup = self.uzupParamLog()
         jsn = result_saver.Result_Saver(
@@ -445,6 +451,9 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             "want_diversity_to_console": str(self.want_diversity_to_console),
             "want_run_end_communications": str(self.want_run_end_communications),
             "last_step": str(self.last_step),
+            "mutation operator": self.operatorName(self.mutation),
+            "crossover operator": self.operatorName(self.crossover),
+            "selection operator": self.operatorName(self.selection),
             "operators": self.wytnij(self.uzup),
         }
 
@@ -539,6 +548,15 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             fitness_osobnikow.append(self.solutions[ind].objectives[0])
         return fitness_osobnikow
 
+    def flatSolutionVariables(self, solution):
+        flat = []
+        for value in solution.variables:
+            if isinstance(value, list):
+                flat.extend(1 if item else 0 for item in value)
+            else:
+                flat.append(value)
+        return flat
+
     def saveXiYiFittnessWhileJump(self):
         self.tab_jump_best_result_and_all[self.tab_jump_ind] = {
             "stepX": self.step_num,
@@ -563,17 +581,17 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
     def savePopulationDiversitiesThreeOfKindForThisStepInTab(self):
         setPopul = set()
         for i in range(len(self.solutions)):
-            solution = self.solutions[i].variables
+            solution = self.flatSolutionVariables(self.solutions[i])
             solutionWhole = ""
-            for i in range(self.solutions[0].number_of_variables):
-                solutionWhole += " " + str(solution[i])
+            for value in solution:
+                solutionWhole += " " + str(value)
             setPopul.add(solutionWhole)
         lsp = len(setPopul)
 
         # DIVERSITY LICZONE ZE STD ODCHYLENIA - Min i Sredni
         listaaa = []
         for i in range(self.solutions.__len__()):  # population_size
-            listaaa.append(self.solutions[i].variables)
+            listaaa.append(self.flatSolutionVariables(self.solutions[i]))
 
         listalTransposed = np.array(listaaa).transpose()
         a, b = distance.Distance.minISrOdchStd(listalTransposed)

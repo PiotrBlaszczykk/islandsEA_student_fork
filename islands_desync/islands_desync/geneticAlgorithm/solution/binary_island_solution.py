@@ -1,4 +1,4 @@
-from typing import List
+import copy
 
 from jmetal.core.solution import BinarySolution
 
@@ -14,6 +14,7 @@ class BinaryIslandSolution(BinarySolution):
         constraints,
         from_island: int,
         from_evaluation: int,
+        bits_per_variable=None,
     ):
         super(BinaryIslandSolution, self).__init__(
             number_of_variables, number_of_objectives, number_of_constants
@@ -23,6 +24,8 @@ class BinaryIslandSolution(BinarySolution):
         self.variables = variables
         self.objectives = objectives
         self.constraints = constraints
+        if bits_per_variable is not None:
+            self.bits_per_variable = bits_per_variable[:]
 
     def __str__(self) -> str:
         return "Binary Island Solution(variables={},objectives={},constraints={},from_island={},from_evaluation={})".format(
@@ -50,11 +53,12 @@ class BinaryIslandSolution(BinarySolution):
             self.number_of_variables,
             self.number_of_objectives,
             self.number_of_constraints,
-            self.variables[:],
+            copy.deepcopy(self.variables),
             self.objectives[:],
             self.constraints[:],
             self.from_island,
             self.from_evaluation,
+            bits_per_variable=getattr(self, "bits_per_variable", None),
         )
 
         return new_solution

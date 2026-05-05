@@ -146,6 +146,60 @@ class Labs(FloatProblem):
         return "Labs"
 
 
+class LabsBinary(BinaryProblem):
+    """Low autocorrelation binary sequence benchmark.
+
+    This is the true binary counterpart of ``Labs``. The objective is ``-merit``
+    so that the existing minimization pipeline can maximize the LABS merit
+    factor without changing selection/replacement semantics.
+    """
+
+    def __init__(self, number_of_bits: int = 64):
+        super(LabsBinary, self).__init__()
+        self.number_of_bits_value = number_of_bits
+        self.number_of_variables = 1
+        self.number_of_objectives = 1
+        self.number_of_constraints = 0
+        self.obj_directions = [self.MINIMIZE]
+        self.obj_labels = ["LABS binary"]
+
+    def calculateAutocorrelation(self, sequenceRepresentation, distance):
+        autocorrelation = 0
+        for i in range(len(sequenceRepresentation) - distance):
+            s_i = 1 if sequenceRepresentation[i] else -1
+            s_ik = 1 if sequenceRepresentation[i + distance] else -1
+            autocorrelation += s_i * s_ik
+        return autocorrelation
+
+    def evaluate(self, solution: BinarySolution) -> BinarySolution:
+        sequence = solution.variables[0]
+        energy = 0
+        for k in range(1, len(sequence)):
+            autocorrelation = self.calculateAutocorrelation(sequence, k)
+            energy += autocorrelation * autocorrelation
+
+        merit = len(sequence) * len(sequence) / (2 * energy)
+        solution.objectives[0] = -merit
+        return solution
+
+    def create_solution(self) -> BinarySolution:
+        new_solution = BinarySolution(1, 1, 0)
+        new_solution.bits_per_variable = [self.number_of_bits_value]
+        new_solution.variables[0] = [
+            random.choice([True, False]) for _ in range(self.number_of_bits_value)
+        ]
+        return new_solution
+
+    def number_of_bits(self) -> int:
+        return self.number_of_bits_value
+
+    def number_of_bits_per_variable(self):
+        return [self.number_of_bits_value]
+
+    def get_name(self) -> str:
+        return "LabB"
+
+
 """class Labs(BinaryProblem):
 
     def __init__(self, number_of_bits: int = 256): #todo param: number_of_variables = sequence

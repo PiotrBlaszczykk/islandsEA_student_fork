@@ -7,6 +7,16 @@ class Distance:
     def __init__(self):
         pass
 
+    @staticmethod
+    def flat_variables(solution):
+        flat = []
+        for value in solution.variables:
+            if isinstance(value, list):
+                flat.extend(1 if item else 0 for item in value)
+            else:
+                flat.append(value)
+        return flat
+
     """def get_individuals_to_migrate(self, population: List[S], number_of_emigrants: int, migrant_selection_type: string) -> List[S]:
         if len(population) < number_of_emigrants:
             raise ValueError("Population is too small")
@@ -75,7 +85,8 @@ class Distance:
         popul = populationF[:]
 
         ile_osobnikow = len(popul)
-        ile_genow = len(popul[0].variables)
+        flattened_population = [Distance.flat_variables(solution) for solution in popul]
+        ile_genow = len(flattened_population[0])
         # print("ILE OS, GEN",ile_osobnikow,ile_genow)
 
         for osob1 in range(ile_osobnikow):
@@ -91,7 +102,9 @@ class Distance:
                         ile_genow
                     ):  # todo: inny sposób obliczenia distance
                         kwadratRoznicy = pow(
-                            popul[osob1].variables[gen] - popul[osob2].variables[gen], 2
+                            flattened_population[osob1][gen]
+                            - flattened_population[osob2][gen],
+                            2,
                         )
                         odleglosc += kwadratRoznicy
                         sumaOdleglosciOdPozostalych += kwadratRoznicy

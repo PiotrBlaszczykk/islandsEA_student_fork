@@ -24,6 +24,8 @@ def main() -> int:
         print(f"No resultsEveryStepW*.json files found in: {run_dir}")
         return 1
 
+    all_y_values = []
+
     plt.figure(figsize=(10, 6))
     for file_path in files:
         with open(file_path, encoding="utf-8") as f:
@@ -31,6 +33,7 @@ def main() -> int:
 
         xs = sorted(int(k) for k in data.keys())
         ys = [data[str(x)] for x in xs]
+        all_y_values.extend(ys)
         name = (
             os.path.basename(file_path)
             .replace("resultsEveryStep", "")
@@ -38,7 +41,10 @@ def main() -> int:
         )
         plt.plot(xs, ys, linewidth=1, label=name)
 
-    plt.yscale("log")
+    if any(y <= 0 for y in all_y_values):
+        plt.yscale("symlog", linthresh=1e-3)
+    else:
+        plt.yscale("log")
     plt.xlabel("step")
     plt.ylabel("best fitness")
     plt.title("Best fitness per step (all islands)")
