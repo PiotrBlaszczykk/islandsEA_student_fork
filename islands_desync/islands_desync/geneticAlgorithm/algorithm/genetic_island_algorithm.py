@@ -418,6 +418,13 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             return get_name()
         return operator.__class__.__name__
 
+    def operatorNameFromAttrs(self, *attribute_names):
+        for attribute_name in attribute_names:
+            operator = getattr(self, attribute_name, None)
+            if operator is not None:
+                return self.operatorName(operator)
+        return "unknown"
+
     def paramJson(self):
         self.uzup = self.uzupParamLog()
         jsn = result_saver.Result_Saver(
@@ -451,9 +458,15 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             "want_diversity_to_console": str(self.want_diversity_to_console),
             "want_run_end_communications": str(self.want_run_end_communications),
             "last_step": str(self.last_step),
-            "mutation operator": self.operatorName(self.mutation),
-            "crossover operator": self.operatorName(self.crossover),
-            "selection operator": self.operatorName(self.selection),
+            "mutation operator": self.operatorNameFromAttrs(
+                "mutation", "mutation_operator"
+            ),
+            "crossover operator": self.operatorNameFromAttrs(
+                "crossover", "crossover_operator"
+            ),
+            "selection operator": self.operatorNameFromAttrs(
+                "selection", "selection_operator"
+            ),
             "operators": self.wytnij(self.uzup),
         }
 
