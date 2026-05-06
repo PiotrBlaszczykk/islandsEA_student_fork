@@ -164,15 +164,6 @@ Wynik `er2` z runu `235703_150er2_test` jest ciekawy: najlepsza wyspa osiagnela 
 - Nie analizowano jeszcze topologii `er3`, `er4`, `ws3`, `ws4` w dostarczonych danych wynikowych.
 - Wykresy maja bardzo gesta legende, bo pokazuja wszystkie wyspy naraz. Dlatego w raporcie wazniejsza od legendy jest ogolna geometria przebiegu oraz metryki z tabel.
 
-## Artefakty
-
-Obrazki uzyte w raporcie:
-
-- `raport/images/fitness_144_torus_220314.png`
-- `raport/images/fitness_150_er1_220723.png`
-- `raport/images/fitness_150_er2_235703.png`
-- `raport/images/fitness_150_er2_000626.png`
-
 Pelne dane z benchmarkow:
 
 - `raport/benchmarki/plot_exports/260407/220314_144tr_test`

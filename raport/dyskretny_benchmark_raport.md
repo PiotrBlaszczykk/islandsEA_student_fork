@@ -80,11 +80,8 @@ W kodzie dodano tez wariant `LabsBinary`, ktory jest prawdziwym problemem binarn
 
 Najuczciwsza interpretacja dla sprawozdania:
 
-```text
-Benchmark LABS sprawdza problem dyskretny przez dyskretyzacje znakiem zmiennej.
-Jest to dzialajacy test dyskretnego celu optymalizacji w istniejacej sciezce HPC.
 Prawdziwy wariant binarny jest przygotowany w kodzie jako LabsBinary, ale wymaga osobnego runa porownawczego.
-```
+
 
 ## Jak benchmark jest odpalany
 
@@ -234,15 +231,3 @@ Najwazniejsze ograniczenia tego konkretnego benchmarku:
 - Uruchomiony wariant `Labs` jest dyskretyzowany przez znak zmiennej, ale nie jest jeszcze czystym runem `BinaryProblem`.
 - Do lokalnego raportu pobrano gotowy `fitness_all_islands.png` i podsumowania tekstowe, ale nie pelne surowe pliki `resultsEveryStepW*.json`, wiec nie przeliczano wykresu od nowa lokalnie.
 - Wynik nalezy traktowac jako walidacje dzialania benchmarku dyskretnego, a nie jako ostateczna ocene jakosci algorytmu dla LABS.
-
-## Wniosek
-
-Benchmark LABS zostal poprawnie uruchomiony w modelu wyspowym na Aresie. Dla sekwencji dlugosci `64` najlepszy znaleziony merit factor wyniosl `4.302521`, a ten sam najlepszy wynik osiagnelo `10` z `12` wysp. To pokazuje, ze infrastruktura Ray/HPC, migracja w topologii `ring`, logowanie i eksport wykresow dzialaja rowniez dla problemu o charakterze dyskretnym.
-
-Najlepszym kolejnym krokiem jest odpalenie wariantu:
-
-```text
-sbatch --export=ALL,ISLANDS_PROBLEM=labs_binary run_labs_ring_test.sh
-```
-
-Taki run pozwolilby dopisac do sprawozdania porownanie: wariant dyskretyzowany przez znak zmiennej kontra prawdziwy wariant binarny.
