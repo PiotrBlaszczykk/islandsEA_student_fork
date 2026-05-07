@@ -86,6 +86,67 @@ Run from outer `islands_desync/` directory.
 
 That relative path assumes CWD is outer `islands_desync/`.
 
+### Verified local run workflow
+The active Ray path can be run locally, but the environment needs to match the old dependency stack reasonably closely.
+
+Validated local setup as of May 5, 2026:
+- package manager / venv tool: `uv`
+- Python: `3.10.20`
+- `ray==2.9.3`
+- `scikit-learn==1.1.3`
+- `setuptools<81` (Ray 2.9.x still imports `pkg_resources`)
+
+Validated local environment creation:
+```bash
+cd islandsEA/islands_desync
+uv venv -c --python 3.10
+uv pip install -r islands_desync/islands_desync/geneticAlgorithm/algorithm/requirements.txt ray==2.9.3 scikit-learn==1.1.3 'setuptools<81'
+```
+
+Validated local launch command:
+```bash
+source .venv/bin/activate
+cd islandsEA/islands_desync
+PYTHONPATH="$PWD" python -u islands_desync/start.py 7 /tmp/islands-ray 5 5 260505 120000 ring random plain
+```
+
+Why this exact shape matters:
+- `PYTHONPATH="$PWD"` is required because `start.py` imports the package as `islands_desync...`.
+- `arg 9` must be present; a baseline non-SAS value like `plain` preserves the default receive-side behavior.
+- if the default matplotlib config directory is not writable, add `MPLCONFIGDIR=/tmp/matplotlib` to both run and analysis commands.
+
+Date/time tags must follow the logging contract:
+- `dda` becomes the `<date>` directory in `logs/<date>/<prob4><dimension>/...`
+- `tta` becomes the leading `<time>` token in the run directory name
+- use compact, no-space tags to keep paths predictable
+- validated example: `dda=260505`, `tta=120000`
+- shell-safe way to generate them:
+```bash
+dda=$(date +%y%m%d)
+tta=$(date +%H%M%S)
+```
+
+Expected run directory naming:
+- format: `logs/<date>/<prob4><dimension>/<time> <island_count><migrant_code><topology_code>-co<migration_interval>ilu<emigrants>`
+- for `7 /tmp/islands-ray 5 5 260505 120000 ring random plain` with the current active `Sphere(200)` setup, the run directory is:
+  `logs/260505/Sphe200/120000 7rr-co5ilu5`
+- `random` contributes migrant code `r`
+- `ring` contributes topology code `r`
+- the top-level `start.py` process also emits `logs/iterations_per_second*.json`
+
+Observed local resource caveat:
+- `Island`, `Computation`, and `SignalActor` each reserve `num_cpus=1`.
+- Practical local island count on a `16`-thread machine is therefore closer to `7` than to `16`.
+- `torus` is not a good first local topology because `IslandRunner.py` hardcodes `12 x (island_count // 12)`.
+
+Validated local output from the command above:
+- run directory: `logs/260505/Sphe200/120000 7rr-co5ilu5`
+- analysis command:
+```bash
+cd islandsEA/islands_desync
+python analyze_migration_delays.py "logs/260505/Sphe200/120000 7rr-co5ilu5"
+```
+
 ### Current active-path caveat
 `IslandRunner.py` currently appears to misassign topologies for islands `1..N-1`:
 - island `0` gets `topology[0]`,
