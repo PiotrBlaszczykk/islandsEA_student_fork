@@ -22,7 +22,11 @@ def load_json(path: Path):
 
 def maybe_load_json(path: Path):
     if path.exists():
-        return load_json(path)
+        try:
+            return load_json(path)
+        except json.JSONDecodeError as exc:
+            print(f"Warning: skipping invalid JSON file {path}: {exc}")
+            return None
     return None
 
 
@@ -532,6 +536,9 @@ def build_summary(run_dir, param, events, fitness_curves, timings, final_results
         "run_dir": str(run_dir),
         "run_name": run_dir.name,
         "metadata": param,
+        "observability_notes": {
+            "delay_sign_convention": "delay_steps = source_iteration - destination_step",
+        },
         "delay_metrics": build_delay_summary(events, strong_delay_threshold),
         "delivery_metrics": build_delivery_summary(events),
         "optimization_metrics": build_optimization_summary(final_results, fitness_curves),
@@ -920,13 +927,6 @@ def write_text_summary(summary, output_dir: Path):
                 "",
             ]
         )
-
-    lines.extend(
-        [
-            "Unavailable metrics",
-            *[f"  - {item}" for item in summary["observability_notes"]["unavailable_metrics"]],
-        ]
-    )
 
     path = output_dir / "summary.txt"
     path.write_text("\n".join(lines) + "\n")

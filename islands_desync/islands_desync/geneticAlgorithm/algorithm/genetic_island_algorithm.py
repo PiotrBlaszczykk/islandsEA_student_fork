@@ -418,6 +418,10 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         return lancuchZnakow.replace("\n", "")
 
     def paramJson(self):
+        # fix race condition where multiple islands try to write param.json at the same time at the end of the run
+        if self.island != 0:
+            return
+
         self.uzup = self.uzupParamLog()
         jsn = result_saver.Result_Saver(
             self.path + "/param", self, self.want_run_end_communications

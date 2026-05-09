@@ -118,9 +118,6 @@ run_dir="$problem_dir/$tta ${number_of_islands}${migrant_code}${topology_code}-c
 
 echo "Run directory: $run_dir"
 
-analysis_status=0
-python analyze_migration_delays.py "$run_dir" || analysis_status=$?
-
 archive_dir="$repo_root/log_archives"
 mkdir -p "$archive_dir"
 
@@ -131,7 +128,6 @@ tar -czf "$archive_path" "$run_dir"
 
 ray stop --force || true
 
-echo "Analysis output: $run_dir/analysis_migration"
 echo "Logs archive: $archive_path"
 
-exit "$analysis_status"
+exit 0
