@@ -91,7 +91,7 @@ for ((i = 1; i <= worker_num; i++)); do
     sleep 5
 done
 
-number_of_islands="${NUMBER_OF_ISLANDS:-32}"
+number_of_islands="${NUMBER_OF_ISLANDS:-150}"
 number_of_migrants="${NUMBER_OF_MIGRANTS:-5}"
 migration_interval="${MIGRATION_INTERVAL:-5}"
 topology="${TOPOLOGY:-ring}"
