@@ -32,10 +32,13 @@ if [[ ! -x "$venv_path/bin/python" ]]; then
     python -m venv "$venv_path"
     source "$venv_path/bin/activate"
 
-    python -m pip install -r "$repo_root/islands_desync/islands_desync/geneticAlgorithm/algorithm/requirements.txt" ray==2.9.3 scikit-learn==1.1.3 'setuptools<81'
+    python -m pip install -r "$repo_root/islands_desync/islands_desync/geneticAlgorithm/algorithm/requirements.txt" ray==2.9.3 scikit-learn==1.1.3 'setuptools<81' 'click<8.2'
 fi
 
 source "$venv_path/bin/activate"
+
+# Ray 2.9.x CLI breaks with newer Click releases on this cluster stack.
+python -m pip install --quiet 'click<8.2'
 
 tmpdir="/tmp/$USER/$SLURM_JOB_ID"
 mkdir -p "$tmpdir"
@@ -54,6 +57,15 @@ python -c "import ray; print('ray', ray.__version__)"
 nodes=$(scontrol show hostnames "$SLURM_JOB_NODELIST")
 nodes_array=($nodes)
 
+raw_cpus_per_node="${RAY_CPUS_PER_NODE:-${SLURM_JOB_CPUS_PER_NODE:-${SLURM_CPUS_ON_NODE:-${SLURM_NTASKS_PER_NODE:-1}}}}"
+ray_cpus_per_node="${raw_cpus_per_node%%(*}"
+ray_cpus_per_node="${ray_cpus_per_node%%,*}"
+
+if [[ ! "$ray_cpus_per_node" =~ ^[0-9]+$ ]]; then
+    echo "Could not infer CPUs per node from '$raw_cpus_per_node', falling back to 1." >&2
+    ray_cpus_per_node=1
+fi
+
 head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address | awk '{print $1}')
 
@@ -62,9 +74,10 @@ ip_head="$head_node_ip:$port"
 export ip_head
 
 echo "IP Head: $ip_head"
+echo "Ray CPUs per node: $ray_cpus_per_node"
 echo "Starting Ray HEAD at $head_node"
-srun --nodes=1 --ntasks=1 -w "$head_node" \
-    ray start --head --node-ip-address="$head_node_ip" --port="$port" --temp-dir="$tmpdir" --block &
+srun --nodes=1 --ntasks=1 --cpus-per-task="$ray_cpus_per_node" -w "$head_node" \
+    ray start --head --node-ip-address="$head_node_ip" --port="$port" --num-cpus="$ray_cpus_per_node" --temp-dir="$tmpdir" --block &
 
 sleep 10
 
@@ -73,8 +86,8 @@ worker_num=$((SLURM_JOB_NUM_NODES - 1))
 for ((i = 1; i <= worker_num; i++)); do
     node_i=${nodes_array[$i]}
     echo "Starting Ray WORKER $i at $node_i"
-    srun --nodes=1 --ntasks=1 -w "$node_i" --export=ALL,RAY_TMPDIR="$tmpdir" \
-        ray start --address "$ip_head" --block &
+    srun --nodes=1 --ntasks=1 --cpus-per-task="$ray_cpus_per_node" -w "$node_i" --export=ALL,RAY_TMPDIR="$tmpdir" \
+        ray start --address "$ip_head" --num-cpus="$ray_cpus_per_node" --block &
     sleep 5
 done
 
