@@ -6,3 +6,7 @@ __pycache__
 .codex
 tmp
 logs
+
+log_archives
+*.out
+.venv

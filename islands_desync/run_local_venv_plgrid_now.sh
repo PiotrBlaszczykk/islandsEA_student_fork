@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=islands-delay
-#SBATCH --nodes=2
-#SBATCH --ntasks=200
+#SBATCH --nodes=4
+#SBATCH --ntasks=400
+#SBATCH --ntasks-per-node=100
 #SBATCH --time=0:50:00
-#SBATCH --mem-per-cpu=12G
-#SBATCH -p plgrid-now
+#SBATCH --mem-per-cpu=250M
+#SBATCH -p plgrid-gpu-a100
 #SBATCH -A plgintobl-gpu-a100
 #SBATCH --output=slurm-%j.out
 
@@ -31,7 +32,7 @@ if [[ ! -x "$venv_path/bin/python" ]]; then
     python -m venv "$venv_path"
     source "$venv_path/bin/activate"
 
-    python -m pip install -r "$repo_root/islands_desync/geneticAlgorithm/algorithm/requirements.txt" ray==2.9.3 scikit-learn==1.1.3 'setuptools<81'
+    python -m pip install -r "$repo_root/islands_desync/islands_desync/geneticAlgorithm/algorithm/requirements.txt" ray==2.9.3 scikit-learn==1.1.3 'setuptools<81'
 fi
 
 source "$venv_path/bin/activate"
