@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=islands-delay
 #SBATCH --nodes=2
-#SBATCH --ntasks=32
+#SBATCH --ntasks=200
 #SBATCH --time=0:50:00
-#SBATCH --mem-per-cpu=4G
+#SBATCH --mem-per-cpu=12G
 #SBATCH -p plgrid-now
 #SBATCH -A plgintobl-gpu-a100
 #SBATCH --output=slurm-%j.out
@@ -104,8 +104,20 @@ run_dir="$problem_dir/$tta ${number_of_islands}${migrant_code}${topology_code}-c
 
 echo "Run directory: $run_dir"
 
-python analyze_migration_delays.py "$run_dir"
+analysis_status=0
+python analyze_migration_delays.py "$run_dir" || analysis_status=$?
+
+archive_dir="$repo_root/log_archives"
+mkdir -p "$archive_dir"
+
+archive_name="${dda}_${tta}_${number_of_islands}${migrant_code}${topology_code}-co${migration_interval}ilu${number_of_migrants}_${selection_strategy}_${acceptance_strategy}_job${SLURM_JOB_ID}.tar.gz"
+archive_path="$archive_dir/$archive_name"
+
+tar -czf "$archive_path" "$run_dir"
 
 ray stop --force || true
 
 echo "Analysis output: $run_dir/analysis_migration"
+echo "Logs archive: $archive_path"
+
+exit "$analysis_status"

@@ -532,23 +532,6 @@ def build_summary(run_dir, param, events, fitness_curves, timings, final_results
         "run_dir": str(run_dir),
         "run_name": run_dir.name,
         "metadata": param,
-        "observability_notes": {
-            "paper_style_scope": (
-                "This report reconstructs paper-style per-run delay, cooperation, and optimization "
-                "visuals from emitted logs. It does not compare multiple runs/topologies automatically."
-            ),
-            "delay_sign_convention": "delay_steps = source_iteration - destination_step",
-            "acceptance_note": (
-                "Current active path logs imply received migrants are added to population; "
-                "accepted/rejected counts are therefore inferred, not independently logged."
-            ),
-            "unavailable_metrics": [
-                "undelivered migrants count",
-                "queue backlog",
-                "topology-accurate active-neighbor count over time",
-                "migrant survival after N epochs",
-            ],
-        },
         "delay_metrics": build_delay_summary(events, strong_delay_threshold),
         "delivery_metrics": build_delivery_summary(events),
         "optimization_metrics": build_optimization_summary(final_results, fitness_curves),

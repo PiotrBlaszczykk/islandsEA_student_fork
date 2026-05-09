@@ -2,11 +2,10 @@ import json
 import random
 from typing import Dict, List
 
-from islands_desync.geneticAlgorithm.migrations.Migration import Migration
+from islands_desync.islands.core.Migration import Migration, MigrationInfo
 from islands_desync.geneticAlgorithm.solution.float_island_solution import (
     FloatIslandSolution,
 )
-
 
 class QueueMigration(Migration):
     def __init__(self, island, channel, rabbitmq_delays, number_of_islands):
@@ -36,23 +35,33 @@ class QueueMigration(Migration):
 
     def receive_individuals(
         self, step_num: int, evaluations: int
-    ) :
+    ) -> tuple[list[FloatIslandSolution], MigrationInfo]:
         new_individuals = []
-        emigration_at_step_num = None
+        
+        fitnesses = []
+        migrant_iteration_numbers = []
+        ind_timestamps = []
+        src_island = []
+
         for i in range(0, 5):
             method, properties, body = self.channel.basic_get(f"island-{self.island}")
             if body:
                 data_str = body.decode("utf-8")
                 data = json.loads(data_str)
 
-                emigration_at_step_num = {
-                    "step": step_num,
-                    "ev": evaluations,
-                    "fitn": data["objectives"][0],
-                    "var": data["variables"],
-                    "from_isl": data["from_island"],
-                    "from_eval": data["from_evaluation"],
-                }
+                # emigration_at_step_num = {
+                #     "step": step_num,
+                #     "ev": evaluations,
+                #     "fitn": data["objectives"][0],
+                #     "var": data["variables"],
+                #     "from_isl": data["from_island"],
+                #     "from_eval": data["from_evaluation"],
+                # }
+
+                fitnesses.append(data["objectives"][0])
+                migrant_iteration_numbers.append(data["from_evaluation"])
+                ind_timestamps.append(data["from_evaluation"])
+                src_island.append(data["from_island"])
 
                 float_solution = FloatIslandSolution(
                     data["lower_bound"],
@@ -72,5 +81,14 @@ class QueueMigration(Migration):
                 float_solution.number_of_constraints = data["number_of_constraints"]
 
                 new_individuals.append(float_solution)
+
+        emigration_at_step_num = MigrationInfo(
+            step=step_num,
+            ev=evaluations,
+            iteration_numbers=migrant_iteration_numbers,
+            timestamps=ind_timestamps,
+            src_islands=src_island,
+            fitnesses=fitnesses,
+        )
 
         return new_individuals, emigration_at_step_num
