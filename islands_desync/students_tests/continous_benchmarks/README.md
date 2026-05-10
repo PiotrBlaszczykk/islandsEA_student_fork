@@ -16,6 +16,9 @@ and island counts?
 
 - `benchmark_matrix_smoke.csv` - very small HPC smoke matrix.
 - `benchmark_matrix_template.csv` - starting point for larger experiment plans.
+- `benchmark_matrix_full_continuous.csv` - full continuous benchmark matrix:
+  `3 problems x 3 topologies x 4 migrant strategies x 3 island counts x 3 repeats`.
+- `generate_full_matrix.py` - regenerates `benchmark_matrix_full_continuous.csv`.
 - `run_one_benchmark_hpc.sh` - SLURM wrapper for one benchmark run.
 - `submit_matrix.sh` - submits one SLURM job per matrix row.
 - `plot_topology.py` - draws topology graphs, optionally colored by final fitness.
@@ -39,6 +42,13 @@ bash students_tests/continous_benchmarks/submit_matrix.sh \
   students_tests/continous_benchmarks/benchmark_matrix_smoke.csv
 ```
 
+Full continuous matrix:
+
+```bash
+bash students_tests/continous_benchmarks/submit_matrix.sh \
+  students_tests/continous_benchmarks/benchmark_matrix_full_continuous.csv
+```
+
 Submit from the repository root or from the outer `islands_desync/` directory.
 The wrapper uses `SLURM_SUBMIT_DIR` to find the outer `islands_desync`
 runtime directory before calling:
@@ -53,6 +63,16 @@ This preserves the current runtime assumption used by
 Each SLURM job derives Ray and dashboard ports from `SLURM_JOB_ID`, so several
 matrix jobs can run on the same physical node without fighting over port
 `6379` or dashboard port `8265`.
+
+When a matrix includes `nodes`, `ntasks`, and `time_limit` columns,
+`submit_matrix.sh` passes those resource requests directly to `sbatch`.
+The full matrix currently uses:
+
+```text
+48 islands  ->  4 nodes,  96 tasks, 01:00:00
+144 islands ->  8 nodes, 192 tasks, 02:00:00
+288 islands -> 16 nodes, 384 tasks, 04:00:00
+```
 
 ## Useful environment overrides
 

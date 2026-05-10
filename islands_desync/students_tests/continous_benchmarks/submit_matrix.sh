@@ -18,12 +18,35 @@ if [[ ! -f "$matrix_file" ]]; then
   fi
 fi
 
-tail -n +2 "$matrix_file" | while IFS=, read -r benchmark_name problem variables evaluations population offspring islands topology migrant_strategy accept_strategy migrants interval repeat; do
+tail -n +2 "$matrix_file" | while IFS=, read -r benchmark_name problem variables evaluations population offspring islands topology migrant_strategy accept_strategy migrants interval repeat nodes ntasks time_limit; do
   [[ -z "${benchmark_name// }" ]] && continue
   [[ "${benchmark_name:0:1}" == "#" ]] && continue
 
+  if [[ -z "${nodes:-}" || -z "${ntasks:-}" ]]; then
+    if [[ "$islands" -le 48 ]]; then
+      nodes="${nodes:-4}"
+      ntasks="${ntasks:-96}"
+    elif [[ "$islands" -le 144 ]]; then
+      nodes="${nodes:-8}"
+      ntasks="${ntasks:-192}"
+    else
+      nodes="${nodes:-16}"
+      ntasks="${ntasks:-384}"
+    fi
+  fi
+
+  if [[ -z "${time_limit:-}" ]]; then
+    if [[ "$islands" -le 48 ]]; then
+      time_limit="01:00:00"
+    elif [[ "$islands" -le 144 ]]; then
+      time_limit="02:00:00"
+    else
+      time_limit="04:00:00"
+    fi
+  fi
+
   echo "Submitting: $benchmark_name"
-  sbatch --export=ALL,\
+  sbatch --job-name="$benchmark_name" --nodes="$nodes" --ntasks="$ntasks" --time="$time_limit" --export=ALL,\
 BENCHMARK_NAME="$benchmark_name",\
 ISLANDS_PROBLEM="$problem",\
 ISLANDS_NUMBER_OF_VARIABLES="$variables",\
@@ -39,4 +62,3 @@ MIGRATION_INTERVAL="$interval",\
 REPEAT="$repeat" \
     "$runner"
 done
-
