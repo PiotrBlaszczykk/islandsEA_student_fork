@@ -1,3 +1,5 @@
+import os
+
 from islands_desync.geneticAlgorithm.utils import fileslister
 
 
@@ -6,6 +8,7 @@ class Controller:
         self.czy_kom = czy_kom
         if self.czy_kom:
             print("rusza controller")
+        os.makedirs(katalog, exist_ok=True)
         self.ctrlFile = open(katalog + "/kontrolW" + str(wyspa) + "Start.ctrl.txt", "a")
         self.ctrlFile.close()
         self.katalog = katalog

@@ -191,7 +191,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
         #KATALOG NA REZULTATY
         if self.island == 0:
-            os.makedirs(self.path)
+            os.makedirs(self.path, exist_ok=True)
             if self.want_run_end_communications:
                 print(
                     "\n\n\n                          The new directory is created! by island: "
