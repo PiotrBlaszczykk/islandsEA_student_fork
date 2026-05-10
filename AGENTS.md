@@ -279,6 +279,141 @@ Required pattern:
 
 ---
 
+## Student Continuous Benchmark Workflow (Validated on Ares)
+
+Student-owned benchmark tooling lives in:
+- `islands_desync/students_tests/continous_benchmarks/`
+
+Important files:
+- `benchmark_matrix_smoke.csv` - small smoke matrix.
+- `benchmark_matrix_full_continuous.csv` - current stable full matrix.
+- `generate_full_matrix.py` - regenerates the stable full matrix.
+- `submit_matrix.sh` - submits one SLURM job per CSV row.
+- `run_one_benchmark_hpc.sh` - generic one-run SLURM/Ray wrapper.
+- `plot_topology.py` and `summarize_experiments.py` - postprocessing/export helpers.
+
+### Current stable research matrix
+The current stable continuous matrix is:
+
+```text
+3 objective functions x 3 topologies x 4 migrant strategies x 3 island counts x 3 repeats = 324 jobs
+```
+
+Values:
+- objective functions: `sphere`, `rastrigin`, `ackley`
+- topologies: `ring`, `torus`, `complete`
+- island counts: `48`, `96`, `144`
+- migrant source strategies: `random`, `best`, `worst`, `maxDistance`
+- repeats: `r1`, `r2`, `r3`
+- fixed GA parameters: `number_of_variables=200`, `number_of_evaluations=8000`, `population_size=16`, `offspring_population_size=4`
+- fixed migration parameters: `number_of_migrants=5`, `migration_interval=5`, `migrant_accept_strategy=BEZ`
+
+Current resource mapping:
+
+```text
+48 islands  ->  4 nodes,  96 tasks, 01:00:00
+96 islands  ->  6 nodes, 144 tasks, 01:30:00
+144 islands ->  8 nodes, 192 tasks, 02:00:00
+```
+
+Do **not** put `288` islands back into the default matrix. Treat `288` as a separate stress test only.
+Probe runs with `288` reached `Ray cluster is ready`, but then Ray workers died with `SYSTEM_ERROR` / `ActorDiedError` / connection EOF, likely due to process/memory pressure at that scale on Ares. At that point the experiment becomes a Ray/SLURM stress test rather than a clean topology/migration experiment.
+
+### Ares submit workflow
+From outer `islands_desync/` on Ares:
+
+```bash
+git fetch origin
+git reset --hard origin/smoke_tests
+
+awk -F, 'NR>1 {count[$7]++} END {for (k in count) print k, count[k]}' \
+  students_tests/continous_benchmarks/benchmark_matrix_full_continuous.csv | sort -n
+
+grep ',288,' students_tests/continous_benchmarks/benchmark_matrix_full_continuous.csv
+
+SUBMIT_SLEEP_SECONDS=2 bash students_tests/continous_benchmarks/submit_matrix.sh \
+  students_tests/continous_benchmarks/benchmark_matrix_full_continuous.csv
+```
+
+Expected matrix count:
+
+```text
+48 108
+96 108
+144 108
+```
+
+`grep ',288,' ...` should print nothing.
+
+### Sanity checks during a full run
+Use the submitted job range for the current batch (for example `20078714-20079050`).
+
+Queue state:
+
+```bash
+squeue -u $USER -h -o "%T" | sort | uniq -c
+```
+
+Accounting state:
+
+```bash
+sacct -j <FIRST_JOB_ID>-<LAST_JOB_ID> --format=State -n -X | sort | uniq -c
+```
+
+Failures:
+
+```bash
+sacct -j <FIRST_JOB_ID>-<LAST_JOB_ID> --format=JobID,JobName,State,ExitCode,Elapsed -X \
+  | grep -E "FAILED|CANCELLED|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL" || true
+```
+
+Export progress:
+
+```bash
+find students_tests/continous_benchmarks/exports/<YYMMDD> -path "*_full_*" -name summary.csv | wc -l
+```
+
+Expected final count for the stable full matrix: `324`.
+
+`COMPLETING` / truncated `COMPLETI` in `squeue` is usually normal SLURM cleanup. `PENDING (Priority)` and `PENDING (Resources)` are normal queue states, not failures.
+
+### Known Ares failure modes and fixes
+
+1. `sbatch: error: Invalid --time specification`
+   - Usually caused by Windows CRLF in CSV, so `time_limit` becomes `01:00:00\r`.
+   - Fix on Ares if needed:
+     ```bash
+     sed -i 's/\r$//' students_tests/continous_benchmarks/benchmark_matrix_full_continuous.csv
+     ```
+   - The benchmark directory has `.gitattributes` and the generator uses `lineterminator="\n"` to prevent this.
+
+2. Ray worker startup timeout before the algorithm starts
+   - Symptom: `The current node timed out during startup`.
+   - `run_one_benchmark_hpc.sh` now:
+     - derives Ray ports from `SLURM_JOB_ID`,
+     - sets `RAY_raylet_start_wait_time_s=300`,
+     - exports `RAY_ADDRESS=$ip_head`,
+     - waits for the head port,
+     - waits until Ray reports all SLURM nodes alive before calling `start.py`.
+   - Do not remove those waits unless replacing them with an equivalent readiness check.
+
+3. `FileNotFoundError` for `logs/.../kontrolW<id>Start.ctrl.txt`
+   - Cause: many islands start concurrently; nonzero islands can try to write before island `0` creates the log directory.
+   - Required safeguards:
+     - `geneticAlgorithm/utils/controller.py` must create `katalog` with `os.makedirs(katalog, exist_ok=True)` before opening control files.
+     - `genetic_island_algorithm.py` should use `os.makedirs(self.path, exist_ok=True)` for island `0`.
+
+4. Ray over-reservation / worker death from helper actors
+   - `Computation` is the CPU-heavy actor and should keep `@ray.remote(num_cpus=1)`.
+   - `Island` and `SignalActor` are helper/state actors and should stay `@ray.remote(num_cpus=0)`.
+   - Setting helper actors back to `num_cpus=1` roughly doubles Ray's logical CPU demand (for 288 islands it creates 288 `Computation` actors, 288 `Island` actors, and 1 `SignalActor`).
+
+5. Avoid submitting the full matrix before a smoke/probe has worked after code changes.
+   - Smoke matrix should produce `summary.csv`, `summary.json`, `fitness_all_islands.png`, `topology_with_fitness.png`, and `topology_metrics.json`.
+   - For orchestration changes, run at least one representative `144`-island probe before the full matrix.
+
+---
+
 ## Before Making Changes
 1. Identify which execution path is affected (Ray/HPC vs legacy RabbitMQ/local).
 2. Trace real call graph from entrypoint before editing.
