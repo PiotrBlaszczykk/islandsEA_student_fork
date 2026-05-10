@@ -43,6 +43,9 @@ tmpdir="/tmp/$USER/$SLURM_JOB_ID"
 export TMPDIR="$tmpdir"
 export RAY_TMPDIR="$tmpdir"
 export PYTHONPATH="${PYTHONPATH:-}:$PWD"
+export RAY_DEDUP_LOGS="${RAY_DEDUP_LOGS:-0}"
+export RAY_USAGE_STATS_ENABLED="${RAY_USAGE_STATS_ENABLED:-0}"
+export RAY_raylet_start_wait_time_s="${RAY_raylet_start_wait_time_s:-300}"
 
 export ISLANDS_PROBLEM="${ISLANDS_PROBLEM:-sphere}"
 export ISLANDS_NUMBER_OF_VARIABLES="${ISLANDS_NUMBER_OF_VARIABLES:-30}"
@@ -71,6 +74,7 @@ port="${RAY_PORT:-$((20000 + SLURM_JOB_ID % 20000))}"
 dashboard_port="${RAY_DASHBOARD_PORT:-$((40000 + SLURM_JOB_ID % 20000))}"
 ip_head="${head_node_ip}:${port}"
 export ip_head
+export RAY_ADDRESS="${RAY_ADDRESS:-$ip_head}"
 
 echo "BENCHMARK_NAME: $benchmark_name"
 echo "Problem: ${ISLANDS_PROBLEM}"
@@ -79,15 +83,33 @@ echo "Evaluations: ${ISLANDS_NUMBER_OF_EVALUATIONS}"
 echo "Islands/topology: ${number_of_islands}/${topolog}"
 echo "Migration: strategy=${strateg}, accept=${strateg2}, migrants=${number_of_migrants}, interval=${migration_interval}"
 echo "IP Head: $ip_head"
+echo "RAY_ADDRESS: $RAY_ADDRESS"
 echo "Dashboard: http://${head_node}:${dashboard_port}"
 echo "Tunnel: ssh -N -L 18265:${head_node}:${dashboard_port} ${USER}@login01.ares.cyfronet.pl"
+echo "Ray raylet startup wait: ${RAY_raylet_start_wait_time_s}s"
 
 echo "Starting HEAD at $head_node"
 srun --nodes=1 --ntasks=1 -w "$head_node" \
   ray start --head --node-ip-address="$head_node_ip" --port="$port" \
   --dashboard-host=0.0.0.0 --dashboard-port="$dashboard_port" \
   --temp-dir="$tmpdir" --block &
-sleep 5
+
+head_wait_seconds="${RAY_HEAD_STARTUP_WAIT_SECONDS:-180}"
+echo "Waiting up to ${head_wait_seconds}s for Ray head port ${ip_head}"
+head_ready=0
+for _ in $(seq 1 "$head_wait_seconds"); do
+  if python3 -c 'import socket, sys; s=socket.socket(); s.settimeout(1); s.connect((sys.argv[1], int(sys.argv[2]))); s.close()' "$head_node_ip" "$port" >/dev/null 2>&1; then
+    head_ready=1
+    break
+  fi
+  sleep 1
+done
+
+if [[ "$head_ready" -ne 1 ]]; then
+  echo "ERROR: Ray head did not open ${ip_head} within ${head_wait_seconds}s"
+  exit 1
+fi
+echo "Ray head port is reachable."
 
 worker_num=$((SLURM_JOB_NUM_NODES - 1))
 for ((i=1; i<=worker_num; i++)); do
@@ -95,8 +117,28 @@ for ((i=1; i<=worker_num; i++)); do
   echo "Starting WORKER $i at $node_i"
   srun --nodes=1 --ntasks=1 -w "$node_i" --export=ALL,RAY_TMPDIR="$tmpdir" \
     ray start --address "$ip_head" --block &
+  sleep "${RAY_WORKER_STARTUP_SPACING_SECONDS:-2}"
+done
+
+cluster_wait_seconds="${RAY_CLUSTER_READY_WAIT_SECONDS:-300}"
+expected_nodes="${SLURM_JOB_NUM_NODES}"
+echo "Waiting up to ${cluster_wait_seconds}s for ${expected_nodes} Ray nodes"
+cluster_ready=0
+for _ in $(seq 1 "$cluster_wait_seconds"); do
+  active_nodes=$(python3 -c 'import ray, sys; ray.init(address=sys.argv[1], logging_level="ERROR"); print(sum(1 for node in ray.nodes() if node.get("Alive"))); ray.shutdown()' "$ip_head" 2>/dev/null || echo 0)
+  echo "Ray active nodes: ${active_nodes}/${expected_nodes}"
+  if [[ "$active_nodes" -ge "$expected_nodes" ]]; then
+    cluster_ready=1
+    break
+  fi
   sleep 1
 done
+
+if [[ "$cluster_ready" -ne 1 ]]; then
+  echo "ERROR: Ray cluster did not reach ${expected_nodes} active nodes within ${cluster_wait_seconds}s"
+  exit 1
+fi
+echo "Ray cluster is ready."
 
 python3 -u islands_desync/start.py \
   "$number_of_islands" "$tmpdir" \

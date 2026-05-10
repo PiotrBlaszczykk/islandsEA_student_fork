@@ -19,6 +19,23 @@ if [[ ! -f "$matrix_file" ]]; then
 fi
 
 tail -n +2 "$matrix_file" | while IFS=, read -r benchmark_name problem variables evaluations population offspring islands topology migrant_strategy accept_strategy migrants interval repeat nodes ntasks time_limit; do
+  benchmark_name="${benchmark_name//$'\r'/}"
+  problem="${problem//$'\r'/}"
+  variables="${variables//$'\r'/}"
+  evaluations="${evaluations//$'\r'/}"
+  population="${population//$'\r'/}"
+  offspring="${offspring//$'\r'/}"
+  islands="${islands//$'\r'/}"
+  topology="${topology//$'\r'/}"
+  migrant_strategy="${migrant_strategy//$'\r'/}"
+  accept_strategy="${accept_strategy//$'\r'/}"
+  migrants="${migrants//$'\r'/}"
+  interval="${interval//$'\r'/}"
+  repeat="${repeat//$'\r'/}"
+  nodes="${nodes//$'\r'/}"
+  ntasks="${ntasks//$'\r'/}"
+  time_limit="${time_limit//$'\r'/}"
+
   [[ -z "${benchmark_name// }" ]] && continue
   [[ "${benchmark_name:0:1}" == "#" ]] && continue
 
@@ -61,4 +78,5 @@ NUMBER_OF_MIGRANTS="$migrants",\
 MIGRATION_INTERVAL="$interval",\
 REPEAT="$repeat" \
     "$runner"
+  sleep "${SUBMIT_SLEEP_SECONDS:-0}"
 done
