@@ -9,7 +9,7 @@ OUTPUT = SCRIPT_DIR / "benchmark_matrix_full_continuous.csv"
 PROBLEMS = ["sphere", "rastrigin", "ackley"]
 TOPOLOGIES = ["ring", "torus", "complete"]
 MIGRANT_STRATEGIES = ["random", "best", "worst", "maxDistance"]
-ISLAND_COUNTS = [48, 144, 288]
+ISLAND_COUNTS = [48, 96, 144]
 REPEATS = [1, 2, 3]
 
 NUMBER_OF_VARIABLES = 200

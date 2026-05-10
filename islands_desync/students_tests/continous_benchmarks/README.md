@@ -16,7 +16,7 @@ and island counts?
 
 - `benchmark_matrix_smoke.csv` - very small HPC smoke matrix.
 - `benchmark_matrix_template.csv` - starting point for larger experiment plans.
-- `benchmark_matrix_full_continuous.csv` - full continuous benchmark matrix:
+- `benchmark_matrix_full_continuous.csv` - stable continuous benchmark matrix:
   `3 problems x 3 topologies x 4 migrant strategies x 3 island counts x 3 repeats`.
 - `generate_full_matrix.py` - regenerates `benchmark_matrix_full_continuous.csv`.
 - `run_one_benchmark_hpc.sh` - SLURM wrapper for one benchmark run.
@@ -66,13 +66,20 @@ matrix jobs can run on the same physical node without fighting over port
 
 When a matrix includes `nodes`, `ntasks`, and `time_limit` columns,
 `submit_matrix.sh` passes those resource requests directly to `sbatch`.
-The full matrix currently uses:
+The stable full matrix currently uses:
 
 ```text
 48 islands  ->  4 nodes,  96 tasks, 01:00:00
+96 islands  ->  6 nodes, 144 tasks, 01:30:00
 144 islands ->  8 nodes, 192 tasks, 02:00:00
-288 islands -> 16 nodes, 384 tasks, 04:00:00
 ```
+
+The earlier `288`-island variant was intentionally removed from the default
+matrix after probe runs showed Ray worker crashes on Ares at that scale. Keep
+it as a separate stress experiment, not as part of the main reliable batch.
+
+`submit_matrix.sh` waits 1 second between `sbatch` calls by default. Override
+with `SUBMIT_SLEEP_SECONDS=0` or a larger value if needed.
 
 ## Useful environment overrides
 

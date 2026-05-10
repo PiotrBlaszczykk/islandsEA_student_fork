@@ -78,5 +78,5 @@ NUMBER_OF_MIGRANTS="$migrants",\
 MIGRATION_INTERVAL="$interval",\
 REPEAT="$repeat" \
     "$runner"
-  sleep "${SUBMIT_SLEEP_SECONDS:-0}"
+  sleep "${SUBMIT_SLEEP_SECONDS:-1}"
 done
