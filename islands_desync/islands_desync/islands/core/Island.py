@@ -8,7 +8,7 @@ from islands_desync.islands.core.SignalActor import SignalActor
 from islands_desync.islands.selectAlgorithm import SelectAlgorithm
 
 
-@ray.remote(num_cpus=1)
+@ray.remote(num_cpus=0)
 class Island:
     def __init__(self, island_id: int, select_algorithm: SelectAlgorithm):
         self.island_id: int = island_id
