@@ -1,0 +1,5 @@
+benchmark_name,problem,number_of_variables,number_of_evaluations,population_size,offspring_population_size,number_of_islands,topology,migrant_strategy,migrant_accept_strategy,number_of_migrants,migration_interval,repeat
+smoke_sphere_ring_12,sphere,30,600,16,4,12,ring,random,BEZ,2,20,1
+smoke_sphere_torus_12,sphere,30,600,16,4,12,torus,random,BEZ,2,20,1
+smoke_rastrigin_ring_12,rastrigin,30,600,16,4,12,ring,random,BEZ,2,20,1
+

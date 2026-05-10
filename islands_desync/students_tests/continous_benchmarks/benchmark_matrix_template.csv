@@ -1,0 +1,7 @@
+benchmark_name,problem,number_of_variables,number_of_evaluations,population_size,offspring_population_size,number_of_islands,topology,migrant_strategy,migrant_accept_strategy,number_of_migrants,migration_interval,repeat
+sphere_ring_12_random,sphere,200,8000,16,4,12,ring,random,BEZ,5,5,1
+sphere_torus_144_random,sphere,200,8000,16,4,144,torus,random,BEZ,5,5,1
+rastrigin_ring_12_random,rastrigin,200,8000,16,4,12,ring,random,BEZ,5,5,1
+ackley_ring_12_random,ackley,200,8000,16,4,12,ring,random,BEZ,5,5,1
+schwefel_ring_12_random,schwefel,200,8000,16,4,12,ring,random,BEZ,5,5,1
+
