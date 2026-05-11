@@ -7,6 +7,7 @@ import copy
 from datetime import datetime
 from math import trunc
 from typing import List, TypeVar
+from dataclasses import asdict
 
 import numpy as np
 import pandas as pd
@@ -14,11 +15,12 @@ from jmetal.algorithm.singleobjective.genetic_algorithm import GeneticAlgorithm
 from jmetal.config import store
 from jmetal.core.operator import Crossover, Mutation, Selection
 from jmetal.core.problem import Problem
+from jmetal.core.solution import Solution
 from jmetal.util.evaluator import Evaluator
 from jmetal.util.generator import Generator
 from jmetal.util.termination_criterion import TerminationCriterion
 
-from ...islands.core.Migration import Migration
+from ...islands.core.Migration import Migration, MigrationInfo
 from ..solution.float_island_solution import FloatIslandSolution
 from ..utils import (
     boxPloter,
@@ -139,8 +141,13 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         self.czasStart = self.dta.teraz()
         self.dist = distance.Distance()
 
-
-        self.tab_jakosc_migracji_z_wysp = [[0 for i in range (self.number_of_islands)], [0 for i in range(self.number_of_islands)]]
+        # tablica do statystyk migracji z wysp
+        # 0 - ile ogółem emigrowało z danej wyspy
+        # 1 - ile z tych emigrantów było lepszych niż aktualnie najlepszy osobnik na wyspie docelowej
+        # t[0][idx] - ile ogółem emigrowało z wyspy idx
+        # t[1][idx] - ile z tych emigrantów było lepszych niż aktualnie najlepszy osobnik na wyspie docelowej
+        self.tab_jakosc_migracji_z_wysp = [[0 for _ in range (self.number_of_islands)], 
+                                           [0 for _ in range(self.number_of_islands)]]
 
         # SCIEZKA I NAZWA PLIKOW
         self.fileName = filename.Filename(self, self.want_run_end_communications)
@@ -228,7 +235,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         self.lastBest = 50000.0
         # self.lastBest = 0.0 dla LABS
 
-        self.tab_emigr = {}
+        self.emigrations_history: dict[int, MigrationInfo] = {}
 
         self.tab_detailed_population = {}
 
@@ -299,120 +306,135 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 individuals_to_migrate, self.step_num, self.island, time.time(), self.island
             )
 
+    # TODO: Fix SAS selection
+    # def _get_island_quality(self, island_idx: int):
+    #     if self.tab_jakosc_migracji_z_wysp[0][island_idx] == 0:
+    #         return 0
+    #     return self.tab_jakosc_migracji_z_wysp[1][island_idx] / self.tab_jakosc_migracji_z_wysp[0][island_idx]
+
+    # def _sas_selection_strategy(
+    #     self, proc: float = 80
+    # ) -> list[bool]:
+    #     island_count = len(self.tab_jakosc_migracji_z_wysp[1])
+
+    #     tab_nie_zero = []
+    #     for j in range(island_count):
+    #         if self.tab_jakosc_migracji_z_wysp[1][j] != 0:
+    #             tab_nie_zero.append(self._get_island_quality(j))
+    #     if len(tab_nie_zero) == 0:
+    #         tab_nie_zero.append(0)
+
+    #     percentyl = np.percentile(
+    #         tab_nie_zero, proc
+    #     )
+
+    #     def _select_island(index: int, percentyl: float):
+    #         if self.tab_jakosc_migracji_z_wysp[0][index] == 0:
+    #             return False
+    #         return self._get_island_quality(index) >= percentyl
+
+    #     return [_select_island(i, percentyl) for i in range(island_count)]
+
+    def filter_new_individuals(
+        self, 
+        new_individuals: list[FloatIslandSolution],
+        emigration_at_step_num: MigrationInfo
+    ):
+        imigr_fitnsesses = emigration_at_step_num.fitnesses
+        imigr_iterations = emigration_at_step_num.iteration_numbers
+
+        strategy = self.migrant_acceptation_strategy
+        param = None
+        if ":" in strategy:
+            strategy, param = strategy.split(":")
+            param = int(param)
+
+        individuals_count = len(new_individuals)
+
+        selected_imigrant_mask = [False] * individuals_count
+
+        if strategy == "plain":
+            selected_imigrant_mask = [True] * individuals_count
+        elif strategy == "better":
+            for i in range(individuals_count):
+                if imigr_fitnsesses[i] < self.lastBest:
+                    selected_imigrant_mask[i] = True
+        elif strategy == "newer": # akceptuj tylko imigrantów, którzy są "nowsi" niż aktualna iteracja
+            for i in range(individuals_count):
+                delay = imigr_iterations[i] - self.step_num
+                if delay >= 0:
+                    selected_imigrant_mask[i] = True
+        elif strategy == "rejectTooOld": # odrzucaj imigrantów, którzy są starsi niż K
+            if param is None:
+                param = self.migration_interval * 2
+            for i in range(individuals_count):
+                delay = imigr_iterations[i] - self.step_num
+                if delay >= -param:
+                    selected_imigrant_mask[i] = True
+        elif strategy == "window":
+            if param is None:
+                param = self.migration_interval
+            for i in range(individuals_count):
+                delay = imigr_iterations[i] - self.step_num
+                if abs(delay) <= param:
+                    selected_imigrant_mask[i] = True
+
+
+        # if "SAS" in strategy:
+        #     sas_islands_mask = self._sas_selection_strategy(proc=80)
+        #     for island_idx in range(len(imigr_src_islands)):
+        #         if sas_islands_mask[imigr_src_islands[island_idx]]:
+        #             selected_imigrant_mask[island_idx] = True
+
+        filtered_indices = [
+            i for i in range(individuals_count)
+            if selected_imigrant_mask[i]
+        ]
+        
+        filtered_emigration_info = MigrationInfo(
+            step=emigration_at_step_num.step,
+            ev=emigration_at_step_num.ev,
+            iteration_numbers=[emigration_at_step_num.iteration_numbers[i] for i in filtered_indices],
+            timestamps=[emigration_at_step_num.timestamps[i] for i in filtered_indices],
+            src_islands=[emigration_at_step_num.src_islands[i] for i in filtered_indices],
+            fitnesses=[emigration_at_step_num.fitnesses[i] for i in filtered_indices],
+        )
+
+        return [new_individuals[i] for i in filtered_indices], filtered_emigration_info
+    
     def add_new_individuals(self):
         new_individuals, emigration_at_step_num = self.migration.receive_individuals(
             self.step_num, self.evaluations
         )
 
-        #print("=== new indiv",new_individuals, "\n === migr at step num ", emigration_at_step_num)
+        new_individuals, filtered_emigration_info = self.filter_new_individuals(
+            new_individuals, emigration_at_step_num
+        )
 
-        #for individual in new_individuals:
-            #if self.step_num == 10:
-                #print ("\n === self.island", self.island, self.step_num, new_individuals, emigration_at_step_num,"\n\nsrc_islands",emigration_at_step_num['src_islands'],"\nfitnesses",emigration_at_step_num['fitnesses'],"lastBest",self.lastBest,"iteration numbers", emigration_at_step_num['iteration_numbers'])
-                #print (individual.__dict__, individual.__dict__['objectives'][0], individual.__dict__['from_island'])
-            #self.tab_jakosc_migracji_z_wysp[0][individual.__dict__['from_island']] += 1
+        imigr_src_islands = filtered_emigration_info.src_islands
+        imigr_fitnsesses = filtered_emigration_info.fitnesses
 
-        #self.island,
-        imigr_list = list(emigration_at_step_num['src_islands'])
-        imigr_ftnss_list = list(emigration_at_step_num['fitnesses'])
-        #self.lastBest, 
-        #self.step_num,
-        imigr_iter_list = list(emigration_at_step_num['iteration_numbers'])
-        #print("=== imigr list, fitt list, iter list", imigr_list, imigr_ftnss_list, imigr_iter_list)
-
-
-
-        if "SAS" in self.migrant_acceptation_strategy:
-            proc = 80
-            tab_nie_zero = []
-            for j in range(self.tab_jakosc_migracji_z_wysp[1].__len__()):  #144 a nie 150!
-                if self.tab_jakosc_migracji_z_wysp[1][j] != 0:
-                    tab_nie_zero.append(self.tab_jakosc_migracji_z_wysp[1][j] / self.tab_jakosc_migracji_z_wysp[0][j])
-            if len(tab_nie_zero) == 0:
-                tab_nie_zero.append(0)  #dopisano element
-            percentyl = np.percentile(tab_nie_zero, proc) #todo - tablica procentowych sukcesow POWINNA BYC
-            tabTFAll = [(self.tab_jakosc_migracji_z_wysp[1][i] / self.tab_jakosc_migracji_z_wysp[0][i]) > 0 if self.tab_jakosc_migracji_z_wysp[0][i] > 0 else False for i in range(len(self.tab_jakosc_migracji_z_wysp[1]))]
-            ileAll = tabTFAll.count(True)
-            tabTF = [(self.tab_jakosc_migracji_z_wysp[1][i] / self.tab_jakosc_migracji_z_wysp[0][i]) >= percentyl if self.tab_jakosc_migracji_z_wysp[0][i] > 0 else False for i in range(len(self.tab_jakosc_migracji_z_wysp[1]))]
-            ile_True = tabTF.count(True)
-            #print("== test2 === === tablice SAS === ileTrue", ile_True,"/", ileAll, "perc", percentyl, "tabTF", tabTF, "tabCala", self.tab_jakosc_migracji_z_wysp[1]) #todo KTORA WYSPA TO PISZE
-            #todo WYBIERAJ TYLKO DLA ile_TRUE < 144 tzn wtedy gdy PERCENTYL > 0
-
-
-        tab_of_better_imigr = []
-        # index=0
-        for imigr_ind in range (len(imigr_list)):
-            self.tab_jakosc_migracji_z_wysp[0][imigr_list[imigr_ind]]+=1
-            if imigr_ftnss_list[imigr_ind]<self.lastBest:
-                tab_of_better_imigr.append(True)
-                self.tab_jakosc_migracji_z_wysp[1][imigr_list[imigr_ind]]+=1
-            else:
-                tab_of_better_imigr.append(False)
-
-        # index +=1
-        #print("=== test3")
-
-        if "SAS" in self.migrant_acceptation_strategy:
-            #print("=== test4")
-            for aa in range (imigr_list.__len__()):
-                if tabTF[int(imigr_list[aa])]:
-                    tab_of_better_imigr[aa] = True # ???????????????????
-                    #print("=== test5")
-
-        #tabTF, 
-
-        #print("BETTER",tab_of_better_imigr,len(new_individuals))
-        #if len(tab_of_better_imigr)>0:
-            #print("TT",type(tab_of_better_imigr[0]))
-
-        #print("=== test6")
-
-        tmp_tab=[]
-        for indiv in range(len(new_individuals)):
-            #print("=== test7")
-            if tab_of_better_imigr[indiv]:
-                tmp_tab.append(new_individuals[indiv])
-
-        #print("=== test8", imigr_list,  new_individuals.__len__(), tmp_tab.__len__(), tab_of_better_imigr.count(True), tabTF.count(True))
-        #print("=== test9", tmp_tab)
-
-        #if tmp_tab != new_individuals:
-             #print("skopiowane", len(tmp_tab),"z" , len(new_individuals))
-             #new_individuals = copy.deepcopy(tmp_tab)
-        #else:
-             #print("wszystko", len(tmp_tab), len(new_individuals))
-
-        """if (self.island == 12):
-            if self.step_num >20 and self.step_num < 100:
-                print("=== %%%",new_individuals, tmp_tab, tab_of_better_imigr)"""
-
-
-
-        #for imigr_ind in range (len(imigr_list[0])):
-            #if self.island == 12:
-                #print("W",self.island, "[",self.step_num,"] imigr_ind ---->",imigr_ind, imigr_list[imigr_ind], imigr_ftnss_list[imigr_ind], imigr_iter_list[imigr_ind], type(imigr_list[imigr_ind]), type(imigr_ftnss_list[imigr_ind]), type(imigr_iter_list[imigr_ind]))
-                #print("W",self.island, "[",self.step_num,"] imigr ind ---->",imigr_ind, "plusuje",imigr_list[0],imigr_ind ,imigr_list[0][imigr_ind])
-            #self.tab_jakosc_migracji_z_wysp[0][imigr_list[0][imigr_ind]]+=1
-            #if imigr_ftnss_list[0][imigr_ind]<self.lastBest:
-                #self.tab_jakosc_migracji_z_wysp[1][imigr_list[0][imigr_ind]]+=
-
-        #if self.island == 12:
-            #print("W",self.island,"[",self.step_num,"] po    ",self.tab_jakosc_migracji_z_wysp)
-
-  
+        # update migration stats
+        for imigr_ind in range(len(imigr_src_islands)):
+            self.tab_jakosc_migracji_z_wysp[0][imigr_src_islands[imigr_ind]] += 1
+            if imigr_fitnsesses[imigr_ind] < self.lastBest:
+                self.tab_jakosc_migracji_z_wysp[1][imigr_src_islands[imigr_ind]] += 1
 
         if len(new_individuals) > 0:
-            #print("=== len new indiv ", len(new_individuals))
             self.nowi = True
-            emigration_at_step_num["destinTimestamp"] = time.time()
-            emigration_at_step_num["destinMaxFitness"] = self.lastBest
-            self.tab_emigr[self.step_num] = emigration_at_step_num
+            filtered_emigration_info.destinTimestamp = time.time()
+            filtered_emigration_info.destinMaxFitness = self.lastBest
+            self.emigrations_history[self.step_num] = filtered_emigration_info
             self.solutions.extend(list(new_individuals))
 
     def wytnij(self, lancuchZnakow):
         return lancuchZnakow.replace("\n", "")
 
     def paramJson(self):
+        # fix race condition where multiple islands try to write param.json at the same time at the end of the run
+        if self.island != 0:
+            return
+
         self.uzup = self.uzupParamLog()
         jsn = result_saver.Result_Saver(
             self.path + "/param", self, self.want_run_end_communications
@@ -428,6 +450,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             "island": str(self.island),
             "type_of_connection": str(self.type_of_connection),
             "migrant_selection_type": self.migrant_selection_type,
+            "migrant_acceptation_strategy": self.migrant_acceptation_strategy,
             "migration interval": str(self.migration_interval),
             "number of emigrants": str(self.number_of_emigrants),
             "how_many_data_intervals": str(self.how_many_data_intervals),
@@ -587,7 +610,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             self,
             self.want_run_end_communications,
         )
-        jsn.saveJson(self.tab_emigr)
+        jsn.saveJson({step: asdict(info) for step, info in self.emigrations_history.items()})
 
     def createAllStepsDetailedPopulationJson(self):
         jsn = result_saver.Result_Saver(

@@ -1,7 +1,18 @@
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from jmetal.core.solution import Solution
+from dataclasses import dataclass
 
+@dataclass
+class MigrationInfo:
+    step: int
+    ev: int
+    iteration_numbers: list[int]
+    timestamps: list[float]
+    src_islands: list[int]
+    fitnesses: list[float]
+    destinTimestamp: float | None = None
+    destinMaxFitness: float | None = None
 
 class Migration(ABC):
     def __init__(self):
@@ -17,7 +28,7 @@ class Migration(ABC):
     @abstractmethod
     def receive_individuals(
             self, step_num: int, evaluations: int
-    ):
+    ) -> tuple[list[Solution], MigrationInfo]:
         pass
 
     def start_time_measure(self):

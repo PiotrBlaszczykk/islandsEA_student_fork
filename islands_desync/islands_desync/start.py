@@ -3,6 +3,8 @@ import sys
 from datetime import datetime
 import os
 os.environ["RAY_DEDUP_LOGS"] = "0"
+os.environ.setdefault("MPLBACKEND", "Agg")
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 import ray
 from islands.core.IslandRunner import IslandRunner
 from islands.selectAlgorithm import RandomSelect
