@@ -19,6 +19,7 @@ except ModuleNotFoundError:
 SCRIPT_DIR = Path(__file__).resolve().parent
 ISLANDS_ROOT = SCRIPT_DIR.parents[1]
 TOPOLOGY_DIR = ISLANDS_ROOT / "islands_desync" / "islands" / "topologies"
+RANDOM_TOPOLOGY_DIR = SCRIPT_DIR / "random_topologies" / "graphs"
 
 HARDCODED_TOPOLOGY_FILES = {
     "er1": "ER1Topology.py",
@@ -92,6 +93,23 @@ def load_hardcoded_topology(name):
     raise ValueError(f"No 'topol = {{...}}' assignment found in {source_path}")
 
 
+def load_json_topology(name, island_count):
+    source_path = RANDOM_TOPOLOGY_DIR / f"{name}_n{island_count}.json"
+    if not source_path.exists():
+        raise FileNotFoundError(source_path)
+
+    data = json.loads(source_path.read_text(encoding="utf-8"))
+    declared_size = int(data["size"])
+    if declared_size != island_count:
+        raise ValueError(
+            f"JSON topology {source_path} declares {declared_size} islands; got {island_count}"
+        )
+    return {
+        int(node): [int(neighbor) for neighbor in neighbors]
+        for node, neighbors in data["adjacency"].items()
+    }
+
+
 def build_adjacency(topology, island_count, torus_width=12):
     topology = topology.lower()
 
@@ -132,8 +150,11 @@ def build_adjacency(topology, island_count, torus_width=12):
             )
         return result
 
+    if topology.startswith("rt_"):
+        return load_json_topology(topology, island_count)
+
     raise ValueError(
-        f"Unsupported topology '{topology}'. Use ring, torus, complete, er1-er4, ws3, ws4."
+        f"Unsupported topology '{topology}'. Use ring, torus, complete, er1-er4, ws3, ws4, or rt_* JSON topologies."
     )
 
 
@@ -508,7 +529,7 @@ def _xml_escape(text):
 
 def main():
     parser = argparse.ArgumentParser(description="Plot island topology graphs.")
-    parser.add_argument("--topology", required=True, help="ring, torus, complete, er1-er4, ws3, ws4")
+    parser.add_argument("--topology", required=True, help="ring, torus, complete, er1-er4, ws3, ws4, or rt_* JSON topology")
     parser.add_argument("--islands", required=True, type=int, help="Number of islands")
     parser.add_argument("--result", help="Optional ___RESULT.txt path for fitness coloring")
     parser.add_argument("--output", required=True, help="Output PNG path")

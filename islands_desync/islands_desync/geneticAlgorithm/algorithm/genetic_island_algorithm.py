@@ -171,6 +171,9 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 self.termination_criterion.max_evaluations,
             )
 
+        topology_path_code = (
+            self.topology if self.topology.startswith("rt_") else self.topology[0]
+        )
         self.path = self.fileName.getpath(
             self.par_date,
             self.problem.get_name()[0:4],
@@ -178,7 +181,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             self.par_time,
             self.number_of_islands,
             self.migrant_selection_type[0],
-            self.topology[0],
+            topology_path_code,
             #"k",
             self.migration_interval,
             self.number_of_emigrants,

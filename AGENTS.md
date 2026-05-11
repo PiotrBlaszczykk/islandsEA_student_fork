@@ -291,6 +291,7 @@ Important files:
 - `submit_matrix.sh` - submits one SLURM job per CSV row.
 - `run_one_benchmark_hpc.sh` - generic one-run SLURM/Ray wrapper.
 - `plot_topology.py` and `summarize_experiments.py` - postprocessing/export helpers.
+- `random_topologies/` - separate deterministic random-topology experiment track.
 
 ### Current stable research matrix
 The current stable continuous matrix is:
@@ -344,6 +345,54 @@ Expected matrix count:
 ```
 
 `grep ',288,' ...` should print nothing.
+
+### Random-topology track
+Random topologies should be reproducible, not generated ad hoc inside each HPC
+run. The current implementation uses frozen JSON adjacency lists:
+
+```text
+students_tests/continous_benchmarks/random_topologies/graphs/<topology>_n<islands>.json
+```
+
+Runtime support:
+- topology names starting with `rt_` are loaded by `JsonTopology`;
+- `plot_topology.py` can draw the same `rt_*` JSON graphs;
+- for `rt_*` topologies, log path topology codes use the full topology name,
+  not only `topology[0]`, to avoid collisions between random variants.
+
+Regenerate the random-topology matrix and JSON graph files from outer
+`islands_desync/`:
+
+```bash
+python3 students_tests/continous_benchmarks/random_topologies/generate_random_topologies.py
+```
+
+Current random-topology matrix:
+
+```text
+3 objective functions x 3 random topologies x 4 migrant strategies x 3 island counts x 3 repeats = 324 jobs
+```
+
+Current variants:
+- `rt_er_d4_s1` - connected Erdos-Renyi, expected degree about 4
+- `rt_er_d8_s1` - connected Erdos-Renyi, expected degree about 8
+- `rt_ws_k4_p010_s1` - Watts-Strogatz, `k=4`, `beta=0.10`
+
+Submit it separately from the fixed-topology matrix, preferably on a separate
+cluster/workspace:
+
+```bash
+SUBMIT_SLEEP_SECONDS=2 bash students_tests/continous_benchmarks/submit_matrix.sh \
+  students_tests/continous_benchmarks/random_topologies/benchmark_matrix_random_topologies.csv
+```
+
+For a different SLURM environment, `submit_matrix.sh` supports:
+
+```bash
+SBATCH_ACCOUNT=<grant> SBATCH_PARTITION=<partition> SUBMIT_SLEEP_SECONDS=2 \
+  bash students_tests/continous_benchmarks/submit_matrix.sh \
+  students_tests/continous_benchmarks/random_topologies/benchmark_matrix_random_topologies.csv
+```
 
 ### Sanity checks during a full run
 Use the submitted job range for the current batch (for example `20078714-20079050`).

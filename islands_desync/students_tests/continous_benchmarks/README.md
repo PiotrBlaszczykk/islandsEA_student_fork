@@ -26,6 +26,8 @@ and island counts?
   and optional `resultsEveryStepW*.json` files.
 - `local_smoke_test.py` - local smoke test using already downloaded report artifacts
   when available, with a synthetic fallback.
+- `random_topologies/` - deterministic random-topology experiment track. It
+  generates frozen JSON adjacency lists plus a separate random-topology matrix.
 
 ## Ares workflow
 
@@ -47,6 +49,24 @@ Full continuous matrix:
 ```bash
 bash students_tests/continous_benchmarks/submit_matrix.sh \
   students_tests/continous_benchmarks/benchmark_matrix_full_continuous.csv
+```
+
+Random-topology matrix:
+
+```bash
+python3 students_tests/continous_benchmarks/random_topologies/generate_random_topologies.py
+
+SUBMIT_SLEEP_SECONDS=2 bash students_tests/continous_benchmarks/submit_matrix.sh \
+  students_tests/continous_benchmarks/random_topologies/benchmark_matrix_random_topologies.csv
+```
+
+For a different SLURM environment, such as another Cyfronet machine, keep the
+same matrix but override account/partition at submit time if needed:
+
+```bash
+SBATCH_ACCOUNT=<grant> SBATCH_PARTITION=<partition> SUBMIT_SLEEP_SECONDS=2 \
+  bash students_tests/continous_benchmarks/submit_matrix.sh \
+  students_tests/continous_benchmarks/random_topologies/benchmark_matrix_random_topologies.csv
 ```
 
 Submit from the repository root or from the outer `islands_desync/` directory.

@@ -62,8 +62,21 @@ tail -n +2 "$matrix_file" | while IFS=, read -r benchmark_name problem variables
     fi
   fi
 
+  sbatch_args=(
+    --job-name="$benchmark_name"
+    --nodes="$nodes"
+    --ntasks="$ntasks"
+    --time="$time_limit"
+  )
+  if [[ -n "${SBATCH_PARTITION:-}" ]]; then
+    sbatch_args+=(--partition="$SBATCH_PARTITION")
+  fi
+  if [[ -n "${SBATCH_ACCOUNT:-}" ]]; then
+    sbatch_args+=(--account="$SBATCH_ACCOUNT")
+  fi
+
   echo "Submitting: $benchmark_name"
-  sbatch --job-name="$benchmark_name" --nodes="$nodes" --ntasks="$ntasks" --time="$time_limit" --export=ALL,\
+  sbatch "${sbatch_args[@]}" --export=ALL,\
 BENCHMARK_NAME="$benchmark_name",\
 ISLANDS_PROBLEM="$problem",\
 ISLANDS_NUMBER_OF_VARIABLES="$variables",\

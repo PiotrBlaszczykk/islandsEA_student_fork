@@ -23,6 +23,7 @@ from islands_desync.islands.topologies.WS1Topology import WS1Topology
 from islands_desync.islands.topologies.WS2Topology import WS2Topology
 from islands_desync.islands.topologies.WS3Topology import WS3Topology
 from islands_desync.islands.topologies.WS4Topology import WS4Topology
+from islands_desync.islands.topologies.JsonTopology import JsonTopology
 
 
 
@@ -79,6 +80,15 @@ def main():
         computation_refs = IslandRunner(WS3Topology, RandomSelect, params).create()
     if topol=="ws4":
         computation_refs = IslandRunner(WS4Topology, RandomSelect, params).create()
+
+    if topol.startswith("rt_"):
+        computation_refs = IslandRunner(
+            lambda size, create_object_method: JsonTopology(
+                size, create_object_method, topol
+            ),
+            RandomSelect,
+            params,
+        ).create()
 
 
     #print("--- testpoint 1 ---")
