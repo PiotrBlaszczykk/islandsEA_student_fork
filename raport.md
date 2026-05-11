@@ -56,5 +56,45 @@ Przyjmujemy tylko migrantów, którzy nie są silnie opóźnieni, tutaj `10` kro
 
 <img src="raport_imgs/delays_too_old_k.png" alt="rejectTooOldK" width="600"/>
 
-# Eksperymenty `Sphere 200`:
+# Eksperymenty `Sphere 200`, topologia `ring`:
 Poniżej wyniki eksperymentów dla 150 wysp dla różnych strategii. Wykresy przedstawiają ewolucję najlepszego fitnessu w funkcji liczby kroków algorytmu.
+
+<table>
+    <tr>
+        <th> <center> Strategia `plain` </center> </th>
+        <th> <center> Strategia `newer` </center> </th>
+    </tr>
+    <tr>
+        <td><img src="raport_imgs/fitness_plain.png" alt="plain" width="400"/></td>
+        <td><img src="raport_imgs/fitness_newer.png" alt="newer" width="400"/></td>
+    </tr>
+    <tr>
+        <th> <center> Strategia `window:10` </center> </th>
+        <th> <center> Strategia `rejectTooOld:10` </center> </th>
+    </tr>
+    <tr>
+        <td><img src="raport_imgs/fitness_window.png" alt="window:10" width="400"/></td>
+        <td><img src="raport_imgs/fitness_too_old.png" alt="rejectTooOld:10" width="400"/></td>
+    </tr>
+    <tr>
+        <th> <center> Strategia `better` </center> </th>
+        <th> </th>
+    </tr>
+    <tr>
+        <td><img src="raport_imgs/fitness_better.png" alt="better" width="400"/></td>
+        <td></td>
+    </tr>
+</table>
+
+## Podsumowanie
+
+| Strategy       | Average Result | Best Result | Avg Delay | Min Delay | Max Delay | Median Delay |
+|----------------|----------------|-------------|-----------|-----------|-----------|--------------|
+| plain          | 3.78 | 0.60 | -0.21 | -555 | 541 | -2 |
+| newer          | 38.50 | 19.67 | 48.45 | 0 | 583 | 25 |
+| window:10      | 32.74 | 15.23 | -1.50 | -10 | 10 | -2 |
+| rejectTooOld:10 | 28.65 | 10.52 | 13.69 | -10 | 584 | -2 |
+| better         | 4.16 |  0.70 | 6.22 | -559 | 548 | -1 |
+
+# Wnioski:
+Przy topologii ring i 150 wyspach, ograniczanie przepływu migrantów znacząco zmniejsza różnorodność populacji, co prowadzi do gorszych wyników. Jako następne przetestujemy inne topologie.
