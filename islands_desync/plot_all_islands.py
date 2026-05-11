@@ -3,8 +3,26 @@ import glob
 import json
 import os
 import sys
+from pathlib import Path
 
 import matplotlib.pyplot as plt
+
+
+def read_run_params(run_dir):
+    param_path = Path(run_dir) / "param.json"
+    if not param_path.exists():
+        return {}
+    try:
+        return json.loads(param_path.read_text(encoding="utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def int_param(params, key, default=0):
+    try:
+        return int(params.get(key, default))
+    except (TypeError, ValueError):
+        return default
 
 
 def main() -> int:
@@ -24,6 +42,11 @@ def main() -> int:
         print(f"No resultsEveryStepW*.json files found in: {run_dir}")
         return 1
 
+    params = read_run_params(run_dir)
+    population_size = int_param(params, "population size")
+    offspring_population_size = int_param(params, "offspring population size", 1)
+    max_evaluations = int_param(params, "number of eval")
+
     all_y_values = []
 
     plt.figure(figsize=(10, 6))
@@ -31,8 +54,13 @@ def main() -> int:
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
 
-        xs = sorted(int(k) for k in data.keys())
-        ys = [data[str(x)] for x in xs]
+        steps = sorted(int(k) for k in data.keys())
+        xs = steps
+        if population_size and offspring_population_size:
+            xs = [population_size + step * offspring_population_size for step in steps]
+            if max_evaluations:
+                xs = [min(x, max_evaluations) for x in xs]
+        ys = [data[str(step)] for step in steps]
         all_y_values.extend(ys)
         name = (
             os.path.basename(file_path)
@@ -45,9 +73,9 @@ def main() -> int:
         plt.yscale("symlog", linthresh=1e-3)
     else:
         plt.yscale("log")
-    plt.xlabel("step")
+    plt.xlabel("evaluation")
     plt.ylabel("best fitness")
-    plt.title("Best fitness per step (all islands)")
+    plt.title("Best fitness per evaluation (all islands)")
     plt.legend(fontsize=7, ncol=2)
     plt.tight_layout()
 

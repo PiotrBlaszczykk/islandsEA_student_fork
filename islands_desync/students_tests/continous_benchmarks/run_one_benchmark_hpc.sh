@@ -34,7 +34,12 @@ fi
 script_dir="${islands_root}/students_tests/continous_benchmarks"
 cd "$islands_root"
 
-module load python/3.10.4-gcccore-11.3.0
+python_module="${PYTHON_MODULE:-python/3.10.4-gcccore-11.3.0}"
+if [[ -n "$python_module" && "$python_module" != "none" ]]; then
+  module load "$python_module"
+else
+  echo "Skipping module load; using Python from PATH/venv."
+fi
 source "${VENV_PATH:-$HOME/venvs/islands-ray/bin/activate}"
 
 mkdir -p "/tmp/$USER/$SLURM_JOB_ID"
@@ -160,10 +165,14 @@ done
 if [[ -z "$run_dir" || ! -d "$run_dir" ]]; then
   echo "WARN: could not resolve run directory from $slurm_out"
 else
-  export_dir="${script_dir}/exports/${dda}/${tta}_${benchmark_name}"
+  export_base_dir="${EXPORT_BASE_DIR:-${script_dir}/exports}"
+  export_dir="${export_base_dir}/${dda}/${tta}_${benchmark_name}"
   mkdir -p "$export_dir"
 
   python3 -u plot_all_islands.py "$run_dir" "$export_dir/fitness_all_islands.png" || true
+  python3 -u "$script_dir/export_step_timeseries.py" \
+    "$run_dir" \
+    "$export_dir/fitness_timeseries.csv" || true
   cp "$run_dir/___RESULT.txt" "$export_dir/" 2>/dev/null || true
   cp "$run_dir/___WINNER.txt" "$export_dir/" 2>/dev/null || true
   cp "$run_dir/param.json" "$export_dir/" 2>/dev/null || true
