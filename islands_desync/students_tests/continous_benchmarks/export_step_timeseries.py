@@ -2,6 +2,7 @@
 import argparse
 import csv
 import glob
+import gzip
 import json
 import re
 from pathlib import Path
@@ -124,7 +125,8 @@ def write_csv(rows, output_csv):
             if key not in fieldnames:
                 fieldnames.append(key)
 
-    with output_path.open("w", newline="", encoding="utf-8") as f:
+    opener = gzip.open if output_path.suffix == ".gz" else open
+    with opener(output_path, "wt", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)

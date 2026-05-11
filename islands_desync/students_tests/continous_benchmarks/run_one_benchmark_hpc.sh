@@ -170,9 +170,14 @@ else
   mkdir -p "$export_dir"
 
   python3 -u plot_all_islands.py "$run_dir" "$export_dir/fitness_all_islands.png" || true
+  timeseries_csv="$export_dir/fitness_timeseries.csv"
+  if [[ "${COMPRESS_FITNESS_TIMESERIES:-0}" == "1" ]]; then
+    timeseries_csv="${timeseries_csv}.gz"
+  fi
+
   python3 -u "$script_dir/export_step_timeseries.py" \
     "$run_dir" \
-    "$export_dir/fitness_timeseries.csv" || true
+    "$timeseries_csv" || true
   cp "$run_dir/___RESULT.txt" "$export_dir/" 2>/dev/null || true
   cp "$run_dir/___WINNER.txt" "$export_dir/" 2>/dev/null || true
   cp "$run_dir/param.json" "$export_dir/" 2>/dev/null || true
@@ -190,6 +195,11 @@ else
 
   echo "RUN_DIR: $run_dir"
   echo "EXPORT_DIR: $export_dir"
+
+  if [[ "${CLEANUP_RUN_DIR_AFTER_EXPORT:-0}" == "1" ]]; then
+    echo "Removing raw run directory after export: $run_dir"
+    rm -rf "$run_dir"
+  fi
 fi
 
 keep_dashboard_seconds="${KEEP_DASHBOARD_SECONDS:-0}"
