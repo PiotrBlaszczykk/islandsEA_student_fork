@@ -337,11 +337,12 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
     def filter_new_individuals(
         self, 
-        new_individuals: list[Solution], 
-        imigr_src_islands: list[int], 
-        imigr_fitnsesses: list[float], 
-        imigr_iterations: list[int]
+        new_individuals: list[FloatIslandSolution],
+        emigration_at_step_num: MigrationInfo
     ):
+        imigr_fitnsesses = emigration_at_step_num.fitnesses
+        imigr_iterations = emigration_at_step_num.iteration_numbers
+
         strategy = self.migrant_acceptation_strategy
         param = None
         if ":" in strategy:
@@ -358,20 +359,20 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             for i in range(individuals_count):
                 if imigr_fitnsesses[i] < self.lastBest:
                     selected_imigrant_mask[i] = True
-        elif strategy == "newer": # akceptuj tylko imigrantów, którzy są "starszy" niż aktualna iteracja
+        elif strategy == "newer": # akceptuj tylko imigrantów, którzy są "nowsi" niż aktualna iteracja
             for i in range(individuals_count):
                 delay = imigr_iterations[i] - self.step_num
                 if delay >= 0:
                     selected_imigrant_mask[i] = True
         elif strategy == "rejectTooOld": # odrzucaj imigrantów, którzy są starsi niż K
-            if not param:
+            if param is None:
                 param = self.migration_interval * 2
             for i in range(individuals_count):
                 delay = imigr_iterations[i] - self.step_num
                 if delay >= -param:
                     selected_imigrant_mask[i] = True
         elif strategy == "window":
-            if not param:
+            if param is None:
                 param = self.migration_interval
             for i in range(individuals_count):
                 delay = imigr_iterations[i] - self.step_num
@@ -385,17 +386,33 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         #         if sas_islands_mask[imigr_src_islands[island_idx]]:
         #             selected_imigrant_mask[island_idx] = True
 
-        filtered_individuals = filter(lambda i: selected_imigrant_mask[i], range(individuals_count))
-        return [new_individuals[i] for i in filtered_individuals]
+        filtered_indices = [
+            i for i in range(individuals_count)
+            if selected_imigrant_mask[i]
+        ]
+        
+        filtered_emigration_info = MigrationInfo(
+            step=emigration_at_step_num.step,
+            ev=emigration_at_step_num.ev,
+            iteration_numbers=[emigration_at_step_num.iteration_numbers[i] for i in filtered_indices],
+            timestamps=[emigration_at_step_num.timestamps[i] for i in filtered_indices],
+            src_islands=[emigration_at_step_num.src_islands[i] for i in filtered_indices],
+            fitnesses=[emigration_at_step_num.fitnesses[i] for i in filtered_indices],
+        )
 
+        return [new_individuals[i] for i in filtered_indices], filtered_emigration_info
+    
     def add_new_individuals(self):
         new_individuals, emigration_at_step_num = self.migration.receive_individuals(
             self.step_num, self.evaluations
         )
 
-        imigr_src_islands = emigration_at_step_num.src_islands
-        imigr_fitnsesses = emigration_at_step_num.fitnesses
-        imigr_iterations = emigration_at_step_num.iteration_numbers
+        new_individuals, filtered_emigration_info = self.filter_new_individuals(
+            new_individuals, emigration_at_step_num
+        )
+
+        imigr_src_islands = filtered_emigration_info.src_islands
+        imigr_fitnsesses = filtered_emigration_info.fitnesses
 
         # update migration stats
         for imigr_ind in range(len(imigr_src_islands)):
@@ -403,15 +420,11 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             if imigr_fitnsesses[imigr_ind] < self.lastBest:
                 self.tab_jakosc_migracji_z_wysp[1][imigr_src_islands[imigr_ind]] += 1
 
-        new_individuals = self.filter_new_individuals(
-            new_individuals, imigr_src_islands, imigr_fitnsesses, imigr_iterations
-        )
-
         if len(new_individuals) > 0:
             self.nowi = True
-            emigration_at_step_num.destinTimestamp = time.time()
-            emigration_at_step_num.destinMaxFitness = self.lastBest
-            self.emigrations_history[self.step_num] = emigration_at_step_num
+            filtered_emigration_info.destinTimestamp = time.time()
+            filtered_emigration_info.destinMaxFitness = self.lastBest
+            self.emigrations_history[self.step_num] = filtered_emigration_info
             self.solutions.extend(list(new_individuals))
 
     def wytnij(self, lancuchZnakow):
@@ -437,6 +450,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             "island": str(self.island),
             "type_of_connection": str(self.type_of_connection),
             "migrant_selection_type": self.migrant_selection_type,
+            "migrant_acceptation_strategy": self.migrant_acceptation_strategy,
             "migration interval": str(self.migration_interval),
             "number of emigrants": str(self.number_of_emigrants),
             "how_many_data_intervals": str(self.how_many_data_intervals),
