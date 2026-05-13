@@ -146,6 +146,123 @@ class Labs(FloatProblem):
         return "Labs"
 
 
+class LabsBinary(BinaryProblem):
+    def __init__(self, number_of_bits: int = 60):
+        super(LabsBinary, self).__init__()
+        self.number_of_bits = number_of_bits
+        self.number_of_variables = 1
+        self.number_of_objectives = 1
+        self.number_of_constraints = 0
+        self.number_of_bits_per_variable = [number_of_bits]
+        self.obj_directions = [self.MINIMIZE]
+        self.obj_labels = ["LabB"]
+
+    def _autocorrelation(self, bits, distance):
+        result = 0
+        for i in range(len(bits) - distance):
+            left = 1 if bits[i] else -1
+            right = 1 if bits[i + distance] else -1
+            result += left * right
+        return result
+
+    def evaluate(self, solution: BinarySolution) -> BinarySolution:
+        bits = solution.variables[0]
+        energy = 0
+        for distance in range(1, len(bits)):
+            autocorrelation = self._autocorrelation(bits, distance)
+            energy += autocorrelation * autocorrelation
+        merit = len(bits) * len(bits) / (2 * energy) if energy else float("inf")
+        solution.objectives[0] = -merit
+        return solution
+
+    def create_solution(self) -> BinarySolution:
+        solution = BinarySolution(number_of_variables=1, number_of_objectives=1)
+        solution.variables[0] = [bool(random.getrandbits(1)) for _ in range(self.number_of_bits)]
+        return solution
+
+    def get_name(self) -> str:
+        return "LabB"
+
+
+class DeceptiveTrap5(BinaryProblem):
+    def __init__(self, number_of_bits: int = 60, block_size: int = 5):
+        super(DeceptiveTrap5, self).__init__()
+        if number_of_bits % block_size != 0:
+            raise ValueError("Trap5 bit count must be divisible by 5")
+        self.number_of_bits = number_of_bits
+        self.block_size = block_size
+        self.number_of_variables = 1
+        self.number_of_objectives = 1
+        self.number_of_constraints = 0
+        self.number_of_bits_per_variable = [number_of_bits]
+        self.obj_directions = [self.MINIMIZE]
+        self.obj_labels = ["Trp5"]
+
+    def evaluate(self, solution: BinarySolution) -> BinarySolution:
+        bits = solution.variables[0]
+        score = 0
+        for offset in range(0, len(bits), self.block_size):
+            ones = sum(1 for bit in bits[offset : offset + self.block_size] if bit)
+            if ones == self.block_size:
+                score += self.block_size
+            else:
+                score += self.block_size - 1 - ones
+        solution.objectives[0] = -score
+        return solution
+
+    def create_solution(self) -> BinarySolution:
+        solution = BinarySolution(number_of_variables=1, number_of_objectives=1)
+        solution.variables[0] = [bool(random.getrandbits(1)) for _ in range(self.number_of_bits)]
+        return solution
+
+    def get_name(self) -> str:
+        return "Trp5"
+
+
+class AdjacentNKLandscape(BinaryProblem):
+    def __init__(self, number_of_bits: int = 60, k: int = 4, seed: int = 20260511):
+        super(AdjacentNKLandscape, self).__init__()
+        self.number_of_bits = number_of_bits
+        self.k = k
+        self.seed = seed
+        self.number_of_variables = 1
+        self.number_of_objectives = 1
+        self.number_of_constraints = 0
+        self.number_of_bits_per_variable = [number_of_bits]
+        self.obj_directions = [self.MINIMIZE]
+        self.obj_labels = ["NK4B"]
+
+        rng = random.Random(seed)
+        table_width = 2 ** (k + 1)
+        self.tables = [
+            [rng.random() for _ in range(table_width)]
+            for _ in range(number_of_bits)
+        ]
+
+    def _pattern_index(self, bits, start):
+        index = 0
+        for shift in range(self.k + 1):
+            bit_index = (start + shift) % self.number_of_bits
+            index = (index << 1) | int(bool(bits[bit_index]))
+        return index
+
+    def evaluate(self, solution: BinarySolution) -> BinarySolution:
+        bits = solution.variables[0]
+        fitness = 0.0
+        for index in range(self.number_of_bits):
+            fitness += self.tables[index][self._pattern_index(bits, index)]
+        solution.objectives[0] = -(fitness / self.number_of_bits)
+        return solution
+
+    def create_solution(self) -> BinarySolution:
+        solution = BinarySolution(number_of_variables=1, number_of_objectives=1)
+        solution.variables[0] = [bool(random.getrandbits(1)) for _ in range(self.number_of_bits)]
+        return solution
+
+    def get_name(self) -> str:
+        return "NK4B"
+
+
 """class Labs(BinaryProblem):
 
     def __init__(self, number_of_bits: int = 256): #todo param: number_of_variables = sequence

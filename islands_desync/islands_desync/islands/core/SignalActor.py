@@ -3,7 +3,7 @@ import asyncio
 import ray
 
 
-@ray.remote(num_cpus=1)
+@ray.remote(num_cpus=0)
 class SignalActor:
     def __init__(self, required_number: int):
         self.required_number: int = required_number

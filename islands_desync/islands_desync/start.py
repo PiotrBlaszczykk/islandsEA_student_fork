@@ -25,13 +25,25 @@ from islands_desync.islands.topologies.WS1Topology import WS1Topology
 from islands_desync.islands.topologies.WS2Topology import WS2Topology
 from islands_desync.islands.topologies.WS3Topology import WS3Topology
 from islands_desync.islands.topologies.WS4Topology import WS4Topology
+from islands_desync.islands.topologies.JsonTopology import JsonTopology
 
+
+
+def ray_init_kwargs(temp_dir):
+    kwargs = {"_temp_dir": temp_dir}
+    ray_num_cpus = os.environ.get("ISLANDS_RAY_NUM_CPUS")
+    if ray_num_cpus:
+        parsed_num_cpus = int(ray_num_cpus)
+        if parsed_num_cpus <= 0:
+            raise ValueError("ISLANDS_RAY_NUM_CPUS must be positive")
+        kwargs["num_cpus"] = parsed_num_cpus
+    return kwargs
 
 
 def main():
     if sys.argv[2] != " ":
         #ray.init()
-        ray.init(_temp_dir=sys.argv[2])
+        ray.init(**ray_init_kwargs(sys.argv[2]))
 
     #topol = "ring"
     #topol = "torus"
@@ -81,6 +93,14 @@ def main():
         computation_refs = IslandRunner(WS3Topology, RandomSelect, params).create()
     if topol=="ws4":
         computation_refs = IslandRunner(WS4Topology, RandomSelect, params).create()
+    if topol.startswith("rt_"):
+        computation_refs = IslandRunner(
+            lambda size, create_object_method: JsonTopology(
+                size, create_object_method, topol
+            ),
+            RandomSelect,
+            params,
+        ).create()
 
 
     #print("--- testpoint 1 ---")

@@ -151,13 +151,16 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
         # SCIEZKA I NAZWA PLIKOW
         self.fileName = filename.Filename(self, self.want_run_end_communications)
+        self.problem_log_size = getattr(
+            self.problem, "number_of_bits", self.problem.number_of_variables
+        )
         if (
             self.problem.get_name()[0:4] == "Labs"
         ):  # <----       todo: LABS i problemy gdzie szukamy max
             self.Fname = self.fileName.getname(
                 par_date + "_" + par_time,
                 self.problem.get_name()[0:4],
-                self.problem.number_of_variables, # usun ()
+                self.problem_log_size, # usun ()
                 "",
                 self.island,
                 self.number_of_islands,
@@ -169,7 +172,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             self.Fname = self.fileName.getname(
                 par_date + "_" + par_time,
                 self.problem.get_name()[0:4],
-                self.problem.number_of_variables, #usun ()
+                self.problem_log_size, #usun ()
                 "",
                 self.island,
                 self.number_of_islands,
@@ -181,7 +184,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         self.path = self.fileName.getpath(
             self.par_date,
             self.problem.get_name()[0:4],
-            self.problem.number_of_variables, #usun ()
+            self.problem_log_size, #usun ()
             self.par_time,
             self.number_of_islands,
             self.migrant_selection_type[0],
@@ -198,7 +201,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
         #KATALOG NA REZULTATY
         if self.island == 0:
-            os.makedirs(self.path)
+            os.makedirs(self.path, exist_ok=True)
             if self.want_run_end_communications:
                 print(
                     "\n\n\n                          The new directory is created! by island: "
@@ -441,7 +444,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         )
         results = {
             "problem": self.problem.get_name(), #
-            "number of variables": str(self.problem.number_of_variables), #
+            "number of variables": str(self.problem_log_size), #
             "termination criterion": str(self.termination_criterion.__str__()),
             "number of eval": str(self.termination_criterion.max_evaluations),
             "population size": str(self.population_size),
@@ -524,7 +527,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 + " w"
                 + str(self.island)
                 + " dim__"
-                + str(self.problem.number_of_variables) #usun ()
+                + str(self.problem_log_size) #usun ()
                 + ".csv"
             )
         else:
@@ -536,7 +539,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 + " w"
                 + str(self.island)
                 + " dim_"
-                + str(self.problem.number_of_variables) # usun ()
+                + str(self.problem_log_size) # usun ()
                 + ".csv"
             )
 
@@ -545,7 +548,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         if self.want_tsne_to2 or self.want_tsne_to3:
             listOfFiles = fl.listFilesExtensionLike(
                 self.path + "/diversity-space/",
-                str(self.problem.number_of_variables) + ".csv", # brak () 
+                str(self.problem_log_size) + ".csv", # brak () 
 
             )
             tsneA = tsne.Tsne()
@@ -584,19 +587,28 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
     # DIVERSITY TAB SECTION -----------------------------------------------------------
     def savePopulationDiversitiesThreeOfKindForThisStepInTab(self):
+        def flat_variables(solution):
+            values = []
+            for value in solution.variables:
+                if isinstance(value, list):
+                    values.extend(int(item) if isinstance(item, bool) else item for item in value)
+                else:
+                    values.append(int(value) if isinstance(value, bool) else value)
+            return values
+
         setPopul = set()
         for i in range(len(self.solutions)):
-            solution = self.solutions[i].variables
+            solution = flat_variables(self.solutions[i])
             solutionWhole = ""
-            for i in range(self.solutions[0].number_of_variables):
-                solutionWhole += " " + str(solution[i])
+            for value in solution:
+                solutionWhole += " " + str(value)
             setPopul.add(solutionWhole)
         lsp = len(setPopul)
 
         # DIVERSITY LICZONE ZE STD ODCHYLENIA - Min i Sredni
         listaaa = []
         for i in range(self.solutions.__len__()):  # population_size
-            listaaa.append(self.solutions[i].variables)
+            listaaa.append(flat_variables(self.solutions[i]))
 
         listalTransposed = np.array(listaaa).transpose()
         a, b = distance.Distance.minISrOdchStd(listalTransposed)

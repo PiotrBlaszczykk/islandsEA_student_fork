@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Usage:
 #   ./sync_logs.sh
-#   REMOTE=plglkwinta@athena.cyfronet.pl REMOTE_REPO='~/islandsEA_student_fork' ./sync_logs.sh
+#   REMOTE=plgblaszczykk@login01.ares.cyfronet.pl REMOTE_REPO='~/inteligencja-obliczeniowa/islandsEA_student_fork' ./sync_logs.sh
 #
 # The SLURM job writes archives to:
 #   <repo_root>/log_archives/*.tar.gz
@@ -14,8 +14,8 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 
-remote="${REMOTE:-plglkwinta@athena.cyfronet.pl}"
-remote_repo="${REMOTE_REPO:-~/islandsEA_student_fork}"
+remote="${REMOTE:-plgblaszczykk@login01.ares.cyfronet.pl}"
+remote_repo="${REMOTE_REPO:-~/inteligencja-obliczeniowa/islandsEA_student_fork}"
 
 local_archive_dir="$repo_root/log_archives"
 local_logs_dir="$repo_root/islands_desync/logs"
