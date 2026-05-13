@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "intent": "Local scaled benchmark configs. Runs are grouped to mirror local_matrix_computation/results.",
+  "groups": [
+    {
+      "experiment_key": "continous_fixed_toplogies",
+      "experiment_name": "local_continuous_fixed_topologies_v2",
+      "problem_kind": "continuous",
+      "path": "runs/continous_fixed_toplogies/manifest.json",
+      "result_dir": "results/continous_fixed_toplogies",
+      "job_count": 324,
+      "batch_count": 27
+    },
+    {
+      "experiment_key": "continous_random_topologies",
+      "experiment_name": "local_continuous_random_topologies_v2",
+      "problem_kind": "continuous",
+      "path": "runs/continous_random_topologies/manifest.json",
+      "result_dir": "results/continous_random_topologies",
+      "job_count": 324,
+      "batch_count": 27
+    },
+    {
+      "experiment_key": "descrete_fixed_toplogies",
+      "experiment_name": "local_descrete_fixed_topologies_v2",
+      "problem_kind": "descrete",
+      "path": "runs/descrete_fixed_toplogies/manifest.json",
+      "result_dir": "results/descrete_fixed_toplogies",
+      "job_count": 324,
+      "batch_count": 27
+    },
+    {
+      "experiment_key": "descrete_random_topologies",
+      "experiment_name": "local_descrete_random_topologies_v2",
+      "problem_kind": "descrete",
+      "path": "runs/descrete_random_topologies/manifest.json",
+      "result_dir": "results/descrete_random_topologies",
+      "job_count": 324,
+      "batch_count": 27
+    }
+  ],
+  "random_topology_graph_dir": "runs/random_topologies/graphs",
+  "random_topology_graph_count": 9,
+  "total_job_count": 1296,
+  "total_batch_count": 108
+}

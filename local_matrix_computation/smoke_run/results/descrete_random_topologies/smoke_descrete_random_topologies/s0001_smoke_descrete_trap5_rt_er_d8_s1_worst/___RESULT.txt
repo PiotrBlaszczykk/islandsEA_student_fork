@@ -1,0 +1,24 @@
+-19.0
+3
+
+ -- -- -- worst MIGRANT SELECTION STRATEGY -- -- --
+ -- -- -- MIGRANT ACCEPTATION STRATEGY BEZ -- -- --
+ -- -- -- rt_er_d8_s1 TOPOLOGY -- -- -- 
+------------------------------------
+Average result:  -15.916666666666666
+------------------------------------
+Best result   : -19.0
+Winner island: 3 (this result was reached on : 1/12 islands) (number of results taken to avg: 12)
+
+0 -15.0
+1 -14.0
+2 -16.0
+3 -19.0
+4 -17.0
+5 -16.0
+6 -16.0
+7 -14.0
+8 -15.0
+9 -17.0
+10 -15.0
+11 -17.0

@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "experiment_name": "smoke_continous_random_topologies",
+  "experiment_key": "continous_random_topologies",
+  "description": "Tiny local smoke batch for the local Ray benchmark pipeline.",
+  "defaults": {
+    "variables": 12,
+    "evaluations": 96,
+    "population_size": 8,
+    "offspring_population_size": 4,
+    "migrants": 1,
+    "migration_interval": 12,
+    "accept_strategy": "BEZ",
+    "compress_timeseries": false,
+    "cleanup_run_dir": false
+  },
+  "execution": {
+    "max_parallel_jobs": 1,
+    "runner": "islands_desync/students_tests/continous_benchmarks/run_local_benchmark.py",
+    "recommended_command": "python local_matrix_computation/run_batch.py local_matrix_computation/smoke_run/runs/continous_random_topologies/smoke_batch.json"
+  },
+  "jobs": [
+    {
+      "job_index": 1,
+      "benchmark_name": "smoke_continuous_sphere_rt_er_d4_s1_random",
+      "problem": "sphere",
+      "problem_kind": "continuous",
+      "variables": 12,
+      "topology": "rt_er_d4_s1",
+      "islands": 12,
+      "ray_num_cpus": 12,
+      "migrant_strategy": "random",
+      "repeat": 1,
+      "date_tag": "smoke_continous_random_topologies",
+      "time_tag": "s0001",
+      "output_base": "local_matrix_computation/smoke_run/results/continous_random_topologies",
+      "random_topology_dir": "local_matrix_computation/smoke_run/runs/random_topologies/graphs"
+    },
+    {
+      "job_index": 2,
+      "benchmark_name": "smoke_continuous_rastrigin_rt_ws_k4_p010_s1_maxDistance",
+      "problem": "rastrigin",
+      "problem_kind": "continuous",
+      "variables": 12,
+      "topology": "rt_ws_k4_p010_s1",
+      "islands": 12,
+      "ray_num_cpus": 12,
+      "migrant_strategy": "maxDistance",
+      "repeat": 1,
+      "date_tag": "smoke_continous_random_topologies",
+      "time_tag": "s0002",
+      "output_base": "local_matrix_computation/smoke_run/results/continous_random_topologies",
+      "random_topology_dir": "local_matrix_computation/smoke_run/runs/random_topologies/graphs"
+    }
+  ]
+}

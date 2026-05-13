@@ -1,0 +1,9 @@
+{
+  "run_dir": "C:\\Users\\piotr\\UMISI\\bielaszek\\islandsEA_student_fork\\islands_desync\\logs\\smoke_descrete_random_topologies\\Trp520\\s0001 12wr-co12ilu1",
+  "export_dir": "C:\\Users\\piotr\\UMISI\\bielaszek\\islandsEA_student_fork\\local_matrix_computation\\smoke_run\\results\\descrete_random_topologies\\smoke_descrete_random_topologies\\s0001_smoke_descrete_trap5_rt_er_d8_s1_worst",
+  "benchmark_name": "smoke_descrete_trap5_rt_er_d8_s1_worst",
+  "topology": "rt_er_d8_s1",
+  "islands": 12,
+  "compress_timeseries": false,
+  "random_topology_dir": "C:\\Users\\piotr\\UMISI\\bielaszek\\islandsEA_student_fork\\local_matrix_computation\\smoke_run\\runs\\random_topologies\\graphs"
+}

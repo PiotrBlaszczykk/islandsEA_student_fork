@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "experiment_key": "descrete_fixed_toplogies",
+  "job_count": 2,
+  "batch_count": 1,
+  "result_dir": "local_matrix_computation/smoke_run/results/descrete_fixed_toplogies",
+  "batch": "local_matrix_computation/smoke_run/runs/descrete_fixed_toplogies/smoke_batch.json"
+}

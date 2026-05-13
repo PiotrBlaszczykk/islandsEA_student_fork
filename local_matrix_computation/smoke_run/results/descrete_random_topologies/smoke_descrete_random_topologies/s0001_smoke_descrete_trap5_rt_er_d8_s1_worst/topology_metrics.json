@@ -1,0 +1,153 @@
+{
+  "island_count": 12,
+  "edge_count_directed": 90,
+  "self_loops": 0,
+  "density_directed_no_self": 0.6818181818181818,
+  "min_out_degree": 4,
+  "max_out_degree": 9,
+  "avg_out_degree": 7.5,
+  "min_in_degree": 4,
+  "max_in_degree": 9,
+  "avg_in_degree": 7.5,
+  "weak_component_count": 1,
+  "weak_component_sizes": [
+    12
+  ],
+  "zero_in_degree_nodes": [],
+  "zero_out_degree_nodes": [],
+  "out_degree_by_node": {
+    "0": 6,
+    "1": 4,
+    "2": 8,
+    "3": 8,
+    "4": 8,
+    "5": 9,
+    "6": 8,
+    "7": 8,
+    "8": 6,
+    "9": 8,
+    "10": 8,
+    "11": 9
+  },
+  "in_degree_by_node": {
+    "0": 6,
+    "1": 4,
+    "2": 8,
+    "3": 8,
+    "4": 8,
+    "5": 9,
+    "6": 8,
+    "7": 8,
+    "8": 6,
+    "9": 8,
+    "10": 8,
+    "11": 9
+  },
+  "total_degree_by_node": {
+    "0": 12,
+    "1": 8,
+    "2": 16,
+    "3": 16,
+    "4": 16,
+    "5": 18,
+    "6": 16,
+    "7": 16,
+    "8": 12,
+    "9": 16,
+    "10": 16,
+    "11": 18
+  },
+  "best_nodes": [
+    [
+      3,
+      -19.0
+    ],
+    [
+      4,
+      -17.0
+    ],
+    [
+      9,
+      -17.0
+    ],
+    [
+      11,
+      -17.0
+    ],
+    [
+      2,
+      -16.0
+    ],
+    [
+      5,
+      -16.0
+    ],
+    [
+      6,
+      -16.0
+    ],
+    [
+      0,
+      -15.0
+    ],
+    [
+      8,
+      -15.0
+    ],
+    [
+      10,
+      -15.0
+    ]
+  ],
+  "worst_nodes": [
+    [
+      9,
+      -17.0
+    ],
+    [
+      11,
+      -17.0
+    ],
+    [
+      2,
+      -16.0
+    ],
+    [
+      5,
+      -16.0
+    ],
+    [
+      6,
+      -16.0
+    ],
+    [
+      0,
+      -15.0
+    ],
+    [
+      8,
+      -15.0
+    ],
+    [
+      10,
+      -15.0
+    ],
+    [
+      1,
+      -14.0
+    ],
+    [
+      7,
+      -14.0
+    ]
+  ],
+  "topology": "rt_er_d8_s1",
+  "result_meta": {
+    "migrant_selection_strategy": "worst",
+    "migrant_acceptation_strategy": "BEZ",
+    "topology": "rt_er_d8_s1",
+    "average_result": -15.916666666666666,
+    "best_result": -19.0,
+    "winner_island": 3
+  }
+}

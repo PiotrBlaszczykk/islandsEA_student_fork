@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "experiment_key": "continous_random_topologies",
+  "job_count": 2,
+  "batch_count": 1,
+  "result_dir": "local_matrix_computation/smoke_run/results/continous_random_topologies",
+  "batch": "local_matrix_computation/smoke_run/runs/continous_random_topologies/smoke_batch.json"
+}

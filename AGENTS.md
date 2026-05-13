@@ -135,9 +135,12 @@ Expected run directory naming:
 - the top-level `start.py` process also emits `logs/iterations_per_second*.json`
 
 Observed local resource caveat:
-- `Island`, `Computation`, and `SignalActor` each reserve `num_cpus=1`.
-- Practical local island count on a `16`-thread machine is therefore closer to `7` than to `16`.
+- `Computation` should reserve `num_cpus=1`.
+- `Island` and `SignalActor` are helper/orchestration actors and should reserve `num_cpus=0`.
+- If helper actors reserve `num_cpus=1`, practical local island count on a `16`-thread machine drops sharply because each island consumes more than one Ray CPU slot.
 - `torus` is not a good first local topology because `IslandRunner.py` hardcodes `12 x (island_count // 12)`.
+
+Do not casually change helper actors back to `num_cpus=1`. That makes local and medium-size Ray runs look resource-starved even when the real computation actor count is reasonable.
 
 Validated local output from the command above:
 - run directory: `logs/260505/Sphe200/120000 7rr-co5ilu5`
@@ -146,6 +149,252 @@ Validated local output from the command above:
 cd islandsEA/islands_desync
 python analyze_migration_delays.py "logs/260505/Sphe200/120000 7rr-co5ilu5"
 ```
+
+### Local benchmark artifact export
+For local experiments that should produce the same friendly artifact package as the smoke/full benchmark exports, use:
+
+```bash
+cd islandsEA/islands_desync
+python students_tests/continous_benchmarks/run_local_benchmark.py \
+  --benchmark-name local_sphere_ring_7_random_r1 \
+  --problem sphere \
+  --variables 30 \
+  --evaluations 1000 \
+  --islands 7 \
+  --topology ring \
+  --migrant-strategy random \
+  --accept-strategy plain \
+  --migrants 2 \
+  --migration-interval 20
+```
+
+The script runs `islands_desync/start.py`, resolves the created `logs/...` run directory, and exports a report folder under:
+
+```text
+students_benchmarks_results/continous/fixed_topologies/local_runs/<date>/<time>_<benchmark_name>/
+```
+
+Expected exported files:
+
+- `fitness_all_islands.png`
+- `fitness_timeseries.csv` or `fitness_timeseries.csv.gz`
+- `topology_with_fitness.png`
+- `topology_metrics.json`
+- `summary.csv`
+- `summary.json`
+- `param.json`
+- `___RESULT.txt`
+- `___WINNER.txt`
+- `export_manifest.json`
+
+For an existing raw `logs/...` run directory, skip rerunning the algorithm and export only artifacts with:
+
+```bash
+python students_tests/continous_benchmarks/export_run_artifacts.py \
+  "logs/<date>/<prob4><dim>/<time> <tag>" \
+  --benchmark-name some_name \
+  --topology ring \
+  --islands 7
+```
+
+This export layer was copied forward from the `smoke_tests` benchmark workflow. It is intentionally post-processing only; it should not change algorithm semantics.
+
+### Local matrix batches
+Local mini-batch configs live in:
+
+```text
+local_matrix_computation/runs/
+```
+
+Generate them from the repository root:
+
+```bash
+python local_matrix_computation/generate_local_matrix_configs.py
+```
+
+The generated local matrix mirrors `local_matrix_computation/results/`:
+
+```text
+runs/continous_fixed_toplogies   -> results/continous_fixed_toplogies
+runs/continous_random_topologies -> results/continous_random_topologies
+runs/descrete_fixed_toplogies    -> results/descrete_fixed_toplogies
+runs/descrete_random_topologies  -> results/descrete_random_topologies
+```
+
+Each group keeps the same experimental axes as the problematic 324-job matrix,
+but scales the run size down for a desktop:
+
+```text
+3 problems x 3 topologies x 3 island counts x 4 migrant strategies x 3 repeats = 324 runs
+```
+
+Continuous values:
+- problems: `sphere`, `rastrigin`, `ackley`
+- fixed topologies: `ring`, `torus`, `complete`
+- random topologies: `rt_er_d4_s1`, `rt_er_d8_s1`, `rt_ws_k4_p010_s1`
+- island counts: `12`, `24`, `36` (all divisible by 12 for torus compatibility)
+- migrant strategies: `random`, `best`, `worst`, `maxDistance`
+- repeats: `1`, `2`, `3`
+- defaults: `variables=30`, `evaluations=1000`, `population_size=16`,
+  `offspring_population_size=4`, `migrants=2`, `migration_interval=20`
+
+Discrete values:
+- problems: `labs_binary`, `trap5`, `nk_k4`
+- defaults: `variables=60` interpreted as bit count; other defaults match continuous.
+
+Random topology JSON files are deterministic and live in:
+
+```text
+local_matrix_computation/runs/random_topologies/graphs/
+```
+
+Each `batch_*.json` has 12 jobs: one problem/topology/island-count slice with
+all migrant strategies and repeats. Run one batch sequentially with:
+
+```bash
+python local_matrix_computation/run_batch.py local_matrix_computation/runs/continous_fixed_toplogies/batch_001_sphere_ring_12.json
+```
+
+Use `--dry-run` first to inspect commands. The batch runner intentionally runs
+sequentially by default; each job starts a local Ray runtime, so running several
+Ray jobs in parallel on one PC should be treated as an explicit stress test.
+
+Practical local runbook:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+.\.venv\Scripts\ray.exe stop --force
+
+python local_matrix_computation\run_batch.py `
+  local_matrix_computation\runs\continous_fixed_toplogies\batch_001_sphere_ring_12.json `
+  --dry-run
+```
+
+Recommended first production batch:
+
+```powershell
+$batch = "local_matrix_computation\runs\continous_fixed_toplogies\batch_001_sphere_ring_12.json"
+$log = "local_matrix_computation\runs\continous_fixed_toplogies\batch_001_sphere_ring_12_$(Get-Date -Format yyyyMMdd_HHmmss).log"
+
+Measure-Command {
+  python local_matrix_computation\run_batch.py $batch 2>&1 | Tee-Object -FilePath $log
+}
+```
+
+Operational semantics:
+
+- `run_batch.py` is the batch-level entrypoint; it launches jobs sequentially.
+- `--limit N` runs only the first `N` selected jobs.
+- `--only TEXT` runs jobs whose `benchmark_name` contains `TEXT`.
+- Without `--force`, jobs with an existing exported `summary.csv` are skipped;
+  use this for resuming interrupted batches.
+- With `--force`, existing exported summaries do not cause skips, and the inner
+  `run_local_benchmark.py` receives `--overwrite-existing`.
+- `run_local_benchmark.py` stops local Ray before and after each job unless
+  `--keep-ray-running` is passed.
+- After manual interrupts on Windows, run `.\.venv\Scripts\ray.exe stop --force`
+  before starting another batch.
+
+For multiple batch files, use the range runner instead of hand-launching a long
+PowerShell chain:
+
+```powershell
+python local_matrix_computation\run_batch_range.py continous_fixed_toplogies --range 2-4
+```
+
+Range runner behavior:
+
+- accepts a group name such as `continous_fixed_toplogies`, a repo-relative
+  batch directory, or an absolute batch directory;
+- selects `batch_*.json` files by numeric index;
+- supports `--range N-M`, `--start N --end M`, and `--limit-batches N`;
+- passes `--limit-jobs`, `--only`, `--force`, and `--dry-run` through to
+  `run_batch.py`;
+- stops on the first failed batch unless `--continue-on-failure` is used;
+- writes per-batch logs and a master `range_<timestamp>.log` under
+  `local_matrix_computation/batch_logs/<group>/` by default.
+
+Prefer no `--force` for overnight/resume-style runs. Add `--force` only when
+the user explicitly wants to overwrite prior summaries/log exports.
+
+Smoke validation:
+
+```powershell
+Measure-Command {
+  python local_matrix_computation\run_batch.py `
+    local_matrix_computation\smoke_run\runs\continous_fixed_toplogies\smoke_batch.json `
+    --force --limit 1
+}
+```
+
+Observed local reference on 2026-05-13: one continuous fixed smoke job took
+about `40` seconds. Production jobs are larger (`1000` evaluations instead of
+the smoke `96`), so a 12-job production batch can take substantially longer.
+
+Result locations:
+
+```text
+raw logs: islands_desync/logs/<date_tag>/<problem_code><dim>/<time_tag> <run_tag>
+exports:  local_matrix_computation/results/<group>/<date_tag>/<time_tag>_<benchmark_name>/
+```
+
+Expected successful export files:
+
+- `summary.csv`
+- `summary.json`
+- `fitness_all_islands.png`
+- `fitness_timeseries.csv`
+- `topology_with_fitness.png`
+- `topology_metrics.json`
+- `param.json`
+- `___RESULT.txt`
+- `___WINNER.txt`
+- `export_manifest.json`
+
+Do not rename the historical `continous_*`, `descrete_*`, or `*_toplogies`
+folder names unless also migrating all generated configs and result paths.
+Do not paste console lines beginning with `+ C:\...` back into PowerShell; they
+are printed child commands from the runner.
+
+For comparison-ready tables after batches finish, run:
+
+```powershell
+python local_matrix_computation\aggregate_results.py
+```
+
+It scans `local_matrix_computation/results/**/summary.csv` and writes:
+
+- `analysis/combined_runs.csv` - one row per finished run/repeat.
+- `analysis/comparison_groups.csv` - grouped means/std/min/max by problem,
+  topology, island count, migration strategy, and fixed parameters.
+- `analysis/strategy_ranking.csv` - migration-strategy ranking within the same
+  problem/topology/island-count setting.
+- `analysis/topology_ranking.csv` - topology ranking within the same
+  problem/migration/island-count setting.
+- `analysis/strategy_convergence_ranking.csv` - migration-strategy ranking by
+  `eval_to_90pct_improvement_mean`.
+- `analysis/topology_convergence_ranking.csv` - topology ranking by
+  `eval_to_90pct_improvement_mean`.
+
+Main benchmark interpretation:
+
+- final quality: prefer `best_final_mean`, with `best_final_std` and
+  `run_count`/`complete_three_repeats` as reliability checks;
+- convergence speed: prefer `eval_to_50pct_improvement_mean` and
+  `eval_to_90pct_improvement_mean`; lower means faster convergence;
+- budget checkpoints: use `best_at_25pct_budget_mean`,
+  `best_at_50pct_budget_mean`, `best_at_75pct_budget_mean`, and
+  `best_at_100pct_budget_mean` to compare curves at fixed evaluation budgets;
+- convergence curve aggregate: `mean_global_best_so_far_mean` is a lower-is-
+  better curve-average proxy.
+
+The export set is sufficient for outcome comparisons such as "which topology
+regularly performs better" or "which migration strategy performs better for a
+given function" because it preserves final quality, per-island convergence
+curves, repeat metadata, and topology metrics. For mechanistic debugging of
+why a migration strategy behaved that way, keep raw `islands_desync/logs/...`
+directories as well; they contain lower-level island JSON logs not all copied
+into the friendly export folder.
 
 ### Current active-path caveat
 `IslandRunner.py` currently appears to misassign topologies for islands `1..N-1`:
@@ -584,6 +833,224 @@ Required pattern:
 - With space-heavy paths, easiest method:
   1. on cluster: `cp "$RUN_DIR/fitness_all_islands.png" "$HOME/fitness_all_islands.png"`
   2. on laptop: `scp <user>@login01.ares.cyfronet.pl:~/fitness_all_islands.png .`
+
+### `sync_logs.sh` defaults
+`islands_desync/sync_logs.sh` is a convenience downloader/extractor for archived logs. Its default remote should point to the current Ares account/repo:
+
+```text
+REMOTE=plgblaszczykk@login01.ares.cyfronet.pl
+REMOTE_REPO=~/inteligencja-obliczeniowa/islandsEA_student_fork
+```
+
+Override these variables explicitly when syncing from another machine/account. Do not leave defaults pointing at a collaborator's account.
+
+---
+
+## Benchmark Matrix and Ares Operational Lessons
+
+This section captures later operational lessons from the continuous benchmark attempts on Ares. Treat it as practical guardrails for future batch design.
+
+### Continuous fixed-topology matrix shape
+
+The full continuous fixed-topology matrix used in the later benchmark attempt had:
+
+- problems: `sphere`, `rastrigin`, `ackley`
+- fixed topologies: `ring`, `torus`, `complete`
+- source migrant strategies: `random`, `best`, `worst`, `maxDistance`
+- island counts: `48`, `96`, `144`
+- repeats: `1`, `2`, `3`
+
+That gives:
+
+```text
+3 problems x 3 topologies x 4 strategies x 3 island counts x 3 repeats = 324 jobs
+```
+
+Per island-count bucket this is:
+
+```text
+48  -> 108 jobs
+96  -> 108 jobs
+144 -> 108 jobs
+```
+
+Do not confuse this `108` with an island count. It is the number of benchmark rows for one island-count bucket.
+
+### Island-count constraints and dropped sizes
+
+Avoid blindly reintroducing `288` islands. In actual Ares probes, `288`-island Ray runs repeatedly died with `ActorDiedError` / `SYSTEM_ERROR` worker crashes shortly after startup.
+
+Also be careful with historical `150`-island scripts:
+
+- old hardcoded ER topologies use 150 nodes,
+- some WS hardcoded maps use 144 nodes,
+- current torus creation is `create(12, island_count // 12)`, so `150` produces a 12 x 12 = 144-node torus shape, not 150 nodes.
+
+For comparable fixed-topology sweeps, prefer `48`, `96`, and `144` unless a specific topology implementation has been revalidated for another size.
+
+### Full-wave Ares failure lesson
+
+Submitting the full 324-job Ray/SLURM matrix as one wave was too aggressive. Observed failure classes included:
+
+- SLURM `TIMEOUT`,
+- Ray `ActorDiedError`,
+- Ray worker `SYSTEM_ERROR`,
+- Ray/GCS startup instability,
+- dashboard/metrics startup failures,
+- `$HOME` quota pressure from `slurm-*.out`, `logs/`, and exports.
+
+This was an operational failure pattern, not evidence that every benchmark/problem/topology was semantically broken.
+
+Do not repeat the same full-wave pattern. Prefer:
+
+- one diagnostic probe,
+- then a tiny batch,
+- then one problem or topology slice,
+- only then a larger sweep.
+
+### Job accounting caution
+
+Do not rely on `sacct -j FIRST-LAST` to summarize a submitted range. It can give misleading or incomplete accounting. Build an explicit comma-separated job list instead:
+
+```bash
+JOB_IDS=$(seq -s, FIRST LAST)
+sacct -j "$JOB_IDS" --format=State -n -X | sort | uniq -c
+```
+
+If jobs were submitted through a log file, prefer extracting job IDs from that submit log instead of assuming dense numeric ranges.
+
+### Ares quota hygiene
+
+Ray/SLURM experiments can quickly create enough logs to block Git operations with quota errors such as:
+
+```text
+fatal: Unable to create .git/index.lock: Disk quota exceeded
+fatal: failed to write object
+```
+
+Before and after large runs, inspect disk usage for:
+
+- `slurm-*.out`
+- `logs/`
+- `students_tests/continous_benchmarks/exports*`
+- archive directories
+- pip/matplotlib caches
+
+Do not leave failed full-matrix runs sitting in the repo workspace. Clean or move old outputs before pulling, committing, or submitting a new run.
+
+### Export contract for detailed continuous runs
+
+Later continuous benchmark wrappers introduced a detailed per-island/per-step export:
+
+- `fitness_all_islands.png`
+- `fitness_timeseries.csv` or `fitness_timeseries.csv.gz`
+- `summary.csv`
+- `summary.json`
+- `topology_with_fitness.png`
+- `topology_metrics.json`
+- `param.json`
+- `___RESULT.txt`
+- `___WINNER.txt`
+
+The fitness plot should use evaluation count on the x-axis, not raw algorithm step. With `population_size=16`, `offspring_population_size=4`, and `number_of_eval=8000`, a run has about `(8000 - 16) / 4 = 1996` algorithm steps, but the plotted/evaluable budget is still 8000 evaluations.
+
+The detailed timeseries CSV should be long-format and include at least:
+
+- `island`
+- `step`
+- `evaluation`
+- `best_fitness`
+- `island_best_so_far`
+- `global_best_at_evaluation`
+- `global_best_so_far`
+
+For storage-heavy runs, prefer gzip:
+
+```bash
+COMPRESS_FITNESS_TIMESERIES=1
+```
+
+If the export is complete and raw logs are no longer needed, the wrapper may remove raw run directories after export:
+
+```bash
+CLEANUP_RUN_DIR_AFTER_EXPORT=1
+```
+
+Only enable cleanup when the exported artifacts contain everything needed for the analysis being performed.
+
+### Submit pacing
+
+Use pacing for matrix submitters:
+
+```bash
+SUBMIT_SLEEP_SECONDS=10
+```
+
+This is not a correctness guarantee, but it avoids hammering SLURM/Ray startup as hard as a no-delay loop.
+
+### Current conclusion on 144/288 scale
+
+In the observed Ares setup:
+
+- `288` islands should be treated as non-production until redesigned/revalidated.
+- `144` islands was unstable in large parallel Ray waves and also failed quickly in a full `run_v2` wave.
+- `48` and `96` are more realistic production candidates unless future code changes reduce Ray actor pressure or improve resource allocation.
+
+If `144` is needed, debug it with one job at a time first. Do not start by submitting all 108 `144` rows.
+
+### Athena note
+
+Athena was not a drop-in replacement for Ares in the observed setup:
+
+- the Ares Python module name did not exist there,
+- Ray version availability differed under Python 3.9,
+- even small random-topology probes reached Ray startup and then failed with worker `SYSTEM_ERROR` / `ActorDiedError`.
+
+Treat Athena as unvalidated for this workload unless the environment and Ray behavior are tested again from a single minimal probe.
+
+---
+
+## Random and Discrete Benchmark Extension Notes
+
+These notes capture later benchmark-design work. Some files may live only on specific branches; do not assume they exist on every branch without checking.
+
+### Deterministic random topologies
+
+Prefer generated-but-deterministic random topologies over runtime-random topology construction. The safer pattern is:
+
+1. generate graph adjacency once,
+2. write it to JSON,
+3. commit or archive the JSON with the benchmark matrix,
+4. have runtime only read that JSON.
+
+This preserves reproducibility and makes topology metrics inspectable after the run.
+
+Useful topology variants explored for this purpose:
+
+- `rt_er_d4_s1`: connected Erdos-Renyi-like graph with expected degree about 4,
+- `rt_er_d8_s1`: connected Erdos-Renyi-like graph with expected degree about 8,
+- `rt_ws_k4_p010_s1`: Watts-Strogatz-like graph with `k=4`, rewiring probability about `0.10`.
+
+When using generated topology JSONs, log or export the graph path/name together with the run output.
+
+### Discrete benchmark plan
+
+Discrete benchmark work should mirror the continuous workflow where possible:
+
+- same fixed topologies (`ring`, `torus`, `complete`),
+- same deterministic random topology families if available,
+- same island-count policy unless a binary benchmark has a specific reason to differ,
+- same source migrant strategies,
+- same repeat structure,
+- separate result roots for fixed and random topologies.
+
+Recommended binary/discrete problems:
+
+- `labs_binary`: Low Autocorrelation Binary Sequence; already used as a hard rugged benchmark candidate.
+- `trap5`: deceptive trap with block size 5; useful for testing whether migration spreads useful building blocks or misleading local structure.
+- `nk_k4`: NK landscape with deterministic instance/seed and `K=4`; useful for topology-sensitive epistasis experiments.
+
+Before adding or renaming these in code, check the 4-letter output-name collision rule.
 
 ---
 

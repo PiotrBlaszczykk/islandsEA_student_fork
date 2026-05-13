@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "intent": "Tiny local smoke suite for continuous/discrete and fixed/random topology paths.",
+  "groups": [
+    {
+      "experiment_key": "continous_fixed_toplogies",
+      "batch": "runs/continous_fixed_toplogies/smoke_batch.json",
+      "result_dir": "results/continous_fixed_toplogies",
+      "job_count": 2
+    },
+    {
+      "experiment_key": "continous_random_topologies",
+      "batch": "runs/continous_random_topologies/smoke_batch.json",
+      "result_dir": "results/continous_random_topologies",
+      "job_count": 2
+    },
+    {
+      "experiment_key": "descrete_fixed_toplogies",
+      "batch": "runs/descrete_fixed_toplogies/smoke_batch.json",
+      "result_dir": "results/descrete_fixed_toplogies",
+      "job_count": 2
+    },
+    {
+      "experiment_key": "descrete_random_topologies",
+      "batch": "runs/descrete_random_topologies/smoke_batch.json",
+      "result_dir": "results/descrete_random_topologies",
+      "job_count": 2
+    }
+  ],
+  "random_topology_graph_dir": "runs/random_topologies/graphs",
+  "random_topology_graph_count": 3,
+  "total_job_count": 8
+}

@@ -1,0 +1,294 @@
+{
+  "schema_version": 1,
+  "experiment_name": "local_continuous_fixed_topologies_v2",
+  "experiment_key": "continous_fixed_toplogies",
+  "problem_kind": "continuous",
+  "defaults": {
+    "evaluations": 1000,
+    "population_size": 16,
+    "offspring_population_size": 4,
+    "migrants": 2,
+    "migration_interval": 20,
+    "accept_strategy": "BEZ",
+    "compress_timeseries": false,
+    "cleanup_run_dir": false,
+    "variables": 30,
+    "output_base": "local_matrix_computation/results/continous_fixed_toplogies"
+  },
+  "shape": {
+    "problems": [
+      "sphere",
+      "rastrigin",
+      "ackley"
+    ],
+    "topologies": [
+      "ring",
+      "torus",
+      "complete"
+    ],
+    "island_counts": [
+      12,
+      24,
+      36
+    ],
+    "migrant_strategies": [
+      "random",
+      "best",
+      "worst",
+      "maxDistance"
+    ],
+    "repeats": [
+      1,
+      2,
+      3
+    ],
+    "job_count": 324
+  },
+  "batch_size": 12,
+  "batch_count": 27,
+  "batches": [
+    {
+      "batch_index": 1,
+      "batch_name": "batch_001_sphere_ring_12",
+      "path": "runs/continous_fixed_toplogies/batch_001_sphere_ring_12.json",
+      "job_count": 12,
+      "problem": "sphere",
+      "topology": "ring",
+      "islands": 12
+    },
+    {
+      "batch_index": 2,
+      "batch_name": "batch_002_sphere_ring_24",
+      "path": "runs/continous_fixed_toplogies/batch_002_sphere_ring_24.json",
+      "job_count": 12,
+      "problem": "sphere",
+      "topology": "ring",
+      "islands": 24
+    },
+    {
+      "batch_index": 3,
+      "batch_name": "batch_003_sphere_ring_36",
+      "path": "runs/continous_fixed_toplogies/batch_003_sphere_ring_36.json",
+      "job_count": 12,
+      "problem": "sphere",
+      "topology": "ring",
+      "islands": 36
+    },
+    {
+      "batch_index": 4,
+      "batch_name": "batch_004_sphere_torus_12",
+      "path": "runs/continous_fixed_toplogies/batch_004_sphere_torus_12.json",
+      "job_count": 12,
+      "problem": "sphere",
+      "topology": "torus",
+      "islands": 12
+    },
+    {
+      "batch_index": 5,
+      "batch_name": "batch_005_sphere_torus_24",
+      "path": "runs/continous_fixed_toplogies/batch_005_sphere_torus_24.json",
+      "job_count": 12,
+      "problem": "sphere",
+      "topology": "torus",
+      "islands": 24
+    },
+    {
+      "batch_index": 6,
+      "batch_name": "batch_006_sphere_torus_36",
+      "path": "runs/continous_fixed_toplogies/batch_006_sphere_torus_36.json",
+      "job_count": 12,
+      "problem": "sphere",
+      "topology": "torus",
+      "islands": 36
+    },
+    {
+      "batch_index": 7,
+      "batch_name": "batch_007_sphere_complete_12",
+      "path": "runs/continous_fixed_toplogies/batch_007_sphere_complete_12.json",
+      "job_count": 12,
+      "problem": "sphere",
+      "topology": "complete",
+      "islands": 12
+    },
+    {
+      "batch_index": 8,
+      "batch_name": "batch_008_sphere_complete_24",
+      "path": "runs/continous_fixed_toplogies/batch_008_sphere_complete_24.json",
+      "job_count": 12,
+      "problem": "sphere",
+      "topology": "complete",
+      "islands": 24
+    },
+    {
+      "batch_index": 9,
+      "batch_name": "batch_009_sphere_complete_36",
+      "path": "runs/continous_fixed_toplogies/batch_009_sphere_complete_36.json",
+      "job_count": 12,
+      "problem": "sphere",
+      "topology": "complete",
+      "islands": 36
+    },
+    {
+      "batch_index": 10,
+      "batch_name": "batch_010_rastrigin_ring_12",
+      "path": "runs/continous_fixed_toplogies/batch_010_rastrigin_ring_12.json",
+      "job_count": 12,
+      "problem": "rastrigin",
+      "topology": "ring",
+      "islands": 12
+    },
+    {
+      "batch_index": 11,
+      "batch_name": "batch_011_rastrigin_ring_24",
+      "path": "runs/continous_fixed_toplogies/batch_011_rastrigin_ring_24.json",
+      "job_count": 12,
+      "problem": "rastrigin",
+      "topology": "ring",
+      "islands": 24
+    },
+    {
+      "batch_index": 12,
+      "batch_name": "batch_012_rastrigin_ring_36",
+      "path": "runs/continous_fixed_toplogies/batch_012_rastrigin_ring_36.json",
+      "job_count": 12,
+      "problem": "rastrigin",
+      "topology": "ring",
+      "islands": 36
+    },
+    {
+      "batch_index": 13,
+      "batch_name": "batch_013_rastrigin_torus_12",
+      "path": "runs/continous_fixed_toplogies/batch_013_rastrigin_torus_12.json",
+      "job_count": 12,
+      "problem": "rastrigin",
+      "topology": "torus",
+      "islands": 12
+    },
+    {
+      "batch_index": 14,
+      "batch_name": "batch_014_rastrigin_torus_24",
+      "path": "runs/continous_fixed_toplogies/batch_014_rastrigin_torus_24.json",
+      "job_count": 12,
+      "problem": "rastrigin",
+      "topology": "torus",
+      "islands": 24
+    },
+    {
+      "batch_index": 15,
+      "batch_name": "batch_015_rastrigin_torus_36",
+      "path": "runs/continous_fixed_toplogies/batch_015_rastrigin_torus_36.json",
+      "job_count": 12,
+      "problem": "rastrigin",
+      "topology": "torus",
+      "islands": 36
+    },
+    {
+      "batch_index": 16,
+      "batch_name": "batch_016_rastrigin_complete_12",
+      "path": "runs/continous_fixed_toplogies/batch_016_rastrigin_complete_12.json",
+      "job_count": 12,
+      "problem": "rastrigin",
+      "topology": "complete",
+      "islands": 12
+    },
+    {
+      "batch_index": 17,
+      "batch_name": "batch_017_rastrigin_complete_24",
+      "path": "runs/continous_fixed_toplogies/batch_017_rastrigin_complete_24.json",
+      "job_count": 12,
+      "problem": "rastrigin",
+      "topology": "complete",
+      "islands": 24
+    },
+    {
+      "batch_index": 18,
+      "batch_name": "batch_018_rastrigin_complete_36",
+      "path": "runs/continous_fixed_toplogies/batch_018_rastrigin_complete_36.json",
+      "job_count": 12,
+      "problem": "rastrigin",
+      "topology": "complete",
+      "islands": 36
+    },
+    {
+      "batch_index": 19,
+      "batch_name": "batch_019_ackley_ring_12",
+      "path": "runs/continous_fixed_toplogies/batch_019_ackley_ring_12.json",
+      "job_count": 12,
+      "problem": "ackley",
+      "topology": "ring",
+      "islands": 12
+    },
+    {
+      "batch_index": 20,
+      "batch_name": "batch_020_ackley_ring_24",
+      "path": "runs/continous_fixed_toplogies/batch_020_ackley_ring_24.json",
+      "job_count": 12,
+      "problem": "ackley",
+      "topology": "ring",
+      "islands": 24
+    },
+    {
+      "batch_index": 21,
+      "batch_name": "batch_021_ackley_ring_36",
+      "path": "runs/continous_fixed_toplogies/batch_021_ackley_ring_36.json",
+      "job_count": 12,
+      "problem": "ackley",
+      "topology": "ring",
+      "islands": 36
+    },
+    {
+      "batch_index": 22,
+      "batch_name": "batch_022_ackley_torus_12",
+      "path": "runs/continous_fixed_toplogies/batch_022_ackley_torus_12.json",
+      "job_count": 12,
+      "problem": "ackley",
+      "topology": "torus",
+      "islands": 12
+    },
+    {
+      "batch_index": 23,
+      "batch_name": "batch_023_ackley_torus_24",
+      "path": "runs/continous_fixed_toplogies/batch_023_ackley_torus_24.json",
+      "job_count": 12,
+      "problem": "ackley",
+      "topology": "torus",
+      "islands": 24
+    },
+    {
+      "batch_index": 24,
+      "batch_name": "batch_024_ackley_torus_36",
+      "path": "runs/continous_fixed_toplogies/batch_024_ackley_torus_36.json",
+      "job_count": 12,
+      "problem": "ackley",
+      "topology": "torus",
+      "islands": 36
+    },
+    {
+      "batch_index": 25,
+      "batch_name": "batch_025_ackley_complete_12",
+      "path": "runs/continous_fixed_toplogies/batch_025_ackley_complete_12.json",
+      "job_count": 12,
+      "problem": "ackley",
+      "topology": "complete",
+      "islands": 12
+    },
+    {
+      "batch_index": 26,
+      "batch_name": "batch_026_ackley_complete_24",
+      "path": "runs/continous_fixed_toplogies/batch_026_ackley_complete_24.json",
+      "job_count": 12,
+      "problem": "ackley",
+      "topology": "complete",
+      "islands": 24
+    },
+    {
+      "batch_index": 27,
+      "batch_name": "batch_027_ackley_complete_36",
+      "path": "runs/continous_fixed_toplogies/batch_027_ackley_complete_36.json",
+      "job_count": 12,
+      "problem": "ackley",
+      "topology": "complete",
+      "islands": 36
+    }
+  ]
+}
