@@ -1054,6 +1054,22 @@ Before adding or renaming these in code, check the 4-letter output-name collisio
 
 ---
 
+## Running Discrete Benchmarks
+
+To run all discrete benchmarking experiments, use the following script:
+
+```bash
+python local_matrix_computation/run_discrete_benchmarks.py
+```
+
+This script will automatically execute all discrete benchmark configurations located in:
+- `local_matrix_computation/runs/descrete_fixed_toplogies/`
+- `local_matrix_computation/runs/descrete_random_topologies/`
+
+Ensure that the configurations are properly defined before running the script.
+
+---
+
 ## Before Making Changes
 1. Identify which execution path is affected (Ray/HPC vs legacy RabbitMQ/local).
 2. Trace real call graph from entrypoint before editing.
