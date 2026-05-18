@@ -402,14 +402,43 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
         return [new_individuals[i] for i in filtered_indices], filtered_emigration_info
     
+    def duplicate_individuals(self, individuals: list[FloatIslandSolution], target_count: int) -> list[FloatIslandSolution]:
+        # randomly duplicate individuals until we have target_count individuals
+        # chance by fitness - better fitness means more chance to be duplicated
+        if len(individuals) == 0:
+            return []
+        
+        fitnesses = [ind.objectives[0] for ind in individuals]
+        max_fitness = max(fitnesses)
+
+        # calculate duplication probabilities (better fitness means higher probability)
+        if max_fitness == 0:
+            probabilities = [1/len(individuals)] * len(individuals)
+        else:
+            probabilities = [1 - (fit / max_fitness) for fit in fitnesses]
+            total_prob = sum(probabilities)
+            probabilities = [p / total_prob for p in probabilities]
+
+        duplicated_individuals = copy.deepcopy(individuals)
+        while len(duplicated_individuals) < target_count:
+            selected = np.random.choice(individuals, p=probabilities)
+            duplicated_individuals.append(copy.deepcopy(selected))
+
+        return duplicated_individuals[:target_count]
+
     def add_new_individuals(self):
         new_individuals, emigration_at_step_num = self.migration.receive_individuals(
             self.step_num, self.evaluations
         )
 
+        initial_length = len(new_individuals)
+
         new_individuals, filtered_emigration_info = self.filter_new_individuals(
             new_individuals, emigration_at_step_num
         )
+
+        # TODO: hide this behind config option?
+        new_individuals = self.duplicate_individuals(new_individuals, initial_length)
 
         imigr_src_islands = filtered_emigration_info.src_islands
         imigr_fitnsesses = filtered_emigration_info.fitnesses
