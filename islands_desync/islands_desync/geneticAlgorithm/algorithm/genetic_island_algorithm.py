@@ -335,6 +335,21 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
     #     return [_select_island(i, percentyl) for i in range(island_count)]
 
+    def parse_acceptation_strategy(self):
+        strategy = self.migrant_acceptation_strategy
+        duplicate_after_filter = False
+        param = None
+
+        if strategy.startswith("dup_"):
+            duplicate_after_filter = True
+            strategy = strategy[len("dup_"):]
+
+        if ":" in strategy:
+            strategy, param_text = strategy.split(":", 1)
+            param = int(param_text)
+
+        return strategy, param, duplicate_after_filter
+
     def filter_new_individuals(
         self, 
         new_individuals: list[FloatIslandSolution],
@@ -343,11 +358,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         imigr_fitnsesses = emigration_at_step_num.fitnesses
         imigr_iterations = emigration_at_step_num.iteration_numbers
 
-        strategy = self.migrant_acceptation_strategy
-        param = None
-        if ":" in strategy:
-            strategy, param = strategy.split(":")
-            param = int(param)
+        strategy, param, _ = self.parse_acceptation_strategy()
 
         individuals_count = len(new_individuals)
 
@@ -378,6 +389,8 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 delay = imigr_iterations[i] - self.step_num
                 if abs(delay) <= param:
                     selected_imigrant_mask[i] = True
+        else:
+            raise ValueError(f"Unknown migrant acceptance strategy: {self.migrant_acceptation_strategy}")
 
 
         # if "SAS" in strategy:
@@ -403,28 +416,36 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         return [new_individuals[i] for i in filtered_indices], filtered_emigration_info
     
     def duplicate_individuals(self, individuals: list[FloatIslandSolution], target_count: int) -> list[FloatIslandSolution]:
-        # randomly duplicate individuals until we have target_count individuals
-        # chance by fitness - better fitness means more chance to be duplicated
+        # Randomly duplicate individuals until we have target_count individuals.
+        # The algorithm is a minimization algorithm, so lower fitness is better.
+
         if len(individuals) == 0:
             return []
-        
+
+        if len(individuals) >= target_count:
+            return copy.deepcopy(individuals[:target_count])
+
         fitnesses = [ind.objectives[0] for ind in individuals]
         max_fitness = max(fitnesses)
 
-        # calculate duplication probabilities (better fitness means higher probability)
         if max_fitness == 0:
-            probabilities = [1/len(individuals)] * len(individuals)
+            probabilities = [1 / len(individuals)] * len(individuals)
         else:
             probabilities = [1 - (fit / max_fitness) for fit in fitnesses]
             total_prob = sum(probabilities)
-            probabilities = [p / total_prob for p in probabilities]
+
+            if total_prob <= 0:
+                probabilities = [1 / len(individuals)] * len(individuals)
+            else:
+                probabilities = [p / total_prob for p in probabilities]
 
         duplicated_individuals = copy.deepcopy(individuals)
+
         while len(duplicated_individuals) < target_count:
-            selected = np.random.choice(individuals, p=probabilities)
+            selected = random.choices(individuals, weights=probabilities, k=1)[0]
             duplicated_individuals.append(copy.deepcopy(selected))
 
-        return duplicated_individuals[:target_count]
+        return duplicated_individuals
 
     def add_new_individuals(self):
         new_individuals, emigration_at_step_num = self.migration.receive_individuals(
@@ -438,7 +459,10 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         )
 
         # TODO: hide this behind config option?
-        new_individuals = self.duplicate_individuals(new_individuals, initial_length)
+        _, _, duplicate_after_filter = self.parse_acceptation_strategy()
+
+        if duplicate_after_filter:
+            new_individuals = self.duplicate_individuals(new_individuals, initial_length)
 
         imigr_src_islands = filtered_emigration_info.src_islands
         imigr_fitnsesses = filtered_emigration_info.fitnesses
