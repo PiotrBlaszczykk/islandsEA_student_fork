@@ -2,10 +2,10 @@
 # Parametric SLURM script for delay experiments across topologies.
 #
 #SBATCH --job-name=islands-delay
-#SBATCH --nodes=4
+#SBATCH --nodes=10
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=48
-#SBATCH --time=08:00:00
+#SBATCH --cpus-per-task=40
+#SBATCH --time=00:30:00
 #SBATCH --mem-per-cpu=500M
 #SBATCH -p plgrid
 #SBATCH -A plglscclass26-cpu
