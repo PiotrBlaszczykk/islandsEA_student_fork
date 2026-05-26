@@ -55,7 +55,7 @@ class IslandRunner:
             ray.get(
                 [
                     island.start.remote(island, topology[island_id], self.params, signal_actor)
-                    for island_id, island in enumerate(islands[1:])
+                    for island_id, island in enumerate(islands[1:], start=1)
                 ]
             )
         )

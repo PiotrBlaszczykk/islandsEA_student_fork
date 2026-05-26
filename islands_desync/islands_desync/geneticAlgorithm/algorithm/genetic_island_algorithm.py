@@ -335,21 +335,43 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
     #     return [_select_island(i, percentyl) for i in range(island_count)]
 
+    def parse_acceptation_strategy(self):
+        strategy = self.migrant_acceptation_strategy
+        duplicate_after_filter = False
+        param = None
+
+        if strategy.startswith("dup_"):
+            duplicate_after_filter = True
+            strategy = strategy[len("dup_"):]
+
+        if ":" in strategy:
+            strategy, param_text = strategy.split(":", 1)
+            param = int(param_text)
+
+        return strategy, param, duplicate_after_filter
+
     def filter_new_individuals(
         self, 
+        strategy: str,
+        param: int,
         new_individuals: list[FloatIslandSolution],
         emigration_at_step_num: MigrationInfo
-    ):
+    ) -> tuple[list[FloatIslandSolution], MigrationInfo]:
         imigr_fitnsesses = emigration_at_step_num.fitnesses
         imigr_iterations = emigration_at_step_num.iteration_numbers
 
-        strategy = self.migrant_acceptation_strategy
-        param = None
-        if ":" in strategy:
-            strategy, param = strategy.split(":")
-            param = int(param)
-
         individuals_count = len(new_individuals)
+
+        if individuals_count == 0:
+            empty_emigration_info = MigrationInfo(
+                step=emigration_at_step_num.step,
+                ev=emigration_at_step_num.ev,
+                iteration_numbers=[],
+                timestamps=[],
+                src_islands=[],
+                fitnesses=[],
+            )
+            return [], empty_emigration_info
 
         selected_imigrant_mask = [False] * individuals_count
 
@@ -363,6 +385,30 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             for i in range(individuals_count):
                 delay = imigr_iterations[i] - self.step_num
                 if delay >= 0:
+                    selected_imigrant_mask[i] = True
+        elif strategy == "older": # akceptuj tylko imigrantów, którzy są tak "starzy" jak lub "starsi" niż aktualna iteracja
+            for i in range(individuals_count):
+                delay = imigr_iterations[i] - self.step_num
+                if delay <= 0:
+                    selected_imigrant_mask[i] = True
+        elif strategy == "oldest": # akceptuj tylko imigrantów, którzy są "starsi" niż aktualna iteracja
+            for i in range(individuals_count):
+                delay = imigr_iterations[i] - self.step_num
+                if delay < 0:
+                    selected_imigrant_mask[i] = True
+        elif strategy == "stochastic":
+            epsilon = 0.01 if param is None else max(0.0, min(1.0, param / 100.0))
+            delays = [iteration - self.step_num for iteration in imigr_iterations]
+            min_delay = min(delays)
+            max_delay = max(delays)
+
+            for i, delay in enumerate(delays):
+                if max_delay == min_delay:
+                    normalized_probability = 1.0
+                else:
+                    normalized_probability = (delay - min_delay) / (max_delay - min_delay)
+                accept_probability = epsilon + normalized_probability * (1.0 - epsilon)
+                if random.random() < accept_probability:
                     selected_imigrant_mask[i] = True
         elif strategy == "rejectTooOld": # odrzucaj imigrantów, którzy są starsi niż K
             if param is None:
@@ -378,6 +424,8 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 delay = imigr_iterations[i] - self.step_num
                 if abs(delay) <= param:
                     selected_imigrant_mask[i] = True
+        else:
+            raise ValueError(f"Unknown migrant acceptance strategy: {self.migrant_acceptation_strategy}")
 
 
         # if "SAS" in strategy:
@@ -402,17 +450,68 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
         return [new_individuals[i] for i in filtered_indices], filtered_emigration_info
     
+    def duplicate_individuals(self, 
+                              individuals: list[FloatIslandSolution], 
+                              emigration_info: MigrationInfo,
+                              target_count: int) -> tuple[list[FloatIslandSolution], MigrationInfo]:
+        # Randomly duplicate individuals until we have target_count individuals.
+        # The algorithm is a minimization algorithm, so lower fitness is better.
+
+        if len(individuals) == 0:
+            return [], emigration_info
+
+        if len(individuals) >= target_count:
+            emigration_info.iteration_numbers = emigration_info.iteration_numbers[:target_count]
+            emigration_info.timestamps = emigration_info.timestamps[:target_count]
+            emigration_info.src_islands = emigration_info.src_islands[:target_count]
+            emigration_info.fitnesses = emigration_info.fitnesses[:target_count]
+            return copy.deepcopy(individuals[:target_count]), emigration_info
+
+        fitnesses = [ind.objectives[0] for ind in individuals]
+        max_fitness = max(fitnesses)
+
+        if max_fitness == 0:
+            probabilities = [1 / len(individuals)] * len(individuals)
+        else:
+            probabilities = [1 - (fit / max_fitness) for fit in fitnesses]
+            total_prob = sum(probabilities)
+
+            if total_prob <= 0:
+                probabilities = [1 / len(individuals)] * len(individuals)
+            else:
+                probabilities = [p / total_prob for p in probabilities]
+
+        duplicated_individuals = copy.deepcopy(individuals)
+
+        while len(duplicated_individuals) < target_count:
+            selected_index = random.choices(range(len(individuals)), weights=probabilities, k=1)[0]
+            duplicated_individuals.append(copy.deepcopy(individuals[selected_index]))
+            emigration_info.iteration_numbers.append(emigration_info.iteration_numbers[selected_index])
+            emigration_info.timestamps.append(emigration_info.timestamps[selected_index])
+            emigration_info.src_islands.append(emigration_info.src_islands[selected_index])
+            emigration_info.fitnesses.append(emigration_info.fitnesses[selected_index])
+
+        return duplicated_individuals, emigration_info
+
     def add_new_individuals(self):
         new_individuals, emigration_at_step_num = self.migration.receive_individuals(
             self.step_num, self.evaluations
         )
 
-        new_individuals, filtered_emigration_info = self.filter_new_individuals(
+        initial_length = len(new_individuals)
+
+        strategy, param, duplicate_after_filter = self.parse_acceptation_strategy()
+
+        new_individuals, emigration_info = self.filter_new_individuals(
+            strategy, param,
             new_individuals, emigration_at_step_num
         )
 
-        imigr_src_islands = filtered_emigration_info.src_islands
-        imigr_fitnsesses = filtered_emigration_info.fitnesses
+        if duplicate_after_filter:
+            new_individuals, emigration_info = self.duplicate_individuals(new_individuals, emigration_info, initial_length)
+
+        imigr_src_islands = emigration_info.src_islands
+        imigr_fitnsesses = emigration_info.fitnesses
 
         # update migration stats
         for imigr_ind in range(len(imigr_src_islands)):
@@ -422,9 +521,9 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
         if len(new_individuals) > 0:
             self.nowi = True
-            filtered_emigration_info.destinTimestamp = time.time()
-            filtered_emigration_info.destinMaxFitness = self.lastBest
-            self.emigrations_history[self.step_num] = filtered_emigration_info
+            emigration_info.destinTimestamp = time.time()
+            emigration_info.destinMaxFitness = self.lastBest
+            self.emigrations_history[self.step_num] = emigration_info
             self.solutions.extend(list(new_individuals))
 
     def wytnij(self, lancuchZnakow):
