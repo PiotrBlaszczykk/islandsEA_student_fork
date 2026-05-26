@@ -362,6 +362,17 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
         individuals_count = len(new_individuals)
 
+        if individuals_count == 0:
+            empty_emigration_info = MigrationInfo(
+                step=emigration_at_step_num.step,
+                ev=emigration_at_step_num.ev,
+                iteration_numbers=[],
+                timestamps=[],
+                src_islands=[],
+                fitnesses=[],
+            )
+            return [], empty_emigration_info
+
         selected_imigrant_mask = [False] * individuals_count
 
         if strategy == "plain":
@@ -375,10 +386,15 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 delay = imigr_iterations[i] - self.step_num
                 if delay >= 0:
                     selected_imigrant_mask[i] = True
-        elif strategy == "older": # akceptuj tylko imigrantów, którzy są "starsi" niż aktualna iteracja
+        elif strategy == "older": # akceptuj tylko imigrantów, którzy są tak "starzy" jak lub "starsi" niż aktualna iteracja
             for i in range(individuals_count):
                 delay = imigr_iterations[i] - self.step_num
                 if delay <= 0:
+                    selected_imigrant_mask[i] = True
+        elif strategy == "oldest": # akceptuj tylko imigrantów, którzy są "starsi" niż aktualna iteracja
+            for i in range(individuals_count):
+                delay = imigr_iterations[i] - self.step_num
+                if delay < 0:
                     selected_imigrant_mask[i] = True
         elif strategy == "stochastic":
             epsilon = 0.01 if param is None else max(0.0, min(1.0, param / 100.0))
