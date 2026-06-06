@@ -10,3 +10,15 @@ logs
 log_archives
 *.out
 .venv
+
+# Benchmark compute outputs
+islands_desync/logs/
+local_matrix_computation/results/
+local_matrix_computation/analysis/
+local_matrix_computation/batch_logs/
+more_local_matrix_computation/results/
+more_local_matrix_computation/analysis/
+more_local_matrix_computation/batch_logs/
+more_local_matrix_computation/smoke_run/results/
+more_local_matrix_computation/smoke_run/analysis/
+more_local_matrix_computation/smoke_run/batch_logs/

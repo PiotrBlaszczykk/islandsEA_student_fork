@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "intent": "More local 40-benchmark fixed-topology matrix. 30 continuous + 10 descrete, 4 migrant strategies, one repeat, 12 islands.",
+  "groups": [
+    {
+      "experiment_key": "continous_fixed_toplogies",
+      "experiment_name": "more_local_40bench_continuous_fixed_v1",
+      "problem_kind": "continuous",
+      "path": "runs/continous_fixed_toplogies/manifest.json",
+      "result_dir": "results/continous_fixed_toplogies",
+      "job_count": 360,
+      "batch_count": 90
+    },
+    {
+      "experiment_key": "descrete_fixed_toplogies",
+      "experiment_name": "more_local_40bench_descrete_fixed_v1",
+      "problem_kind": "descrete",
+      "path": "runs/descrete_fixed_toplogies/manifest.json",
+      "result_dir": "results/descrete_fixed_toplogies",
+      "job_count": 120,
+      "batch_count": 30
+    }
+  ],
+  "total_job_count": 480,
+  "total_batch_count": 120
+}

@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "experiment_name": "more_local_40bench_smoke_v1",
+  "experiment_key": "mixed_fixed_toplogies",
+  "problem_kind": "mixed",
+  "batch_index": 1,
+  "batch_name": "smoke_batch",
+  "description": "Tiny mixed smoke batch for the 40-benchmark suite: simple continuous, complex CEC composition, and binary discrete problem across fixed topologies.",
+  "defaults": {
+    "evaluations": 96,
+    "population_size": 16,
+    "offspring_population_size": 4,
+    "islands": 12,
+    "ray_num_cpus": 12,
+    "migrant_strategy": "random",
+    "accept_strategy": "plain",
+    "migrants": 2,
+    "migration_interval": 12,
+    "repeat": 1,
+    "compress_timeseries": false,
+    "cleanup_run_dir": false,
+    "output_base": "more_local_matrix_computation/smoke_run/results/mixed_fixed_toplogies"
+  },
+  "execution": {
+    "max_parallel_jobs": 1,
+    "runner": "islands_desync/students_tests/continous_benchmarks/run_local_benchmark.py",
+    "recommended_command": "python more_local_matrix_computation/run_batch.py more_local_matrix_computation/smoke_run/runs/mixed_fixed_toplogies/smoke_batch.json"
+  },
+  "jobs": [
+    {
+      "job_index": 1,
+      "benchmark_name": "smoke_continuous_c01_elliptic_ring_12_random_r1",
+      "problem": "c01_elliptic",
+      "problem_kind": "continuous",
+      "topology": "ring",
+      "variables": 10,
+      "date_tag": "more_local_40bench_smoke_v1",
+      "time_tag": "s0001"
+    },
+    {
+      "job_index": 2,
+      "benchmark_name": "smoke_continuous_c30_composition8_torus_12_random_r1",
+      "problem": "c30_composition8",
+      "problem_kind": "continuous",
+      "topology": "torus",
+      "variables": 10,
+      "date_tag": "more_local_40bench_smoke_v1",
+      "time_tag": "s0002"
+    },
+    {
+      "job_index": 3,
+      "benchmark_name": "smoke_descrete_d02_trap5_complete_12_random_r1",
+      "problem": "d02_trap5",
+      "problem_kind": "descrete",
+      "topology": "complete",
+      "variables": 20,
+      "date_tag": "more_local_40bench_smoke_v1",
+      "time_tag": "s0003"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "experiment_name": "more_local_40bench_continuous_fixed_v1",
+  "experiment_key": "continous_fixed_toplogies",
+  "problem_kind": "continuous",
+  "batch_index": 83,
+  "batch_name": "batch_083_c28_composition6_torus_12",
+  "description": "More local matrix batch: one benchmark/topology slice, 12 islands, all migrant strategies, one repeat.",
+  "defaults": {
+    "evaluations": 1000,
+    "population_size": 16,
+    "offspring_population_size": 4,
+    "migrants": 2,
+    "migration_interval": 20,
+    "accept_strategy": "plain",
+    "compress_timeseries": false,
+    "cleanup_run_dir": false,
+    "variables": 30,
+    "output_base": "more_local_matrix_computation/results/continous_fixed_toplogies"
+  },
+  "execution": {
+    "max_parallel_jobs": 1,
+    "runner": "islands_desync/students_tests/continous_benchmarks/run_local_benchmark.py",
+    "recommended_command": "python more_local_matrix_computation/run_batch.py more_local_matrix_computation/runs/continous_fixed_toplogies/batch_083_c28_composition6_torus_12.json"
+  },
+  "jobs": [
+    {
+      "job_index": 329,
+      "benchmark_name": "more_continuous_c28_composition6_torus_12_random_r1",
+      "problem": "c28_composition6",
+      "problem_kind": "continuous",
+      "topology": "torus",
+      "islands": 12,
+      "ray_num_cpus": 12,
+      "migrant_strategy": "random",
+      "repeat": 1,
+      "date_tag": "more_local_40bench_continuous_fixed_v1",
+      "time_tag": "j0329"
+    },
+    {
+      "job_index": 330,
+      "benchmark_name": "more_continuous_c28_composition6_torus_12_best_r1",
+      "problem": "c28_composition6",
+      "problem_kind": "continuous",
+      "topology": "torus",
+      "islands": 12,
+      "ray_num_cpus": 12,
+      "migrant_strategy": "best",
+      "repeat": 1,
+      "date_tag": "more_local_40bench_continuous_fixed_v1",
+      "time_tag": "j0330"
+    },
+    {
+      "job_index": 331,
+      "benchmark_name": "more_continuous_c28_composition6_torus_12_worst_r1",
+      "problem": "c28_composition6",
+      "problem_kind": "continuous",
+      "topology": "torus",
+      "islands": 12,
+      "ray_num_cpus": 12,
+      "migrant_strategy": "worst",
+      "repeat": 1,
+      "date_tag": "more_local_40bench_continuous_fixed_v1",
+      "time_tag": "j0331"
+    },
+    {
+      "job_index": 332,
+      "benchmark_name": "more_continuous_c28_composition6_torus_12_maxDistance_r1",
+      "problem": "c28_composition6",
+      "problem_kind": "continuous",
+      "topology": "torus",
+      "islands": 12,
+      "ray_num_cpus": 12,
+      "migrant_strategy": "maxDistance",
+      "repeat": 1,
+      "date_tag": "more_local_40bench_continuous_fixed_v1",
+      "time_tag": "j0332"
+    }
+  ]
+}

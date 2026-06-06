@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "intent": "Scheduled 40 benchmark suite: 30 continuous CEC2014 + 10 discrete binary problems.",
+  "continuous_count": 30,
+  "discrete_count": 10,
+  "benchmarks": [
+    {
+      "name": "c01_elliptic",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Rotated High Conditioned Elliptic Function",
+      "log_prefix": "c01_"
+    },
+    {
+      "name": "c02_bent_cigar",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Rotated Bent Cigar Function",
+      "log_prefix": "c02_"
+    },
+    {
+      "name": "c03_discus",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Rotated Discus Function",
+      "log_prefix": "c03_"
+    },
+    {
+      "name": "c04_rosenbrock",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted and Rotated Rosenbrock's Function",
+      "log_prefix": "c04_"
+    },
+    {
+      "name": "c05_ackley",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted and Rotated Ackley's Function",
+      "log_prefix": "c05_"
+    },
+    {
+      "name": "c06_weierstrass",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted and Rotated Weierstrass Function",
+      "log_prefix": "c06_"
+    },
+    {
+      "name": "c07_griewank",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted and Rotated Griewank's Function",
+      "log_prefix": "c07_"
+    },
+    {
+      "name": "c08_rastrigin",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted Rastrigin's Function",
+      "log_prefix": "c08_"
+    },
+    {
+      "name": "c09_rot_rastrigin",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted and Rotated Rastrigin's Function",
+      "log_prefix": "c09_"
+    },
+    {
+      "name": "c10_schwefel",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted Schwefel's Function",
+      "log_prefix": "c10_"
+    },
+    {
+      "name": "c11_rot_schwefel",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted and Rotated Schwefel's Function",
+      "log_prefix": "c11_"
+    },
+    {
+      "name": "c12_katsuura",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted and Rotated Katsuura Function",
+      "log_prefix": "c12_"
+    },
+    {
+      "name": "c13_happycat",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted and Rotated HappyCat Function",
+      "log_prefix": "c13_"
+    },
+    {
+      "name": "c14_hgbat",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted and Rotated HGBat Function",
+      "log_prefix": "c14_"
+    },
+    {
+      "name": "c15_grie_rosen",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted and Rotated Expanded Griewank plus Rosenbrock Function",
+      "log_prefix": "c15_"
+    },
+    {
+      "name": "c16_schaffer_f6",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Shifted and Rotated Expanded Scaffer F6 Function",
+      "log_prefix": "c16_"
+    },
+    {
+      "name": "c17_hybrid1",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Hybrid Function 1",
+      "log_prefix": "c17_"
+    },
+    {
+      "name": "c18_hybrid2",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Hybrid Function 2",
+      "log_prefix": "c18_"
+    },
+    {
+      "name": "c19_hybrid3",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Hybrid Function 3",
+      "log_prefix": "c19_"
+    },
+    {
+      "name": "c20_hybrid4",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Hybrid Function 4",
+      "log_prefix": "c20_"
+    },
+    {
+      "name": "c21_hybrid5",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Hybrid Function 5",
+      "log_prefix": "c21_"
+    },
+    {
+      "name": "c22_hybrid6",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Hybrid Function 6",
+      "log_prefix": "c22_"
+    },
+    {
+      "name": "c23_composition1",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Composition Function 1",
+      "log_prefix": "c23_"
+    },
+    {
+      "name": "c24_composition2",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Composition Function 2",
+      "log_prefix": "c24_"
+    },
+    {
+      "name": "c25_composition3",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Composition Function 3",
+      "log_prefix": "c25_"
+    },
+    {
+      "name": "c26_composition4",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Composition Function 4",
+      "log_prefix": "c26_"
+    },
+    {
+      "name": "c27_composition5",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Composition Function 5",
+      "log_prefix": "c27_"
+    },
+    {
+      "name": "c28_composition6",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Composition Function 6",
+      "log_prefix": "c28_"
+    },
+    {
+      "name": "c29_composition7",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Composition Function 7",
+      "log_prefix": "c29_"
+    },
+    {
+      "name": "c30_composition8",
+      "kind": "continuous",
+      "source": "Definitions_of_CEC2014_benchmark_suite_Part_A.md",
+      "description": "Composition Function 8",
+      "log_prefix": "c30_"
+    },
+    {
+      "name": "d01_labs_binary",
+      "kind": "discrete",
+      "source": "local binary benchmark suite",
+      "description": "Low autocorrelation binary sequence",
+      "log_prefix": "d01_"
+    },
+    {
+      "name": "d02_trap5",
+      "kind": "discrete",
+      "source": "local binary benchmark suite",
+      "description": "Deceptive trap with block size 5",
+      "log_prefix": "d02_"
+    },
+    {
+      "name": "d03_nk_k4",
+      "kind": "discrete",
+      "source": "local binary benchmark suite",
+      "description": "Adjacent NK landscape with K=4",
+      "log_prefix": "d03_"
+    },
+    {
+      "name": "d04_onemax",
+      "kind": "discrete",
+      "source": "local binary benchmark suite",
+      "description": "OneMax",
+      "log_prefix": "d04_"
+    },
+    {
+      "name": "d05_zeromax",
+      "kind": "discrete",
+      "source": "local binary benchmark suite",
+      "description": "ZeroMax",
+      "log_prefix": "d05_"
+    },
+    {
+      "name": "d06_leading_ones",
+      "kind": "discrete",
+      "source": "local binary benchmark suite",
+      "description": "Leading Ones",
+      "log_prefix": "d06_"
+    },
+    {
+      "name": "d07_alternating_bits",
+      "kind": "discrete",
+      "source": "local binary benchmark suite",
+      "description": "Alternating bit string",
+      "log_prefix": "d07_"
+    },
+    {
+      "name": "d08_trap4",
+      "kind": "discrete",
+      "source": "local binary benchmark suite",
+      "description": "Deceptive trap with block size 4",
+      "log_prefix": "d08_"
+    },
+    {
+      "name": "d09_royal_road4",
+      "kind": "discrete",
+      "source": "local binary benchmark suite",
+      "description": "Royal Road with block size 4",
+      "log_prefix": "d09_"
+    },
+    {
+      "name": "d10_maxcut_ring",
+      "kind": "discrete",
+      "source": "local binary benchmark suite",
+      "description": "Max-Cut on a ring graph",
+      "log_prefix": "d10_"
+    }
+  ]
+}

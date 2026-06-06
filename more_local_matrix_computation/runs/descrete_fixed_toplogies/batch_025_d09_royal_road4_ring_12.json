@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "experiment_name": "more_local_40bench_descrete_fixed_v1",
+  "experiment_key": "descrete_fixed_toplogies",
+  "problem_kind": "descrete",
+  "batch_index": 25,
+  "batch_name": "batch_025_d09_royal_road4_ring_12",
+  "description": "More local matrix batch: one benchmark/topology slice, 12 islands, all migrant strategies, one repeat.",
+  "defaults": {
+    "evaluations": 1000,
+    "population_size": 16,
+    "offspring_population_size": 4,
+    "migrants": 2,
+    "migration_interval": 20,
+    "accept_strategy": "plain",
+    "compress_timeseries": false,
+    "cleanup_run_dir": false,
+    "variables": 60,
+    "output_base": "more_local_matrix_computation/results/descrete_fixed_toplogies"
+  },
+  "execution": {
+    "max_parallel_jobs": 1,
+    "runner": "islands_desync/students_tests/continous_benchmarks/run_local_benchmark.py",
+    "recommended_command": "python more_local_matrix_computation/run_batch.py more_local_matrix_computation/runs/descrete_fixed_toplogies/batch_025_d09_royal_road4_ring_12.json"
+  },
+  "jobs": [
+    {
+      "job_index": 97,
+      "benchmark_name": "more_descrete_d09_royal_road4_ring_12_random_r1",
+      "problem": "d09_royal_road4",
+      "problem_kind": "descrete",
+      "topology": "ring",
+      "islands": 12,
+      "ray_num_cpus": 12,
+      "migrant_strategy": "random",
+      "repeat": 1,
+      "date_tag": "more_local_40bench_descrete_fixed_v1",
+      "time_tag": "j0097"
+    },
+    {
+      "job_index": 98,
+      "benchmark_name": "more_descrete_d09_royal_road4_ring_12_best_r1",
+      "problem": "d09_royal_road4",
+      "problem_kind": "descrete",
+      "topology": "ring",
+      "islands": 12,
+      "ray_num_cpus": 12,
+      "migrant_strategy": "best",
+      "repeat": 1,
+      "date_tag": "more_local_40bench_descrete_fixed_v1",
+      "time_tag": "j0098"
+    },
+    {
+      "job_index": 99,
+      "benchmark_name": "more_descrete_d09_royal_road4_ring_12_worst_r1",
+      "problem": "d09_royal_road4",
+      "problem_kind": "descrete",
+      "topology": "ring",
+      "islands": 12,
+      "ray_num_cpus": 12,
+      "migrant_strategy": "worst",
+      "repeat": 1,
+      "date_tag": "more_local_40bench_descrete_fixed_v1",
+      "time_tag": "j0099"
+    },
+    {
+      "job_index": 100,
+      "benchmark_name": "more_descrete_d09_royal_road4_ring_12_maxDistance_r1",
+      "problem": "d09_royal_road4",
+      "problem_kind": "descrete",
+      "topology": "ring",
+      "islands": 12,
+      "ray_num_cpus": 12,
+      "migrant_strategy": "maxDistance",
+      "repeat": 1,
+      "date_tag": "more_local_40bench_descrete_fixed_v1",
+      "time_tag": "j0100"
+    }
+  ]
+}

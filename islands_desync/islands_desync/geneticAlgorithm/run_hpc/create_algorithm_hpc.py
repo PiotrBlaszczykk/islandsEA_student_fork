@@ -21,7 +21,7 @@ from islands_desync.geneticAlgorithm.run_hpc.directory_preparation import Direct
 from islands_desync.geneticAlgorithm.run_hpc.run_algorithm_params import (
     RunAlgorithmParams,
 )
-from islands_desync.geneticAlgorithm.utils import datetimer, myDefCrossover
+from islands_desync.geneticAlgorithm.utils import benchmark_problems, datetimer, myDefCrossover
 from islands_desync.geneticAlgorithm.utils import myDefProblems
 from islands_desync.geneticAlgorithm.utils.myDefMutation import MyUniformMutation
 
@@ -32,6 +32,9 @@ def _env_or_config(configuration, env_name, config_name):
 
 def _create_problem(problem_name: str, number_of_variables: int):
     normalized = problem_name.strip().lower()
+
+    if benchmark_problems.is_registered_problem(normalized):
+        return benchmark_problems.create_problem(normalized, number_of_variables)
 
     if normalized in ("sphere", "sphe"):
         return Sphere(number_of_variables)
@@ -52,7 +55,9 @@ def _create_problem(problem_name: str, number_of_variables: int):
 
     raise ValueError(
         "Unknown ISLANDS_PROBLEM='{}'. Use one of: sphere, rastrigin, "
-        "ackley, schwefel, labs, labs_binary, trap5, nk_k4.".format(problem_name)
+        "ackley, schwefel, labs, labs_binary, trap5, nk_k4, c01_elliptic.."
+        "c30_composition8, d01_labs_binary..d10_maxcut_ring, or optional "
+        "g01_sphere..g16_six_hump_camel.".format(problem_name)
     )
 
 
