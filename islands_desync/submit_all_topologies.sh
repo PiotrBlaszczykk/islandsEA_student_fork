@@ -3,15 +3,15 @@
 #
 # What this submits (27 jobs total):
 #   144 islands: ring, torus, complete
-#   Strategy: plain, newer, dup_newer, stochastic, window:10
+#   Strategy: plain, newer, dup_newer, stochastic, window:10, oldest
 #   Repetitions: 3
 
 set -euo pipefail
 
 SLEEP_SECONDS=60
-SCRIPT="run_delay_experiment.sh"
+SCRIPT="${SCRIPT:-run_delay_experiment.sh}"
 
-STRATEGIES=("plain" "newer" "dup_newer" "stochastic" "window:10")
+STRATEGIES=("plain" "newer" "dup_newer" "stochastic" "window:10" "oldest")
 REPS=(1 2 3)
 
 TOPOLOGIES_144=("ring" "torus" "complete")
