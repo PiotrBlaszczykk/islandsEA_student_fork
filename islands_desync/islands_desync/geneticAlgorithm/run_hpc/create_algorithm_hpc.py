@@ -19,6 +19,7 @@ from islands_desync.geneticAlgorithm.run_hpc.run_algorithm_params import (
 )
 from islands_desync.geneticAlgorithm.utils import datetimer, myDefCrossover
 from islands_desync.geneticAlgorithm.utils.myDefMutation import MyUniformMutation
+from islands_desync.geneticAlgorithm.utils.myDefProblems import Ackley, Schwefel, Labs
 
 
 def create_algorithm_hpc(
@@ -46,10 +47,11 @@ def create_algorithm_hpc(
     except ValueError:
         print("Invalid configuration")
 
-    #
-    #problem = Rastrigin(NUMBER_OF_VARIABLES)
-    #
     problem = Sphere(NUMBER_OF_VARIABLES)
+    # problem = Ackley(NUMBER_OF_VARIABLES)
+    # problem = Schwefel(NUMBER_OF_VARIABLES)
+    # problem = Labs(NUMBER_OF_VARIABLES)
+    # problem = Rastrigin(NUMBER_OF_VARIABLES)
 
     # if n==0:
     #     print ("W run_algorithm "+str(sys.argv[1])+"/"+str(sys.argv[4])+" WYSPA,  seria: "+ str(sys.argv[5])+",  interwał: "+str(sys.argv[7])+", liczba migrantów: "+str(sys.argv[6])+" - "+str(sys.argv[2])+" "+str(sys.argv[3]))
