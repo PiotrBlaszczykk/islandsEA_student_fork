@@ -6,11 +6,12 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-os.environ.setdefault("MPLBACKEND", "Agg")
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
-import matplotlib
+from islands_desync.geneticAlgorithm.utils.matplotlib_setup import (
+    configure_headless_matplotlib,
+)
 
-matplotlib.use("Agg")
+configure_headless_matplotlib()
+
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt

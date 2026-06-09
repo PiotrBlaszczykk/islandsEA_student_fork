@@ -1,3 +1,9 @@
+from islands_desync.geneticAlgorithm.utils.matplotlib_setup import (
+    configure_headless_matplotlib,
+)
+
+configure_headless_matplotlib()
+
 import matplotlib.pyplot as plt
 
 

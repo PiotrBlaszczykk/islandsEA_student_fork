@@ -45,10 +45,13 @@ mkdir -p "$tmpdir"
 
 export TMPDIR="$tmpdir"
 export RAY_TMPDIR="$tmpdir"
-export MPLCONFIGDIR="${MPLCONFIGDIR:-/tmp/matplotlib-$USER-$SLURM_JOB_ID}"
+export ISLANDS_MPLCONFIGDIR_BASE="${ISLANDS_MPLCONFIGDIR_BASE:-$tmpdir/matplotlib}"
+export ISLANDS_SHARED_MPLCONFIGDIR="${ISLANDS_SHARED_MPLCONFIGDIR:-0}"
+export MPLCONFIGDIR="$ISLANDS_MPLCONFIGDIR_BASE"
+export MPLBACKEND=Agg
 export PYTHONPATH="$PWD:${PYTHONPATH:-}"
 
-mkdir -p "$MPLCONFIGDIR"
+mkdir -p "$ISLANDS_MPLCONFIGDIR_BASE"
 mkdir -p logs
 
 python --version
@@ -56,6 +59,9 @@ python -c "import ray; print('ray', ray.__version__)"
 
 nodes=$(scontrol show hostnames "$SLURM_JOB_NODELIST")
 nodes_array=($nodes)
+
+srun --nodes="$SLURM_JOB_NUM_NODES" --ntasks="$SLURM_JOB_NUM_NODES" \
+    mkdir -p "$tmpdir" "$ISLANDS_MPLCONFIGDIR_BASE"
 
 raw_cpus_per_node="${RAY_CPUS_PER_NODE:-${SLURM_JOB_CPUS_PER_NODE:-${SLURM_CPUS_ON_NODE:-${SLURM_NTASKS_PER_NODE:-1}}}}"
 ray_cpus_per_node="${raw_cpus_per_node%%(*}"

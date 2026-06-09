@@ -4,7 +4,11 @@ from datetime import datetime
 import os
 os.environ["RAY_DEDUP_LOGS"] = "0"
 os.environ.setdefault("MPLBACKEND", "Agg")
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+user = os.environ.get("USER", "unknown")
+job_id = os.environ.get("SLURM_JOB_ID")
+default_mpl_base = f"/tmp/{user}/{job_id}/matplotlib" if job_id else f"/tmp/{user}/matplotlib"
+os.environ.setdefault("ISLANDS_MPLCONFIGDIR_BASE", os.environ.get("MPLCONFIGDIR", default_mpl_base))
+os.environ.setdefault("MPLCONFIGDIR", os.environ["ISLANDS_MPLCONFIGDIR_BASE"])
 import ray
 from islands.core.IslandRunner import IslandRunner
 from islands.selectAlgorithm import RandomSelect
@@ -29,9 +33,18 @@ from islands_desync.islands.topologies.WS4Topology import WS4Topology
 
 
 def main():
+    ray_runtime_env = {
+        "env_vars": {
+            "MPLBACKEND": os.environ["MPLBACKEND"],
+            "MPLCONFIGDIR": os.environ["MPLCONFIGDIR"],
+            "ISLANDS_MPLCONFIGDIR_BASE": os.environ["ISLANDS_MPLCONFIGDIR_BASE"],
+            "ISLANDS_SHARED_MPLCONFIGDIR": os.environ.get("ISLANDS_SHARED_MPLCONFIGDIR", "0"),
+        }
+    }
+
     if sys.argv[2] != " ":
         #ray.init()
-        ray.init(_temp_dir=sys.argv[2])
+        ray.init(_temp_dir=sys.argv[2], runtime_env=ray_runtime_env)
 
     #topol = "ring"
     #topol = "torus"
