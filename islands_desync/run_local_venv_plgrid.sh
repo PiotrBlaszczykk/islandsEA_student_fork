@@ -117,23 +117,8 @@ python -u islands_desync/start.py \
     "$selection_strategy" \
     "$acceptance_strategy"
 
-problem_dir="logs/$dda/Sphe200"
-migrant_code="${selection_strategy:0:1}"
-topology_code="${topology:0:1}"
-run_dir="$problem_dir/$tta ${number_of_islands}${migrant_code}${topology_code}-co${migration_interval}ilu${number_of_migrants}"
-
-echo "Run directory: $run_dir"
-
-archive_dir="$repo_root/log_archives"
-mkdir -p "$archive_dir"
-
-archive_name="${dda}_${tta}_${number_of_islands}${migrant_code}${topology_code}-co${migration_interval}ilu${number_of_migrants}_${selection_strategy}_${acceptance_strategy}_job${SLURM_JOB_ID}.tar.gz"
-archive_path="$archive_dir/$archive_name"
-
-tar -czf "$archive_path" "$run_dir"
-
 ray stop --force || true
 
-echo "Logs archive: $archive_path"
+echo "Done. Raw logs are in: logs/$dda"
 
 exit 0
