@@ -184,4 +184,11 @@ def create_algorithm_hpc(
         population_generator=IslandSolutionGenerator(island_number=n)
     )
 
+    # The refined suite uses fixed, identifiable instances. Emit provenance
+    # once during construction, before the timed evolutionary/migration loop.
+    if n == 0 and hasattr(problem, "benchmark_metadata"):
+        manifest_path = os.path.join(genetic_island_algorithm.path, "benchmark_manifest.json")
+        with open(manifest_path, "w", encoding="utf-8") as manifest_file:
+            json.dump(problem.benchmark_metadata(), manifest_file, indent=2, allow_nan=False)
+
     return genetic_island_algorithm

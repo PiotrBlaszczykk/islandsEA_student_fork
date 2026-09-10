@@ -869,10 +869,16 @@ def benchmark_info() -> dict[str, BenchmarkInfo]:
 
 
 def is_registered_problem(problem_name: str) -> bool:
+    from . import benchmarks_refined
+    if benchmarks_refined.is_registered_problem(problem_name):
+        return True
     return normalize_problem_name(problem_name) in _problem_factories()
 
 
 def create_problem(problem_name: str, number_of_variables: int):
+    from . import benchmarks_refined
+    if benchmarks_refined.is_registered_problem(problem_name):
+        return benchmarks_refined.create_problem(problem_name, number_of_variables)
     normalized = normalize_problem_name(problem_name)
     factories = _problem_factories()
     if normalized not in factories:

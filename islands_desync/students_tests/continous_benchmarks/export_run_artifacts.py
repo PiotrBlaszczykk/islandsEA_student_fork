@@ -96,7 +96,7 @@ def export_artifacts(
         ]
     )
 
-    for file_name in ("___RESULT.txt", "___WINNER.txt", "param.json"):
+    for file_name in ("___RESULT.txt", "___WINNER.txt", "param.json", "benchmark_manifest.json"):
         source = run_path / file_name
         if source.exists():
             shutil.copy2(source, export_dir / file_name)

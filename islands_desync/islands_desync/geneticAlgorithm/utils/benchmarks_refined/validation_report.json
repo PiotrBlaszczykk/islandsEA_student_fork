@@ -1,0 +1,23 @@
+{
+  "success": true,
+  "tests_run": 13,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "core_only": false,
+  "python": "3.12.14",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "versions": {
+    "numpy": "1.26.4",
+    "jmetalpy": "1.5.5",
+    "ray": "2.31.0",
+    "scipy": "1.14.1",
+    "scikit-learn": "1.5.2"
+  },
+  "suite_version": "1.0.0",
+  "implementation_sha256": "89ffc1f4ddd337760f0645becebcfc7046fd4e78cb6fc4979208cff8efa536c9",
+  "cec_reference_cases": 1776,
+  "continuous_count": 30,
+  "discrete_count": 10,
+  "ares_slurm_validated": false
+}
