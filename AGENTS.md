@@ -54,6 +54,21 @@ Historical notes describe both RabbitMQ and Ray flows. Both code paths exist, bu
 
 ## Execution Paths
 
+### Named benchmark launcher (added September 12, 2026)
+
+- Operational instructions: `hpc_benchmarks/README.md`.
+- `hpc_benchmarks/run_ares.sh` starts Ray head/workers inside one SLURM allocation and invokes `run_benchmark.py`, which calls the existing `IslandRunner` directly. Legacy `start.py` remains available.
+- `hpc_benchmarks/validate_ares.sh` runs the 17-test benchmark/integration suite on a compute node, without a Ray cluster.
+- `run_hpc/benchmark_configuration.py` reads the existing JSON and optional `ISLANDS_CONFIG`, `ISLANDS_PROBLEM`, `ISLANDS_NUMBER_OF_VARIABLES`, `ISLANDS_NUMBER_OF_EVALUATIONS`, `ISLANDS_POPULATION_SIZE`, `ISLANDS_OFFSPRING_POPULATION_SIZE`. Validate a positive whole number of offspring batches; never silently round the budget.
+- Refined suite: 30 continuous CEC functions (official D=10/30/50/100, explicitly custom IslandsEA D=200) and the same 10 binary functions from help. Fixed data and golden references are committed with the package; no per-worker generation/downloads. Runtime mathematical modules are identical to help at port time.
+- Binary operators are BitFlip(1/bits) and SPX; continuous operators remain MyUniformMutation(1/D, 10) and SwitchCrossover. `active_operators` is authoritative; the old `param.json` text field `operators` remains for compatibility.
+- BinarySolution stores a nested bit vector. `utils/decision_variables.py` flattens it for distance, diversity and population logging; logged problem size is number of bits. `maxDistance` sums squared bit differences (Hamming), keeping existing selection and tie order. Continuous distance arithmetic is preserved.
+- `--seed` and `--repeat` give seed `seed + (repeat-1)*1000000 + island_id`; these seeds do not change benchmark instances or guarantee deterministic asynchronous ordering. Old launches without `ISLANDS_SEED` preserve their RNG policy.
+- Existing actor reservations require `2*N+1` logical Ray CPUs; the SLURM wrapper reserves one additional head CPU for the driver. BLAS/OMP threads are restricted to 1. Code, instance, configuration, Python and dependency versions are checked on every node before the timed run.
+- `benchmark_manifest.json` is written before the evolutionary loop; `experiment_manifest.json`, exact `topology.json`, a post-run topology plot and `iterations_per_second.json` accompany the original raw logs. Do not replace raw migrant logs with only summary statistics.
+- **Migration interval currently measures evaluation-counter differences**, not generations: `evaluations - last_migration_evolution >= migration_interval`. The port does not change this or signed delay / immigrant acceptance methods.
+- Evidence: `hpc_benchmarks/validation_local.json` and the package `validation_report.json`. Locally, 17 tests and two genuine two-island Ray runs (NK60/maxDistance and F29 200D/best, 128 evaluations each) passed. These ran on Windows/Python 3.12/Ray 2.31. Ares/Python 3.10/SLURM and multiple physical nodes still require target-environment validation. Do not infer a need to upgrade the existing Ares Ray version from the local test version.
+
 ## 1) Ray/HPC path (primary, based on current inspection)
 
 ### Entrypoint chain
@@ -81,10 +96,7 @@ If arg 2 is `" "`, current code does **not** call `ray.init()` at all; treat `" 
 
 ### Working-directory requirement
 Run from outer `islands_desync/` directory.  
-`create_algorithm_hpc.py` loads config from:
-- `./islands_desync/geneticAlgorithm/algorithm/configurations/algorithm_configuration.json`
-
-That relative path assumes CWD is outer `islands_desync/`.
+The benchmark launcher sets this working directory automatically. The builder now resolves `algorithm/configurations/algorithm_configuration.json` relative to its source through `run_hpc/benchmark_configuration.py`, or reads `ISLANDS_CONFIG`. Other legacy logging paths still expect the outer package working directory.
 
 ### Verified local run workflow
 The active Ray path can be run locally, but the environment needs to match the old dependency stack reasonably closely.
@@ -147,14 +159,8 @@ cd islandsEA/islands_desync
 python analyze_migration_delays.py "logs/260505/Sphe200/120000 7rr-co5ilu5"
 ```
 
-### Current active-path caveat
-`IslandRunner.py` currently appears to misassign topologies for islands `1..N-1`:
-- island `0` gets `topology[0]`,
-- island `1` also gets `topology[0]`,
-- subsequent islands are shifted by one,
-- the last topology entry is never used.
-
-Treat current topology behavior in live Ray runs as potentially affected by this bug until validated/fixed.
+### Current topology limits (verified September 12, 2026)
+`IslandRunner.py` already uses `enumerate(..., start=1)` for islands 1..N-1, so the earlier note about shifted topology indices is obsolete. The benchmark port leaves this code unchanged. Torus requires N divisible by 12; ER1..ER4 use fixed 150-node graphs; WS3/WS4 use fixed 144-node graphs. The new benchmark launcher validates the actual adjacency before starting Ray. Do not silently regenerate graphs to fit a requested N.
 
 ### SLURM script status
 - `run144tr-hpc.sh`, `run150rr-hpc.sh` call `start.py` but currently pass only 8 args.
@@ -226,7 +232,7 @@ Never assume historical example values are authoritative; inspect live config an
 ## Benchmark Selection and Naming Compatibility
 
 ### Where the active problem is selected
-- Ray/HPC path: `geneticAlgorithm/run_hpc/create_algorithm_hpc.py` (`problem = Sphere(...)` or `Rastrigin(...)`)
+- Ray/HPC path: `geneticAlgorithm/run_hpc/create_algorithm_hpc.py` via `benchmark_configuration.create_problem`; `ISLANDS_PROBLEM` / JSON `problem`, default `sphere`. Supports `sphere`, `rastrigin` and all 40 names from `benchmarks_refined --list`.
 - Legacy local path: `geneticAlgorithm/run_algorithm.py` (currently `Rastrigin(...)`, alternatives commented)
 - Custom problems: `geneticAlgorithm/utils/myDefProblems.py` (includes `Ackley`, `Schwefel`, `Labs` placeholders/variants)
 
@@ -259,7 +265,7 @@ Implemented in `genetic_island_algorithm.py` (`get_individuals_to_migrate`) usin
 - `maxDistance` (delegates to `geneticAlgorithm/utils/distance.py`)
 
 ### Destination-island acceptance
-Implemented in `add_new_individuals`; behavior changes when `migrant_acceptation_strategy` contains `"SAS"`.
+Implemented through `parse_acceptation_strategy`, `filter_new_individuals` and `add_new_individuals`: current names are `plain`, `better`, `newer`, `older`, `oldest`, `stochastic`, `rejectTooOld`, `window`, with existing `dup_` and `:integer` syntax. The historical SAS-only description is obsolete. The benchmark port preserves these methods.
 
 Migration logic is part of the research apparatus, not plumbing. Any semantic change affects comparability.
 

@@ -1,3 +1,5 @@
+from .decision_variables import decision_variables
+
 import math
 import random
 from typing import List
@@ -75,7 +77,8 @@ class Distance:
         popul = populationF[:]
 
         ile_osobnikow = len(popul)
-        ile_genow = len(popul[0].variables)
+        vectors = [decision_variables(solution) for solution in popul]
+        ile_genow = len(vectors[0])
         # print("ILE OS, GEN",ile_osobnikow,ile_genow)
 
         for osob1 in range(ile_osobnikow):
@@ -91,7 +94,7 @@ class Distance:
                         ile_genow
                     ):  # todo: inny sposób obliczenia distance
                         kwadratRoznicy = pow(
-                            popul[osob1].variables[gen] - popul[osob2].variables[gen], 2
+                            vectors[osob1][gen] - vectors[osob2][gen], 2
                         )
                         odleglosc += kwadratRoznicy
                         sumaOdleglosciOdPozostalych += kwadratRoznicy

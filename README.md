@@ -2,6 +2,10 @@
 
 Research codebase for asynchronous island-model evolutionary computation, focused on migration-delay behavior and topology effects.
 
+## Named benchmarks on Ares
+
+The active Ray builder supports the validated **30 continuous + 10 binary** benchmark suite, including the separately identified IslandsEA 200D extension. See [the HPC guide](hpc_benchmarks/README.md) for SLURM validation, small pilots, resource sizing and full experiment commands. [Local validation evidence](hpc_benchmarks/validation_local.json) includes two completed Ray runs; Ares/SLURM validation remains to be performed on the cluster.
+
 ## Local Setup
 
 The current actively maintained path is the Ray-based path in `islands_desync/islands_desync/start.py`.

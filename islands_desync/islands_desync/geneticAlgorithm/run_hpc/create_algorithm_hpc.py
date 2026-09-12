@@ -1,7 +1,11 @@
 import json
+import os
+import random
+import numpy as np
 from datetime import datetime, timedelta
 
-from jmetal.operator import BinaryTournamentSelection
+from jmetal.core.problem import BinaryProblem
+from jmetal.operator import BinaryTournamentSelection, BitFlipMutation, SPXCrossover
 from jmetal.problem.singleobjective.unconstrained import Rastrigin
 from jmetal.problem.singleobjective.unconstrained import Sphere
 
@@ -19,37 +23,29 @@ from islands_desync.geneticAlgorithm.run_hpc.run_algorithm_params import (
 )
 from islands_desync.geneticAlgorithm.utils import datetimer, myDefCrossover
 from islands_desync.geneticAlgorithm.utils.myDefMutation import MyUniformMutation
+from .benchmark_configuration import create_problem, load_configuration, operator_metadata
 
 
 def create_algorithm_hpc(
         n, migration, params: RunAlgorithmParams
 ) -> GeneticIslandAlgorithm:
-    conf_file = "./islands_desync/geneticAlgorithm/algorithm/configurations/algorithm_configuration.json"
-
-    with open(conf_file) as file:
-        configuration = json.loads(file.read())
-
-    try:
-        NUMBER_OF_VARIABLES = int(configuration["number_of_variables"])
-        NUMBER_OF_EVALUATIONS = int(configuration["number_of_evaluations"])
-        POPULATION_SIZE = int(configuration["population_size"])
-        OFFSPRING_POPULATION_SIZE = int(configuration["offspring_population_size"])
-
-        if NUMBER_OF_VARIABLES <= 0:
-            raise ValueError("Number of variables have to be positive")
-        if NUMBER_OF_EVALUATIONS <= 0:
-            raise ValueError("Number of evaluations have to be positive")
-        if POPULATION_SIZE <= 0:
-            raise ValueError("Population size has to be positive")
-        if OFFSPRING_POPULATION_SIZE <= 0:
-            raise ValueError("Offspring population size have to be positive")
-    except ValueError:
-        print("Invalid configuration")
-
-    #
-    #problem = Rastrigin(NUMBER_OF_VARIABLES)
-    #
-    problem = Sphere(NUMBER_OF_VARIABLES)
+    configuration = load_configuration()
+    NUMBER_OF_VARIABLES = configuration["number_of_variables"]
+    NUMBER_OF_EVALUATIONS = configuration["number_of_evaluations"]
+    POPULATION_SIZE = configuration["population_size"]
+    OFFSPRING_POPULATION_SIZE = configuration["offspring_population_size"]
+    problem = create_problem(configuration["problem"], NUMBER_OF_VARIABLES)
+    if isinstance(problem, BinaryProblem):
+        mutation = BitFlipMutation(1.0 / problem.number_of_bits)
+        crossover = SPXCrossover(1.0)
+    else:
+        mutation = MyUniformMutation(1.0 / problem.number_of_variables, 10.0)
+        crossover = myDefCrossover.SwitchCrossover()
+    # Opt-in seed: existing launches without ISLANDS_SEED keep their RNG policy.
+    if "ISLANDS_SEED" in os.environ:
+        seed = int(os.environ["ISLANDS_SEED"]) + n
+        random.seed(seed)
+        np.random.seed(seed % 2**32)
 
     # if n==0:
     #     print ("W run_algorithm "+str(sys.argv[1])+"/"+str(sys.argv[4])+" WYSPA,  seria: "+ str(sys.argv[5])+",  interwał: "+str(sys.argv[7])+", liczba migrantów: "+str(sys.argv[6])+" - "+str(sys.argv[2])+" "+str(sys.argv[3]))
@@ -63,12 +59,12 @@ def create_algorithm_hpc(
         # przy binary solution
         # mutation=BitFlipMutation(0.01),
         # crossover=SPXCrossover(1.0),
-        mutation=MyUniformMutation(1 / (problem.number_of_variables), 10.0), #number_of_variables()
+        mutation=mutation,
         # 0.5, 9.0),
         # 1.0 / (problem.number_of_variables), 0.2),
         # mutation=PolynomialMutation(
         #    1.0 / 2 * problem.number_of_variables, -20.0),
-        crossover=myDefCrossover.SwitchCrossover(),
+        crossover=crossover,
         # crossover=SBXCrossover(0.9, 2.0), #9,20
         selection=BinaryTournamentSelection(),
         # selection=RouletteWheelSelection(),
@@ -123,4 +119,10 @@ def create_algorithm_hpc(
         population_generator=IslandSolutionGenerator(island_number=n)
     )
 
+    genetic_island_algorithm.active_operators = operator_metadata(genetic_island_algorithm)
+    if n == 0 and hasattr(problem, "benchmark_metadata"):
+        metadata = problem.benchmark_metadata()
+        metadata["active_operators"] = genetic_island_algorithm.active_operators
+        with open(os.path.join(genetic_island_algorithm.path, "benchmark_manifest.json"), "w", encoding="utf-8") as file:
+            json.dump(metadata, file, indent=2, allow_nan=False)
     return genetic_island_algorithm

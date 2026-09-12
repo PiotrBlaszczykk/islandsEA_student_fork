@@ -22,6 +22,7 @@ from jmetal.util.termination_criterion import TerminationCriterion
 
 from ...islands.core.Migration import Migration, MigrationInfo
 from ..solution.float_island_solution import FloatIslandSolution
+from ..utils.decision_variables import decision_variables
 from ..utils import (
     boxPloter,
     controller,
@@ -151,13 +152,14 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
         # SCIEZKA I NAZWA PLIKOW
         self.fileName = filename.Filename(self, self.want_run_end_communications)
+        self.problem_log_size = getattr(self.problem, "number_of_bits", self.problem.number_of_variables)
         if (
             self.problem.get_name()[0:4] == "Labs"
         ):  # <----       todo: LABS i problemy gdzie szukamy max
             self.Fname = self.fileName.getname(
                 par_date + "_" + par_time,
                 self.problem.get_name()[0:4],
-                self.problem.number_of_variables, # usun ()
+                self.problem_log_size, # usun ()
                 "",
                 self.island,
                 self.number_of_islands,
@@ -169,7 +171,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             self.Fname = self.fileName.getname(
                 par_date + "_" + par_time,
                 self.problem.get_name()[0:4],
-                self.problem.number_of_variables, #usun ()
+                self.problem_log_size, #usun ()
                 "",
                 self.island,
                 self.number_of_islands,
@@ -181,7 +183,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         self.path = self.fileName.getpath(
             self.par_date,
             self.problem.get_name()[0:4],
-            self.problem.number_of_variables, #usun ()
+            self.problem_log_size, #usun ()
             self.par_time,
             self.number_of_islands,
             self.migrant_selection_type[0],
@@ -540,7 +542,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         )
         results = {
             "problem": self.problem.get_name(), #
-            "number of variables": str(self.problem.number_of_variables), #
+            "number of variables": str(self.problem_log_size), #
             "termination criterion": str(self.termination_criterion.__str__()),
             "number of eval": str(self.termination_criterion.max_evaluations),
             "population size": str(self.population_size),
@@ -569,6 +571,9 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             "last_step": str(self.last_step),
             "operators": self.wytnij(self.uzup),
         }
+
+        if hasattr(self, "active_operators"):
+            results["active_operators"] = self.active_operators
 
         # commented out because rabbitmq_delays was moved out of this class
         # if self.number_of_islands > 1:
@@ -609,8 +614,8 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         osobniki = []
         for solut in range(len(self.solutions)):
             lista = []
-            for vari in range(self.solutions[solut].number_of_variables):
-                lista.append(self.solutions[solut].variables[vari])
+            for value in decision_variables(self.solutions[solut]):
+                lista.append(value)
             osobniki.append(lista)
 
         dataframeBig = pd.DataFrame(osobniki)
@@ -623,7 +628,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 + " w"
                 + str(self.island)
                 + " dim__"
-                + str(self.problem.number_of_variables) #usun ()
+                + str(self.problem_log_size) #usun ()
                 + ".csv"
             )
         else:
@@ -635,7 +640,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 + " w"
                 + str(self.island)
                 + " dim_"
-                + str(self.problem.number_of_variables) # usun ()
+                + str(self.problem_log_size) # usun ()
                 + ".csv"
             )
 
@@ -644,7 +649,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         if self.want_tsne_to2 or self.want_tsne_to3:
             listOfFiles = fl.listFilesExtensionLike(
                 self.path + "/diversity-space/",
-                str(self.problem.number_of_variables) + ".csv", # brak () 
+                str(self.problem_log_size) + ".csv", # brak ()
 
             )
             tsneA = tsne.Tsne()
@@ -676,8 +681,8 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         osobniki = []
         for solut in range(len(self.solutions)):
             lista = []
-            for vari in range(self.solutions[solut].number_of_variables):
-                lista.append(self.solutions[solut].variables[vari])
+            for value in decision_variables(self.solutions[solut]):
+                lista.append(value)
             osobniki.append(lista)
         self.tab_detailed_population[self.step_num] = osobniki
 
@@ -685,9 +690,9 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
     def savePopulationDiversitiesThreeOfKindForThisStepInTab(self):
         setPopul = set()
         for i in range(len(self.solutions)):
-            solution = self.solutions[i].variables
+            solution = decision_variables(self.solutions[i])
             solutionWhole = ""
-            for i in range(self.solutions[0].number_of_variables):
+            for i in range(len(solution)):
                 solutionWhole += " " + str(solution[i])
             setPopul.add(solutionWhole)
         lsp = len(setPopul)
@@ -695,7 +700,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         # DIVERSITY LICZONE ZE STD ODCHYLENIA - Min i Sredni
         listaaa = []
         for i in range(self.solutions.__len__()):  # population_size
-            listaaa.append(self.solutions[i].variables)
+            listaaa.append(decision_variables(self.solutions[i]))
 
         listalTransposed = np.array(listaaa).transpose()
         a, b = distance.Distance.minISrOdchStd(listalTransposed)

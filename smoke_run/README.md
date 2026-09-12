@@ -56,6 +56,49 @@ SMOKE_TEST_OK
 
 Job nie uruchamia właściwego benchmarku i nie korzysta z węzła logowania do obliczeń.
 
+## 3. Zebranie diagnostyki Aresa
+
+Po aktualizacji repozytorium uruchom na login node:
+
+```bash
+cd ~/islandsEA_student_fork/smoke_run
+bash collect_ares_info.sh 21045868
+```
+
+Argumenty są opcjonalnymi identyfikatorami jobów, które mają zostać opisane przez `sacct`,
+`seff` i `scontrol`. Można przekazać kilka:
+
+```bash
+bash collect_ares_info.sh JOB_SMOKE JOB_PILOT_COMPLETE JOB_PILOT_TORUS
+```
+
+Raport zawiera informacje o partycjach, grantach i limitach SLURM, kolejce, fairshare,
+przydzielonych CPU, ostatnich jobach, systemach plików, quota, repozytorium oraz wersjach
+pakietów w venvie. Jest zapisywany poza repozytorium w:
+
+```text
+/net/people/plgrid/plgblaszczykk/artifacts/diagnostics/
+```
+
+Ostatnia linia polecenia podaje dokładną ścieżkę jako `DIAGNOSTICS_READY=...`.
+
+## 4. CPU-hours z pełnego pilota
+
+Po zakończeniu pełnowymiarowego pilota, a nie krótkiego smoke testu:
+
+```bash
+module load python/3.10.4-gcccore-11.3.0
+source /net/people/plgrid/plgblaszczykk/venvs/islands-ray/bin/activate
+
+python slurm_job_cost.py JOB_ID \
+  --planned-runs 1800 \
+  --overhead-percent 20 \
+  --json-output /net/people/plgrid/plgblaszczykk/artifacts/diagnostics/job_cost.json
+```
+
+Można podać kilka pilotów. Skrypt liczy koszt z `AllocCPUS × ElapsedRaw`, uśrednia wyłącznie
+joby zakończone stanem `COMPLETED` i pokazuje projekcję pełnej macierzy.
+
 ## Końce linii
 
 Reguła w `.gitattributes`:

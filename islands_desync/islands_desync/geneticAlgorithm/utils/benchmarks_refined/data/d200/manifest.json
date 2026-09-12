@@ -1,0 +1,371 @@
+{
+  "schema_version": 1,
+  "source": "IslandsEA generated extension; not official CEC2014 instance data",
+  "official_cec2014_instance": false,
+  "instance_id": "islandsea-cec2014-d200-v1",
+  "commit": "98488087d590c29aaded9978ccfe2a356d10dd63",
+  "archive_url": "https://raw.githubusercontent.com/P-N-Suganthan/CEC2014/98488087d590c29aaded9978ccfe2a356d10dd63/cec14-c-code.zip",
+  "source_relationship": "CEC2014 formulas only; the upstream archive does not supply these 200D instances",
+  "data_sha256": "86ac55435ea9b3cb55d9df5129055aa63911fcd96791efd1fda189f3c39e0f89",
+  "dimensions": [
+    200
+  ],
+  "function_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+  ],
+  "generation": {
+    "seed": 20260911,
+    "rng": "NumPy PCG64 with SeedSequence([seed, dimension, fid, component, stream])",
+    "streams": {
+      "0": "shift",
+      "1": "rotation factors",
+      "2": "rotation variable ordering",
+      "3": "hybrid shuffle"
+    },
+    "shift": "independent uniform [-80, 80)",
+    "rotation": "10 blocks of size 20; each U diag(geomspace(1,2,20)) V.T; U,V from sign-normalized Gaussian QR; identical random row/column permutation",
+    "block_size": 20,
+    "condition_number": 2.0,
+    "shuffle": "independent uniform permutation of 1,...,200",
+    "component_count": "1 for F1-F22; 10 for F23-F30, of which the CEC formula uses 3 or 5"
+  },
+  "generator_sha256": "86f875188061665573abb7b04af29a2ef76f7e42f209024b92fc47aefed8da5b",
+  "generation_environment": {
+    "python": "3.12.14",
+    "numpy": "2.3.5"
+  },
+  "reproducibility": "Use the bundled arrays/hash across hosts. Re-running QR on a different LAPACK may change the last bits; the seed does not guarantee byte-identical arrays on all platforms.",
+  "array_shapes": {
+    "shift_1": [
+      1,
+      200
+    ],
+    "matrix_1_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_2": [
+      1,
+      200
+    ],
+    "matrix_2_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_3": [
+      1,
+      200
+    ],
+    "matrix_3_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_4": [
+      1,
+      200
+    ],
+    "matrix_4_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_5": [
+      1,
+      200
+    ],
+    "matrix_5_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_6": [
+      1,
+      200
+    ],
+    "matrix_6_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_7": [
+      1,
+      200
+    ],
+    "matrix_7_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_8": [
+      1,
+      200
+    ],
+    "matrix_8_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_9": [
+      1,
+      200
+    ],
+    "matrix_9_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_10": [
+      1,
+      200
+    ],
+    "matrix_10_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_11": [
+      1,
+      200
+    ],
+    "matrix_11_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_12": [
+      1,
+      200
+    ],
+    "matrix_12_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_13": [
+      1,
+      200
+    ],
+    "matrix_13_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_14": [
+      1,
+      200
+    ],
+    "matrix_14_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_15": [
+      1,
+      200
+    ],
+    "matrix_15_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_16": [
+      1,
+      200
+    ],
+    "matrix_16_200": [
+      1,
+      200,
+      200
+    ],
+    "shift_17": [
+      1,
+      200
+    ],
+    "matrix_17_200": [
+      1,
+      200,
+      200
+    ],
+    "shuffle_17_200": [
+      1,
+      200
+    ],
+    "shift_18": [
+      1,
+      200
+    ],
+    "matrix_18_200": [
+      1,
+      200,
+      200
+    ],
+    "shuffle_18_200": [
+      1,
+      200
+    ],
+    "shift_19": [
+      1,
+      200
+    ],
+    "matrix_19_200": [
+      1,
+      200,
+      200
+    ],
+    "shuffle_19_200": [
+      1,
+      200
+    ],
+    "shift_20": [
+      1,
+      200
+    ],
+    "matrix_20_200": [
+      1,
+      200,
+      200
+    ],
+    "shuffle_20_200": [
+      1,
+      200
+    ],
+    "shift_21": [
+      1,
+      200
+    ],
+    "matrix_21_200": [
+      1,
+      200,
+      200
+    ],
+    "shuffle_21_200": [
+      1,
+      200
+    ],
+    "shift_22": [
+      1,
+      200
+    ],
+    "matrix_22_200": [
+      1,
+      200,
+      200
+    ],
+    "shuffle_22_200": [
+      1,
+      200
+    ],
+    "shift_23": [
+      10,
+      200
+    ],
+    "matrix_23_200": [
+      10,
+      200,
+      200
+    ],
+    "shift_24": [
+      10,
+      200
+    ],
+    "matrix_24_200": [
+      10,
+      200,
+      200
+    ],
+    "shift_25": [
+      10,
+      200
+    ],
+    "matrix_25_200": [
+      10,
+      200,
+      200
+    ],
+    "shift_26": [
+      10,
+      200
+    ],
+    "matrix_26_200": [
+      10,
+      200,
+      200
+    ],
+    "shift_27": [
+      10,
+      200
+    ],
+    "matrix_27_200": [
+      10,
+      200,
+      200
+    ],
+    "shift_28": [
+      10,
+      200
+    ],
+    "matrix_28_200": [
+      10,
+      200,
+      200
+    ],
+    "shift_29": [
+      10,
+      200
+    ],
+    "matrix_29_200": [
+      10,
+      200,
+      200
+    ],
+    "shuffle_29_200": [
+      10,
+      200
+    ],
+    "shift_30": [
+      10,
+      200
+    ],
+    "matrix_30_200": [
+      10,
+      200,
+      200
+    ],
+    "shuffle_30_200": [
+      10,
+      200
+    ]
+  }
+}

@@ -1,0 +1,1629 @@
+{
+  "schema_version": 1,
+  "source": "J. J. Liang, CEC14 Test Function Suite, December 20, 2013",
+  "repository": "https://github.com/P-N-Suganthan/CEC2014",
+  "commit": "98488087d590c29aaded9978ccfe2a356d10dd63",
+  "archive_url": "https://raw.githubusercontent.com/P-N-Suganthan/CEC2014/98488087d590c29aaded9978ccfe2a356d10dd63/cec14-c-code.zip",
+  "archive_sha256": "1a210560398ca7a50be6adf1e5e90602222519ef23b6e31aba8847e109761876",
+  "data_sha256": "36aa658fd78dc82889b53aadfee44c04b72c976f4a6d86e7e705634ed0d84a73",
+  "dimensions": [
+    10,
+    30,
+    50,
+    100
+  ],
+  "function_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+  ],
+  "conversion": "Original text -> float64 matrices/shifts and int64 one-based permutations; no resampling or renormalization.",
+  "array_shapes": {
+    "shift_1": [
+      1,
+      100
+    ],
+    "matrix_1_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_1_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_1_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_1_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_2": [
+      1,
+      100
+    ],
+    "matrix_2_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_2_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_2_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_2_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_3": [
+      1,
+      100
+    ],
+    "matrix_3_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_3_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_3_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_3_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_4": [
+      1,
+      100
+    ],
+    "matrix_4_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_4_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_4_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_4_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_5": [
+      1,
+      100
+    ],
+    "matrix_5_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_5_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_5_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_5_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_6": [
+      1,
+      100
+    ],
+    "matrix_6_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_6_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_6_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_6_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_7": [
+      1,
+      100
+    ],
+    "matrix_7_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_7_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_7_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_7_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_8": [
+      1,
+      100
+    ],
+    "matrix_8_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_8_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_8_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_8_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_9": [
+      1,
+      100
+    ],
+    "matrix_9_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_9_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_9_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_9_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_10": [
+      1,
+      100
+    ],
+    "matrix_10_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_10_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_10_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_10_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_11": [
+      1,
+      100
+    ],
+    "matrix_11_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_11_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_11_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_11_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_12": [
+      1,
+      100
+    ],
+    "matrix_12_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_12_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_12_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_12_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_13": [
+      1,
+      100
+    ],
+    "matrix_13_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_13_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_13_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_13_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_14": [
+      1,
+      100
+    ],
+    "matrix_14_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_14_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_14_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_14_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_15": [
+      1,
+      100
+    ],
+    "matrix_15_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_15_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_15_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_15_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_16": [
+      1,
+      100
+    ],
+    "matrix_16_10": [
+      1,
+      10,
+      10
+    ],
+    "matrix_16_30": [
+      1,
+      30,
+      30
+    ],
+    "matrix_16_50": [
+      1,
+      50,
+      50
+    ],
+    "matrix_16_100": [
+      1,
+      100,
+      100
+    ],
+    "shift_17": [
+      1,
+      100
+    ],
+    "matrix_17_10": [
+      1,
+      10,
+      10
+    ],
+    "shuffle_17_10": [
+      1,
+      10
+    ],
+    "matrix_17_30": [
+      1,
+      30,
+      30
+    ],
+    "shuffle_17_30": [
+      1,
+      30
+    ],
+    "matrix_17_50": [
+      1,
+      50,
+      50
+    ],
+    "shuffle_17_50": [
+      1,
+      50
+    ],
+    "matrix_17_100": [
+      1,
+      100,
+      100
+    ],
+    "shuffle_17_100": [
+      1,
+      100
+    ],
+    "shift_18": [
+      1,
+      100
+    ],
+    "matrix_18_10": [
+      1,
+      10,
+      10
+    ],
+    "shuffle_18_10": [
+      1,
+      10
+    ],
+    "matrix_18_30": [
+      1,
+      30,
+      30
+    ],
+    "shuffle_18_30": [
+      1,
+      30
+    ],
+    "matrix_18_50": [
+      1,
+      50,
+      50
+    ],
+    "shuffle_18_50": [
+      1,
+      50
+    ],
+    "matrix_18_100": [
+      1,
+      100,
+      100
+    ],
+    "shuffle_18_100": [
+      1,
+      100
+    ],
+    "shift_19": [
+      1,
+      100
+    ],
+    "matrix_19_10": [
+      1,
+      10,
+      10
+    ],
+    "shuffle_19_10": [
+      1,
+      10
+    ],
+    "matrix_19_30": [
+      1,
+      30,
+      30
+    ],
+    "shuffle_19_30": [
+      1,
+      30
+    ],
+    "matrix_19_50": [
+      1,
+      50,
+      50
+    ],
+    "shuffle_19_50": [
+      1,
+      50
+    ],
+    "matrix_19_100": [
+      1,
+      100,
+      100
+    ],
+    "shuffle_19_100": [
+      1,
+      100
+    ],
+    "shift_20": [
+      1,
+      100
+    ],
+    "matrix_20_10": [
+      1,
+      10,
+      10
+    ],
+    "shuffle_20_10": [
+      1,
+      10
+    ],
+    "matrix_20_30": [
+      1,
+      30,
+      30
+    ],
+    "shuffle_20_30": [
+      1,
+      30
+    ],
+    "matrix_20_50": [
+      1,
+      50,
+      50
+    ],
+    "shuffle_20_50": [
+      1,
+      50
+    ],
+    "matrix_20_100": [
+      1,
+      100,
+      100
+    ],
+    "shuffle_20_100": [
+      1,
+      100
+    ],
+    "shift_21": [
+      1,
+      100
+    ],
+    "matrix_21_10": [
+      1,
+      10,
+      10
+    ],
+    "shuffle_21_10": [
+      1,
+      10
+    ],
+    "matrix_21_30": [
+      1,
+      30,
+      30
+    ],
+    "shuffle_21_30": [
+      1,
+      30
+    ],
+    "matrix_21_50": [
+      1,
+      50,
+      50
+    ],
+    "shuffle_21_50": [
+      1,
+      50
+    ],
+    "matrix_21_100": [
+      1,
+      100,
+      100
+    ],
+    "shuffle_21_100": [
+      1,
+      100
+    ],
+    "shift_22": [
+      1,
+      100
+    ],
+    "matrix_22_10": [
+      1,
+      10,
+      10
+    ],
+    "shuffle_22_10": [
+      1,
+      10
+    ],
+    "matrix_22_30": [
+      1,
+      30,
+      30
+    ],
+    "shuffle_22_30": [
+      1,
+      30
+    ],
+    "matrix_22_50": [
+      1,
+      50,
+      50
+    ],
+    "shuffle_22_50": [
+      1,
+      50
+    ],
+    "matrix_22_100": [
+      1,
+      100,
+      100
+    ],
+    "shuffle_22_100": [
+      1,
+      100
+    ],
+    "shift_23": [
+      10,
+      100
+    ],
+    "matrix_23_10": [
+      10,
+      10,
+      10
+    ],
+    "matrix_23_30": [
+      10,
+      30,
+      30
+    ],
+    "matrix_23_50": [
+      10,
+      50,
+      50
+    ],
+    "matrix_23_100": [
+      10,
+      100,
+      100
+    ],
+    "shift_24": [
+      10,
+      100
+    ],
+    "matrix_24_10": [
+      10,
+      10,
+      10
+    ],
+    "matrix_24_30": [
+      10,
+      30,
+      30
+    ],
+    "matrix_24_50": [
+      10,
+      50,
+      50
+    ],
+    "matrix_24_100": [
+      10,
+      100,
+      100
+    ],
+    "shift_25": [
+      10,
+      100
+    ],
+    "matrix_25_10": [
+      10,
+      10,
+      10
+    ],
+    "matrix_25_30": [
+      10,
+      30,
+      30
+    ],
+    "matrix_25_50": [
+      10,
+      50,
+      50
+    ],
+    "matrix_25_100": [
+      10,
+      100,
+      100
+    ],
+    "shift_26": [
+      10,
+      100
+    ],
+    "matrix_26_10": [
+      10,
+      10,
+      10
+    ],
+    "matrix_26_30": [
+      10,
+      30,
+      30
+    ],
+    "matrix_26_50": [
+      10,
+      50,
+      50
+    ],
+    "matrix_26_100": [
+      10,
+      100,
+      100
+    ],
+    "shift_27": [
+      10,
+      100
+    ],
+    "matrix_27_10": [
+      10,
+      10,
+      10
+    ],
+    "matrix_27_30": [
+      10,
+      30,
+      30
+    ],
+    "matrix_27_50": [
+      10,
+      50,
+      50
+    ],
+    "matrix_27_100": [
+      10,
+      100,
+      100
+    ],
+    "shift_28": [
+      10,
+      100
+    ],
+    "matrix_28_10": [
+      10,
+      10,
+      10
+    ],
+    "matrix_28_30": [
+      10,
+      30,
+      30
+    ],
+    "matrix_28_50": [
+      10,
+      50,
+      50
+    ],
+    "matrix_28_100": [
+      10,
+      100,
+      100
+    ],
+    "shift_29": [
+      10,
+      100
+    ],
+    "matrix_29_10": [
+      10,
+      10,
+      10
+    ],
+    "shuffle_29_10": [
+      10,
+      10
+    ],
+    "matrix_29_30": [
+      10,
+      30,
+      30
+    ],
+    "shuffle_29_30": [
+      10,
+      30
+    ],
+    "matrix_29_50": [
+      10,
+      50,
+      50
+    ],
+    "shuffle_29_50": [
+      10,
+      50
+    ],
+    "matrix_29_100": [
+      10,
+      100,
+      100
+    ],
+    "shuffle_29_100": [
+      10,
+      100
+    ],
+    "shift_30": [
+      10,
+      100
+    ],
+    "matrix_30_10": [
+      10,
+      10,
+      10
+    ],
+    "shuffle_30_10": [
+      10,
+      10
+    ],
+    "matrix_30_30": [
+      10,
+      30,
+      30
+    ],
+    "shuffle_30_30": [
+      10,
+      30
+    ],
+    "matrix_30_50": [
+      10,
+      50,
+      50
+    ],
+    "shuffle_30_50": [
+      10,
+      50
+    ],
+    "matrix_30_100": [
+      10,
+      100,
+      100
+    ],
+    "shuffle_30_100": [
+      10,
+      100
+    ]
+  },
+  "source_files": [
+    {
+      "path": "cec14-c-code/input_data/shift_data_1.txt",
+      "sha256": "1c9fd0acb252c255fe7507f4b58d3a2cf8c8ff573cd47de85b846bed9c6c4641"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_1_D10.txt",
+      "sha256": "f3eae4b3d09ebda637688dcc73c7620f0cfd63c40bc748694c24e00af4c1f97c"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_1_D30.txt",
+      "sha256": "52aaa5be360e5a648adc2bf7eaab6ca82f76efca736996a090ef7e3693aa29b9"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_1_D50.txt",
+      "sha256": "8ab512f140223b54f0bab8a3191518caebdee05d7deb19e154225c0eca6795d9"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_1_D100.txt",
+      "sha256": "8794fa60a2b1abc84d1ba79aea1d8a66cc9323382039a8e7fdf602ba3122a59c"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_2.txt",
+      "sha256": "23f3d4a46ea5a3fc1cc8ced0d495fed6e8d23bc3cb520aaa14982ef275a2a834"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_2_D10.txt",
+      "sha256": "ca73b3696daa6088934305792463b4025823994a10882c32e75640dc789676c5"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_2_D30.txt",
+      "sha256": "9b99fc0695a001a8d1270142c81039989c08f489a9203324c7dd003424b36bc9"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_2_D50.txt",
+      "sha256": "9a7395fee20cca66b47e5d3846cd53be3ab276b562c3bf4fa29206125c3fe9c7"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_2_D100.txt",
+      "sha256": "112afbb0e135eb74f4f39d55b359b49d564dc98adddc55c7f609288a440399bf"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_3.txt",
+      "sha256": "a1173926e57c0f52b69b389968b96ba6b50b7d9c50272268bcce580e5ae2e1f5"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_3_D10.txt",
+      "sha256": "d86a7dd52b999d465b01f6b922875c03b24b995b759dab950c413a3c781fc36a"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_3_D30.txt",
+      "sha256": "6a4b988dad27508a7e71682fdcac43589ad4d7e9f5c4fdd4ac9392983a99d243"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_3_D50.txt",
+      "sha256": "4da319de6b6b8afdbb7435c566aed4f3a52ed34556bdf2cc137fac061758b965"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_3_D100.txt",
+      "sha256": "0b327c3412ee2b5637beb5a7645f564e72f5446f1b9f8ca2d43de30c21842856"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_4.txt",
+      "sha256": "41e9dcd52e2fddfa0ee378c930f5f6f67e30eb157bacb27de30fbfd7947166e4"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_4_D10.txt",
+      "sha256": "85698e732c16f1b8ef4b15a14f8e6396f730eb8b5bd0bc0b1424579e8f21faac"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_4_D30.txt",
+      "sha256": "aaff2670791bf83053c76f0e0706186ab9782dab5d9b2a9bc00bb370c0d75f3d"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_4_D50.txt",
+      "sha256": "de3efacf81684dd7441111e5c976f76b451f889670d16e5bb6b8488fcbc90140"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_4_D100.txt",
+      "sha256": "017534ca9ac8ef42a323de3de2bf60d25f4f8c16b9bb27dae76187b7d2407747"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_5.txt",
+      "sha256": "cb78ea15214f75df2c279f23cc71953a43f88670f058c9a7ba48e856a5915206"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_5_D10.txt",
+      "sha256": "111053116296555e74313d4a21e1dd849337711baa26f27adfe0608f4b0fbd75"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_5_D30.txt",
+      "sha256": "6de73e05b9416fb439f630682e982ac8902dcd5ef06edcf5a6065700bcf961fe"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_5_D50.txt",
+      "sha256": "fb6048089147afc591e88c6552f92d961aa151799fb40e7ba9f9a217d7dbf156"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_5_D100.txt",
+      "sha256": "6ee040ce247adf4abf257cfa16d1eac89c7393f0a9afb1f2f55c619a75ac2180"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_6.txt",
+      "sha256": "ea767874597fb99af09ffa7ac4bf8fa92dea2bef8dcdd9a7a308070b73573ba1"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_6_D10.txt",
+      "sha256": "f84b1db3abc5cd7287565ce8bb4792e273f4367aa00e731d518fb74411b0d755"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_6_D30.txt",
+      "sha256": "3a6333169203f4f23a678d2668dd8f66b819bb62643f67f13d6ae3ce2efdeb54"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_6_D50.txt",
+      "sha256": "0149c29d9fc353f4281438a88acfa8968e0cc3ed29dfa086078b972479fdd6ed"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_6_D100.txt",
+      "sha256": "d7e2e1798f64f346c373f1a17e531cff1ef8db3229396e04a7874dee0fd1a9c7"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_7.txt",
+      "sha256": "85f982274de7e833c0e4bebcf3fa54c4f1939bb4cd9508f9ff18e25b60fab1a0"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_7_D10.txt",
+      "sha256": "5ed13fb30bb789f80fc9d0872eeb5a71a0af76b642937824efe9f4cbbe69d44a"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_7_D30.txt",
+      "sha256": "a1535f2a944b9b520c27d26e0a7280c3e27d7726a82ac6816a29261919d00aa2"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_7_D50.txt",
+      "sha256": "ed4801dae43de692b8938f26added33fc308f0da184c4521f20552c13b062b07"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_7_D100.txt",
+      "sha256": "1525e9dff417cd6b5f21bac664c1199fd08367f4a705115384fd283cecb2cfa7"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_8.txt",
+      "sha256": "a93374a501c1310d10cbd8fb9a4d22969e11c028e3b769431787a3edaad869ef"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_8_D10.txt",
+      "sha256": "93463420724a33ad754b15859a05fcb63bad9424d09b8a1e6a993104a181b2d4"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_8_D30.txt",
+      "sha256": "cfc89e8ffe93a556e1af0d12cc4e61f4df66a37f45984a49ef4e6e91228c9b7c"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_8_D50.txt",
+      "sha256": "b9be5e28b7f547fca1369804fb59d9286109e4c414005dfed79995fa33c65f68"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_8_D100.txt",
+      "sha256": "8df832ad937f38255899c11e79cdbdbef09cb396b1c6e5558ebee406146b6d0a"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_9.txt",
+      "sha256": "ef57dc79f321996db2a5919db4cd970dea88946d80f7d12ba95d9d61fc21c85a"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_9_D10.txt",
+      "sha256": "577c740d69fedd4e7f025d698785756d1f8391d2cfc3d81cae8dadcd6aa97588"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_9_D30.txt",
+      "sha256": "74ea9c72949697f8df3ded2294007893f4495dba26ca4912500f715032df622a"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_9_D50.txt",
+      "sha256": "edfe35b5fdba8f4803d90ff4b67116d67109a8db31e91ca15bfd8f9b849402fb"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_9_D100.txt",
+      "sha256": "95d7f7e520bf5df5f553329a948946a44176092ea3c51872cf2db92e182d2df2"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_10.txt",
+      "sha256": "fae98a1e0fa31f3472028ce5dd6e2d883aa1d1b4a8165375f492b599e96d1c9e"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_10_D10.txt",
+      "sha256": "81508c19bebd3c1b0ac67adb4d76af1574242df046a58b8b36f943c7c8569711"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_10_D30.txt",
+      "sha256": "950bf834003e16889cd1a1e776622ee8bad44e0da423b55bb8216fd7eaaa7b43"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_10_D50.txt",
+      "sha256": "7d0e848def756a67fce06ce1e36e0707e18aa276ec72d5f5fe45b5d05d7fa3a6"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_10_D100.txt",
+      "sha256": "9515ae98aacd5afa993b55d9ec7e1a60bfd4c1839fa7fe735fda7aa458900e09"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_11.txt",
+      "sha256": "45545eed3f42945964a74f79a0655b62fbe44b1870ba9119f8b454e0e70efbf7"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_11_D10.txt",
+      "sha256": "407cd5175c898071d6181e0c517a2f2f51a34788b6b9c64a55dc7ceed05498ad"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_11_D30.txt",
+      "sha256": "07e486c7deaaf821fe6c496614386fb11e73e8a169a27fed941e0535c58660db"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_11_D50.txt",
+      "sha256": "59f30c7f1cccd34102afc81d9aa5e2938fb25416262e74a22a50227d4623540d"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_11_D100.txt",
+      "sha256": "e9c2578bc958529d897cda25cdf29656748cddd4ffd65edf202aa11301d50a0c"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_12.txt",
+      "sha256": "7420ad4a0cb71e53ec2c9b3f7e0abd7a5ef7972f01a5c026c227b7ae129224b6"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_12_D10.txt",
+      "sha256": "e612fcd9463f31590c74ba9a2ae54c96cf1a6c9b01fde0798fa28a4f5a71cdb5"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_12_D30.txt",
+      "sha256": "d2a1ae9ee6cce2cc151b3ea064ecbec10789f6541249c0792f0516500087a9fe"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_12_D50.txt",
+      "sha256": "bb16ef037bbc5f2da3e7a0e7186ed8db57b861af45379d59673798d164d3e725"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_12_D100.txt",
+      "sha256": "66537f34057729b21c3863785fd751cab7308e5a3dafea95db9b49c31c6da3ad"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_13.txt",
+      "sha256": "bfd29d7fdac9dfe67cae9417bce5461844312ae308b7009385483f415750b9a4"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_13_D10.txt",
+      "sha256": "54cf55461e22df59c76804a11c251964fc33f8a505e1889c8842aa289ee14178"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_13_D30.txt",
+      "sha256": "c6ee16951775f0d0ae8307d9f1dfbbb8b4c0e0b4efb0eadf842f09f59674d297"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_13_D50.txt",
+      "sha256": "84dd60da807abad7936ba3fc136213869a3ca529a108abbd904686dfe30c793c"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_13_D100.txt",
+      "sha256": "80507649ee7cdb2f59a8385bddb7b60e50f327c9431cac9c55c7c0c58300d711"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_14.txt",
+      "sha256": "5a94d387150e329ceb6d82fbc15d56e107de7c25035e562a706cdb19b9885d48"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_14_D10.txt",
+      "sha256": "330803a18f62e8933d6188e449fb272b7a148e0119d0058f46d842d4866c4085"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_14_D30.txt",
+      "sha256": "2924a33df2b824362ab23e6b2fb432e1f38a02d03db672ad9c731c1846ea5f07"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_14_D50.txt",
+      "sha256": "d259132d2b03fe9bdb70917777a08e9f4150ecc653dd5c96c553aecde5401ca0"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_14_D100.txt",
+      "sha256": "3d4992a37cb665a5da8d4a15f02137fdf6ec658fa691c1de0ddf69ba9f5117e1"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_15.txt",
+      "sha256": "68e1d36402bf286ea4c6f1ad4a97de4b84e6e6ba383d63b3e1d8088a5d433909"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_15_D10.txt",
+      "sha256": "987e29019b55eddeda2cb95b33cb1d250ccc7531f36656aec9d219213d4c4782"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_15_D30.txt",
+      "sha256": "526929acd22912ae959f00653de370b26a3dd6bb64414808ee5d73d5041967f7"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_15_D50.txt",
+      "sha256": "436a86fb3e8c980400113f64a3378421c50444563e2a1afc0eca7f2cb935c05a"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_15_D100.txt",
+      "sha256": "f58c521339008959be7b4b9a0953df23873c5e7fe15cab77dcb9d708de8c2109"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_16.txt",
+      "sha256": "075d4798084f681d3adb253a1a5c450fd5f8faa9d7d5d6d9e6947f16a3dd5815"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_16_D10.txt",
+      "sha256": "49cf7146a723ba06b4c85e78dcef052b74b6d3df225dc8b1fc965a4e62c01fe3"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_16_D30.txt",
+      "sha256": "254d9751f4610944569495e1dc6de0cd2195ef49763c6a7790f3476785c3dd93"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_16_D50.txt",
+      "sha256": "19f400b41b84f1e6d6434ef9da7228c2ca5e3634753168067f38f1e670d61776"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_16_D100.txt",
+      "sha256": "a0bcbfc0b8b8899b24d4897262beb4d0b855ea0baae4919a6dadf06e6d026049"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_17.txt",
+      "sha256": "3d81c441aa069fb101e17496b1f225cf32021fbb0a3a5c6eecda6ea6186574dd"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_17_D10.txt",
+      "sha256": "b3f5cfaf35fc6b23fb2a9e61f393aa06a8f838549bb5d8306fbd4f9f8152fe07"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_17_D10.txt",
+      "sha256": "bd5705c456dc9915fb603d377e18494dae16df6e390cf7390559921f66924801"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_17_D30.txt",
+      "sha256": "b610cb5eba70c31355bacab46db34e5a9e16d8a7230551358c891473e319bcf1"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_17_D30.txt",
+      "sha256": "d73176068037ed32176cbdf273794106f25270e1de13a100ee139329556abf66"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_17_D50.txt",
+      "sha256": "e83933c26f0631dc792b7c419cb8301ee70cb78206914d8ce89f28f02b77623f"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_17_D50.txt",
+      "sha256": "d25e30b56ad9616bba07cdcf563f551a6a0fdc217f1b5c697cdd6d83839d54f6"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_17_D100.txt",
+      "sha256": "ef80270bbc09052b05154f6e9eebfaaacb6aa8f42d30defee0e932a554041df1"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_17_D100.txt",
+      "sha256": "8aac279665ab5b1b988b818739214de2f8a41344067fd14f0ace3cb15838291a"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_18.txt",
+      "sha256": "01dcb3a97f79619963d878e748983c0ebcd8df825044becd108a2b8531243088"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_18_D10.txt",
+      "sha256": "3655635f8244e3bc14ca4e624decd5722f81a7cd1f87e9c1020da4a3133bf61e"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_18_D10.txt",
+      "sha256": "888fa8cf118c2696bf4d9bfbcdcf68f3d854d131d91265a4b0a77cae4cdd0ac5"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_18_D30.txt",
+      "sha256": "3fadb850a70a356039698892d555d5e32cdac5e68616f1872f71c069ba27707a"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_18_D30.txt",
+      "sha256": "1161ccb12dd708970b7f6c234a3f92285243b5ba2d125fba847c096512c05445"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_18_D50.txt",
+      "sha256": "65720267a37d6ee1e587dbc36f44eddc02e7f3e92a6d7873cfea3c9250fd890d"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_18_D50.txt",
+      "sha256": "1a77bb5b050d59969d077e289e418f26cb68c2d64ae5e0f4ae773017a2cccca6"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_18_D100.txt",
+      "sha256": "8e6b7ac794e66ba0d139d499190040d19bb7b9a309ebc697738cc465b3dec098"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_18_D100.txt",
+      "sha256": "d8936ce6c6deda049c1c033267a2b2b5233cdb56b69bbd1497f2458b69c4dfca"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_19.txt",
+      "sha256": "70c323328e3aa369cd093145d2c86496decca290f3163ff186bafceb2b6a122b"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_19_D10.txt",
+      "sha256": "63b81956c3f832e23351f77a737f6c3e4f6eb33f2b26364e8c0324134767c73f"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_19_D10.txt",
+      "sha256": "51cb05b73a74da6f05b4a01bbbc81bdcc877cd27dece0cc40d01c254aa4aed94"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_19_D30.txt",
+      "sha256": "94a3c0a04149348460d65c9c0aff9168debccedb7dbc30440c783c3cf59ebd47"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_19_D30.txt",
+      "sha256": "2ca6a1a94bb843f3a5d42b49a4a77fea7c4106c9608f7d0cfbe7db5c8bc2b346"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_19_D50.txt",
+      "sha256": "8f3866a8ec7e358973efd5e22b6d8239e46999d3fbcaf34cceff87168969a638"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_19_D50.txt",
+      "sha256": "b16762b0b0dedd219fe5bf7d0e0df6db860371e418218a150e12b4a792bcb9fe"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_19_D100.txt",
+      "sha256": "f7ebdd68dcb54646eacc79821e6428cbe08e99caa6038247ce788b4e77bcb386"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_19_D100.txt",
+      "sha256": "20919accd51e33e5e38057e10ed22616872da9da743c0785948087be5fad2f15"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_20.txt",
+      "sha256": "1f2c8885ba21ee133466f17ad06cf11f71e700315c58a14acbf3f309b27a11ae"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_20_D10.txt",
+      "sha256": "03fef97e76e8ee8cfb5411ab2301d516388dd54a4108ce764b9df9b7a01df722"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_20_D10.txt",
+      "sha256": "6737e9a80f20abea65079488eecca593d0c20db63895722bcde11c35468071d7"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_20_D30.txt",
+      "sha256": "4f860e654b9b14f34318a2b855d6b97d124364b2a1748feb617955529b8deff7"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_20_D30.txt",
+      "sha256": "3c6fb13c8586309cc4c9f9899e57eff8e664e701c8c7990ae4cf7d48709c6695"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_20_D50.txt",
+      "sha256": "76807e628456bb28c51c6833950e743df5efa5ed9b0399105e410122a1a72aa2"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_20_D50.txt",
+      "sha256": "f503df691b040833bb843a2c47cc188c3da2003ce0be3a6ffb84d8329694b3ff"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_20_D100.txt",
+      "sha256": "f97a762c55a52672018121ab7e9c9900bc69af8b2254c637b4a2c86a6fd7b327"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_20_D100.txt",
+      "sha256": "98467b842734785c7d98ba187146e0c219762f58a3e7c7ff75f57bb09594d7bf"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_21.txt",
+      "sha256": "de05bae191d6a7a70c043b47b0054da6310e3c9aa414bb132c493d5b05a8301c"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_21_D10.txt",
+      "sha256": "2cbc449dc2a34db1132dfc46c96acfb149d6de5660a63dd701e50fe655de530e"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_21_D10.txt",
+      "sha256": "eeab60429b143bc1e3e8202decf7829b8430709c3531a4be7727f457b217cda4"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_21_D30.txt",
+      "sha256": "c7a9d65af66fed2204a16ea52706558d4e95edf371a250c005246d46201bb32f"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_21_D30.txt",
+      "sha256": "1d0d3a9cef7ba4c3aca8187f4f883b7944843d8f481dbe7b0d5cf6e3c164b2c0"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_21_D50.txt",
+      "sha256": "61f08ac22d27adf2f2aaa7412e523d9bb37818b72689146a75486cb825edd40d"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_21_D50.txt",
+      "sha256": "46c0ed47a51c969e453c3c64f8a468ba27408ba0a7ecb74e2e0c99c3b95a6a92"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_21_D100.txt",
+      "sha256": "3737d0920fdc55be1ace2afb2aeb54c7f73e986f4e4ba75e9bd29f2bb068fff0"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_21_D100.txt",
+      "sha256": "03adcfcbabc2359d48561721e95c405487b016865c6d934ec9f181274c75ac18"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_22.txt",
+      "sha256": "665b8ea4638d1c1effd6a270427cef00caaf814bc9b7363a7804b80df1ca22f0"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_22_D10.txt",
+      "sha256": "8c80f8e39094c80df4b7ea1859365d3ccd1f454d4de8b579bd863c50e37231a8"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_22_D10.txt",
+      "sha256": "206fe2b8225fc45ce0a2bd75ae641635d26404a78ac4b9ec33e4a142408bae4d"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_22_D30.txt",
+      "sha256": "4da644ea4e7a2c0de02c048b518c909384a7afa6ba851102cc7c27b22948478f"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_22_D30.txt",
+      "sha256": "028195648d98e250b7c2af31568f24407ede09fe322290ba4dc22f4e6a7810c6"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_22_D50.txt",
+      "sha256": "9282fba90ba460986fa9d88f2ab94ad0c3d1f20611fec26827dddec61b0e3324"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_22_D50.txt",
+      "sha256": "f80f49e40ddf3b54ed63353d4627e26e5b489957a16b340b72e3ae528c1a55fa"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_22_D100.txt",
+      "sha256": "de08e513fbcceb415b6365009a2093b510874db05bbe6cc63549fb58ecb2ec40"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_22_D100.txt",
+      "sha256": "ea841d5e590dd35a93b838de3a14053bca5e56c4ff3ade9bbd664e36ccf00c44"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_23.txt",
+      "sha256": "4fef8a5c13266d251cba0d21ebf6ec25523be3eb91752c724b5f704887b96b63"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_23_D10.txt",
+      "sha256": "4835dc286ea90c8a625f858f9ce45ea411c9dfc654f9815dea61cebde6510523"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_23_D30.txt",
+      "sha256": "086afab874f3253971c4fdb6eec801f9ab440e006ca175994a79971e60ae4328"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_23_D50.txt",
+      "sha256": "748349615aee5a1ca3a5c62e700ef3e91c0640f52729fc270665c9c040aeb37a"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_23_D100.txt",
+      "sha256": "2603d1776e2769813dc3f0ab9497489d32437f39bb283ff1a9fcc56f645799cf"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_24.txt",
+      "sha256": "6abf630eff8ef1db07493a7414082e867452286c2a64553108f2bc41442fc0c5"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_24_D10.txt",
+      "sha256": "374c755dc2dbee6f53a6a5c4a68e4547753fa4884a03029bee1c17ea3b1bc2be"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_24_D30.txt",
+      "sha256": "3e46018504402539fc3b0309d638beef8b2fa46fa2d056bb3e0ca545436ab129"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_24_D50.txt",
+      "sha256": "0d7b2200c87f8d0db346bc91981eca8e78c301f705a393957c82f868b4209c7a"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_24_D100.txt",
+      "sha256": "fa7e6dda7e9b07c21a4902b6d15427a3af954c40bc55b9b1b02861f77e81d028"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_25.txt",
+      "sha256": "66b45b15b2dc29a89304269e6deb36356e7980b030f4869a7e5018097c760158"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_25_D10.txt",
+      "sha256": "98eb179a7b320fc9c93d552b290cc9fa702c54f187ee48b79fbde51f3851f333"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_25_D30.txt",
+      "sha256": "b0b3fd0b286ea79cb3a4e416bf832373c8ddd7e13af180de4c310c9831dfd4ab"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_25_D50.txt",
+      "sha256": "1bdcf23b83663c8fbf0260ee5fc5c319c32075a942fb73c73bae5eb6573faaeb"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_25_D100.txt",
+      "sha256": "5bb1bb948da0a6025fdb36f39089e717943be2c075e56ad13ccf75303acd319d"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_26.txt",
+      "sha256": "8746dccfd5a46b570375112a5092e7d6406befd284f66d6529f21fd29eeb74d1"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_26_D10.txt",
+      "sha256": "3da747f9d4006a9528ec01d99cc4882179ad38367722dba17e411e066b28fbe0"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_26_D30.txt",
+      "sha256": "489562bacdea90b1eea0da3e58ad004a87beb9e1fab27730755d60cc7e08a54f"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_26_D50.txt",
+      "sha256": "77530d4e94c05a6f97e51b3d1f55be8a073720c4e6ebc5e966fa2197ecc2c5f4"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_26_D100.txt",
+      "sha256": "fca408d9da9a90f5d90f03505f6c260ac561eef8c54e832ac19e0ca65dc99d0b"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_27.txt",
+      "sha256": "deab4f109e024e40b0d69f4dd8af1d431f46b7adc7c88977dce7982e5367e70c"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_27_D10.txt",
+      "sha256": "9474943d082b9a8c76b5b66333ffb968d3e72a23e9b0be1e9e09712e425814c9"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_27_D30.txt",
+      "sha256": "226148302fe6dd9f0b764aaf920c1ffa9de01d77535bfba5f3f522d6fe106e60"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_27_D50.txt",
+      "sha256": "e98ebb12580a16ee7f8cfec782f4240fe8858c5beadc9f56fa47159efe587760"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_27_D100.txt",
+      "sha256": "6bd0316081ba91be72dfe48dcb08b8160c05dccd3f121863775104051eacaf49"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_28.txt",
+      "sha256": "c80fba97286c49f8694b14df4102503b95c1e4c64666787a7c4bc432207d72e5"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_28_D10.txt",
+      "sha256": "c2958248e408100001aadb96b6552d05f610eb7716045ad1c9d0ae1bf28636c6"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_28_D30.txt",
+      "sha256": "61fafdb7dba0a12e0e86064f1e502791b68a9c0182a51b3e1e19f3450822038f"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_28_D50.txt",
+      "sha256": "fd84951c0476ef4e2c7431aca759ec4530c0000f89fc2bfc834a6fc3e3b7b07f"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_28_D100.txt",
+      "sha256": "0401731739ae628ea95c30e3a2a744edcf635bd4c2668065b4a87eee0ac26f4e"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_29.txt",
+      "sha256": "189f9626cca88ff06f1bb3889c8fb28603ed1947a6cb02fe2d5140fadb5d62d0"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_29_D10.txt",
+      "sha256": "9979d49cc439b8fd98517de0815bf0e1c1dae33a735594aff44281376e058966"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_29_D10.txt",
+      "sha256": "0b36910dec49de9998ca79c1670c555937dffa2eee2c39dbc23fd57a0f1fe25d"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_29_D30.txt",
+      "sha256": "a3f2c3f8c67641208f2e41d65a562610498a92ef2cf59cc34b8bbeeef9b5606c"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_29_D30.txt",
+      "sha256": "15d59e93e6c7d0af900af317bc8be31829ca980302b77ba5933e753881647d19"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_29_D50.txt",
+      "sha256": "f39d9ad0acb25653a3706e10a1692fbdf2de1ff4bc46df14a5e917118b9b655e"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_29_D50.txt",
+      "sha256": "aff56082a15bb0b01f7542b9171b5ab9db0ff44fc0876753586921dc15098e90"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_29_D100.txt",
+      "sha256": "10c0706fb386197ba505b005b89e5a2e1d09fafbbdd665a707eae9d657f4ebea"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_29_D100.txt",
+      "sha256": "4581888a589b0a68a9b9c694289a2686a889863d0686b18d2048afb9665187df"
+    },
+    {
+      "path": "cec14-c-code/input_data/shift_data_30.txt",
+      "sha256": "36efcd0569c1e565bcf36a350cbe08397c8f479365bf311474adb115395ef561"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_30_D10.txt",
+      "sha256": "51e67455160658e97a1cd8472718a1fe8525ee2d1aa4b65cc37fee917b5ca4a8"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_30_D10.txt",
+      "sha256": "3078286b3e685378eb75cb2a735b5c4f69a1d27db6265ff441bf2f455db1d2ab"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_30_D30.txt",
+      "sha256": "0264ed75c58bc1ed0a2e30cba2b4e8366aebe7729d5caf10af04cef948e782be"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_30_D30.txt",
+      "sha256": "6e1c4f613d4fd5464866d35723c5cfe136d06b1c36dd9bd024da6c1f567046f0"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_30_D50.txt",
+      "sha256": "fe142211968b0491c771f2487373166f31930d8585eeab23029b65d9d195e8ea"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_30_D50.txt",
+      "sha256": "6d72d53864d467e6ed094b4ff211ddfe411df27206ee30534f827eec1c139029"
+    },
+    {
+      "path": "cec14-c-code/input_data/M_30_D100.txt",
+      "sha256": "5bef9d83ff7d2743ebe263aeb4e5dd74f3e481649307ff9d8de7fa58b242129a"
+    },
+    {
+      "path": "cec14-c-code/input_data/shuffle_data_30_D100.txt",
+      "sha256": "ae0db122af0303afac718d9e9cc8289d57d7cbbcd98bee017e5b73d3958f9883"
+    }
+  ],
+  "license_note": "Official public research distribution. No explicit license file was found in the archive/repository; no additional license grant is asserted for these data."
+}

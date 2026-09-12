@@ -1,0 +1,264 @@
+{
+  "validated_utc": "2026-09-12T12:47:09.540443+00:00",
+  "success": true,
+  "ares_slurm_validated": false,
+  "multiple_physical_nodes_validated": false,
+  "scope": "Port from help into main; local tests only, no SLURM jobs submitted",
+  "main_baseline_commit": "91177a47ad1a53327675c8ad5d630e1b8933b524",
+  "runtime_sha256_at_final_validation": "8b91e06b8ca99b2d27a145be3aec9faeda5a820fef96e0b77af3e39a1ee4e6e5",
+  "launcher_sha256_at_final_validation": "17ee7c737275846edaf8884f6a0a16b9d8ec714393f673259f6f5722130bcdcb",
+  "source_package": "help_codebase/islandsEA_student_fork/islands_desync/islands_desync/geneticAlgorithm/utils/benchmarks_refined",
+  "identical_source_files_sha256": {
+    "__init__.py": "a6a220a575cd4d8848ac9aefbd571e3be06888fe756e1af60ab6745225bfe524",
+    "__main__.py": "30e3bda4bd24db08fc2e49a356ac765d276c13c4bfb8234a19f4f9a885259263",
+    "adapters.py": "bab9dfef2a5415c77747d0078e8cf361c97f8b39d91f6ee6266e1492c6a22c78",
+    "cec2014.py": "05ac519b677379226b845eb649e0fd3676b33ef64c35f7aee1b34ba10281ddcb",
+    "cec_functions.py": "e880b3fa8c2a598d65422931ff752e6e2b11ec2722e81456207e982fe2d891b8",
+    "data/cec2014.npz": "36aa658fd78dc82889b53aadfee44c04b72c976f4a6d86e7e705634ed0d84a73",
+    "data/d200/cec2014.npz": "86ac55435ea9b3cb55d9df5129055aa63911fcd96791efd1fda189f3c39e0f89",
+    "data/d200/manifest.json": "350f15a8f737e4e914beb6950c7af71356a2321fd1b418baaf40f22b8e1b3d3d",
+    "data/manifest.json": "3bb9e677f6dc0e048ec5539f2a0d6e2aedf11d830efeda1e3feb7fb247f3faf6",
+    "discrete.py": "8f2c8f9ae335b0137e3d29be83de380c778d70a9ce2f4952fa104e88f6c1a5d1",
+    "provenance.py": "58af196e5fc73bad3597648214ee8501eb77bc20405d3b68095b28d236621954",
+    "tests/__init__.py": "aa5c88bf26ccf38fb6c7b03a6a4fda6e2583b68645a55502197047eef68cb50a",
+    "tests/reference/cec2014_d200_golden.json.gz": "54576e57ceb3bff37561cfae0e73af0350719e2f622d92b47c29426818fb201e",
+    "tests/reference/cec2014_golden.json.gz": "b3304e3a123758534b4e2fd19aa6c615d7afb2c7a78324870cb7f5f40203cd20",
+    "tests/test_cec2014.py": "d24c2ccb89111422ba601a0413204644056a9ffea493e7496d4e6264919743ab",
+    "tests/test_discrete.py": "6a1e3ac0f7c5eef93b15667c75ec92b8857c0075c9007a8328c721f1fa633df0",
+    "tools/generate_cec_reference.py": "ee38d44127ce95710b93a27ab82697e46ecef295ef0a36d1b788a3304576be63",
+    "tools/prepare_cec200_data.py": "86f875188061665573abb7b04af29a2ef76f7e42f209024b92fc47aefed8da5b",
+    "tools/prepare_cec_data.py": "9d152c2e88653f2dc2a6e201f5e4d41e2ec59467656552eff555e46116c7375d"
+  },
+  "intentionally_adapted_package_files": [
+    "README.md",
+    "RESEARCH.md",
+    "tests/test_integration.py",
+    "validation_report.json"
+  ],
+  "unchanged_migration_method_asts": [
+    "parse_acceptation_strategy",
+    "filter_new_individuals",
+    "duplicate_individuals",
+    "add_new_individuals",
+    "migrate_individuals",
+    "get_individuals_to_migrate",
+    "step"
+  ],
+  "unchanged_orchestration_topology_and_default_config_files": [
+    "islands_desync/islands_desync/geneticAlgorithm/algorithm/configurations/algorithm_configuration.json",
+    "islands_desync/islands_desync/islands/__init__.py",
+    "islands_desync/islands_desync/islands/core/Computation.py",
+    "islands_desync/islands_desync/islands/core/Emigration.py",
+    "islands_desync/islands_desync/islands/core/Island.py",
+    "islands_desync/islands_desync/islands/core/IslandRunner.py",
+    "islands_desync/islands_desync/islands/core/Migration.py",
+    "islands_desync/islands_desync/islands/core/SignalActor.py",
+    "islands_desync/islands_desync/islands/core/__init__.py",
+    "islands_desync/islands_desync/islands/selectAlgorithm/RandomSelect.py",
+    "islands_desync/islands_desync/islands/selectAlgorithm/SelectAlgorithm.py",
+    "islands_desync/islands_desync/islands/selectAlgorithm/__init__.py",
+    "islands_desync/islands_desync/islands/topologies/CompleteTopology.py",
+    "islands_desync/islands_desync/islands/topologies/ER1Topology.py",
+    "islands_desync/islands_desync/islands/topologies/ER2Topology.py",
+    "islands_desync/islands_desync/islands/topologies/ER3Topology.py",
+    "islands_desync/islands_desync/islands/topologies/ER4Topology.py",
+    "islands_desync/islands_desync/islands/topologies/ERTopology.py",
+    "islands_desync/islands_desync/islands/topologies/RingTopology.py",
+    "islands_desync/islands_desync/islands/topologies/Topology.py",
+    "islands_desync/islands_desync/islands/topologies/TorusTopology.py",
+    "islands_desync/islands_desync/islands/topologies/WS1Topology.py",
+    "islands_desync/islands_desync/islands/topologies/WS2Topology.py",
+    "islands_desync/islands_desync/islands/topologies/WS3Topology.py",
+    "islands_desync/islands_desync/islands/topologies/WS4Topology.py",
+    "islands_desync/islands_desync/islands/topologies/WSTopology.py",
+    "islands_desync/islands_desync/islands/topologies/__init__.py"
+  ],
+  "python_310_syntax_files_checked": 22,
+  "bash_syntax_checked": [
+    "hpc_benchmarks/run_ares.sh",
+    "hpc_benchmarks/validate_ares.sh"
+  ],
+  "topology_preflight": {
+    "complete": {
+      "islands": 200,
+      "valid": true,
+      "directed_neighbour_entries": 39800
+    },
+    "ring": {
+      "islands": 150,
+      "valid": true,
+      "directed_neighbour_entries": 300
+    },
+    "torus": {
+      "islands": 180,
+      "valid": true,
+      "directed_neighbour_entries": 720
+    },
+    "er1": {
+      "islands": 150,
+      "valid": true,
+      "directed_neighbour_entries": 462
+    },
+    "er2": {
+      "islands": 150,
+      "valid": true,
+      "directed_neighbour_entries": 419
+    },
+    "er3": {
+      "islands": 150,
+      "valid": true,
+      "directed_neighbour_entries": 694
+    },
+    "er4": {
+      "islands": 150,
+      "valid": true,
+      "directed_neighbour_entries": 728
+    },
+    "ws3": {
+      "islands": 144,
+      "valid": true,
+      "directed_neighbour_entries": 3606
+    },
+    "ws4": {
+      "islands": 144,
+      "valid": true,
+      "directed_neighbour_entries": 3456
+    }
+  },
+  "suite_validation": {
+    "success": true,
+    "tests_run": 17,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "core_only": false,
+    "python": "3.12.14",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "versions": {
+      "numpy": "1.26.4",
+      "jmetalpy": "1.5.5",
+      "ray": "2.31.0",
+      "scipy": "1.14.1",
+      "scikit-learn": "1.5.2"
+    },
+    "suite_version": "1.1.0",
+    "implementation_sha256": "875363a5c748bb149c60ed1c5250c1677fc68b6b7ea7885bc4cffc4d02740caa",
+    "cec_reference_cases": 1776,
+    "cec_d200_extension_reference_cases": 444,
+    "continuous_dimensions": [
+      10,
+      30,
+      50,
+      100,
+      200
+    ],
+    "continuous_count": 30,
+    "discrete_count": 10,
+    "ares_slurm_validated": false
+  },
+  "ray_end_to_end_runs": [
+    {
+      "status": "complete",
+      "args": {
+        "problem": "b03_nk_k4",
+        "dimension": 60,
+        "islands": 2,
+        "evaluations": 128,
+        "population": 16,
+        "offspring": 4,
+        "migrants": 5,
+        "interval": 5,
+        "topology": "complete",
+        "strategy": "maxDistance",
+        "acceptance": "plain",
+        "repeat": 1,
+        "seed": 20260912,
+        "ray_address": "local",
+        "local_cpus": 6
+      },
+      "versions": {
+        "numpy": "1.26.4",
+        "jmetalpy": "1.5.5",
+        "ray": "2.31.0",
+        "scikit-learn": "1.5.2"
+      },
+      "raw_run_directory": "islands_desync/logs/260912/b03_60/142532_2167d790fd 2mc-co5ilu5",
+      "audit_manifest": "hpc_benchmarks/results/260912_142532_2167d790fd/experiment_manifest.json",
+      "audit_manifest_sha256": "8ee5e2e6b4df98e2a354d34c1b9f8619c975a8c815250317822bc1020dfb1d1a",
+      "active_operators": {
+        "mutation": {
+          "class": "BitFlipMutation",
+          "probability": 0.016666666666666666
+        },
+        "crossover": {
+          "class": "SPXCrossover",
+          "probability": 1.0
+        },
+        "selection": {
+          "class": "BinaryTournamentSelection"
+        }
+      },
+      "islands_completed": 2,
+      "received_migrants_per_island": [
+        70,
+        62
+      ],
+      "signed_delay_min": -5,
+      "signed_delay_max": 1,
+      "node_checks_passed": true,
+      "runtime_sha256_at_run": null
+    },
+    {
+      "status": "complete",
+      "args": {
+        "problem": "r29_composition7",
+        "dimension": 200,
+        "islands": 2,
+        "evaluations": 128,
+        "population": 16,
+        "offspring": 4,
+        "migrants": 5,
+        "interval": 5,
+        "topology": "complete",
+        "strategy": "best",
+        "acceptance": "plain",
+        "repeat": 1,
+        "seed": 20260912,
+        "ray_address": "local",
+        "local_cpus": 6
+      },
+      "versions": {
+        "numpy": "1.26.4",
+        "jmetalpy": "1.5.5",
+        "ray": "2.31.0",
+        "scikit-learn": "1.5.2"
+      },
+      "raw_run_directory": "islands_desync/logs/260912/r29_200/142758_e2943a48bb 2bc-co5ilu5",
+      "audit_manifest": "hpc_benchmarks/results/260912_142758_e2943a48bb/experiment_manifest.json",
+      "audit_manifest_sha256": "863c00a4a6305aed64956d49acef284983f208eff03f67ee484afd6ec438c674",
+      "active_operators": {
+        "mutation": {
+          "class": "MyUniformMutation",
+          "probability": 0.005,
+          "perturbation": 10.0
+        },
+        "crossover": {
+          "class": "SwitchCrossover"
+        },
+        "selection": {
+          "class": "BinaryTournamentSelection"
+        }
+      },
+      "islands_completed": 2,
+      "received_migrants_per_island": [
+        67,
+        66
+      ],
+      "signed_delay_min": -4,
+      "signed_delay_max": -1,
+      "node_checks_passed": true,
+      "runtime_sha256_at_run": "eb39cc7ce783cf219a0726e61758743cceb632a6f47ea206ab6dfc1c02834855"
+    }
+  ],
+  "validation_note": "Ray pilots preceded final launcher-only refinements: canonical config propagation, clear topology errors, launcher/SLURM provenance, platform-stable runtime hash order and explicit Ray local address. Numerical code and GA semantics did not change after pilots (one GA trailing whitespace fix only). The final 17-test suite and static checks cover the final files."
+}
