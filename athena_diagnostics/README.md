@@ -26,7 +26,7 @@ $HOME/artifacts/athena_duagnostics.txt
 Następnie zgłasza w stanie `HOLD`, opisuje w raporcie i zwalnia minimalny job:
 
 - partycja `plgrid-gpu-a100`,
-- konto `plglscclass26-gpu-a100`,
+- konto `plgintobl-gpu-a100`,
 - 1 GPU A100, 16 CPU, 128000 MB RAM,
 - limit 10 minut, czyli maksymalnie 1/6 GPUh,
 - bez właściwego benchmarku i bez instalowania pakietów.
@@ -76,7 +76,7 @@ cd C:\Users\piotr\UMISI\IslandsEA_summer\main_codebase\islandsEA_student_fork
 Powstanie dokładnie:
 
 ```text
-C:\Users\piotr\UMISI\IslandsEA_summer\main_codebase\athena_duagnostics.txt
+C:\Users\piotr\UMISI\IslandsEA_summer\main_codebase\athena_diagnostics.txt
 ```
 
 ## Ważne przed właściwym portem

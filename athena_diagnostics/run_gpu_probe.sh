@@ -8,13 +8,22 @@ set -uo pipefail
 
 PROJECT_DIR="${ATHENA_PROJECT_DIR:-${HOME}/islandsEA_student_fork}"
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
-PROBE_TMP="/tmp/${USER}/islandsea-athena-diagnostics-${SLURM_JOB_ID}"
+PYTHON_MODULE="${ATHENA_PYTHON_MODULE:-Python/3.10.4}"
+PROBE_TMP="/tmp/r${SLURM_JOB_ID}"
+if [[ ! "$PROBE_TMP" =~ ^/tmp/r[0-9]+$ ]]; then
+    echo "ERROR: refusing unsafe probe tmp path: $PROBE_TMP" >&2
+    exit 2
+fi
 mkdir -p "$PROBE_TMP"
 trap 'rm -rf -- "$PROBE_TMP"' EXIT
 
 # The report is deliberately small and lives in HOME/artifacts for easy scp.
 # The normal SLURM stdout/stderr remains a separate file under SCRATCH.
 exec >>"$ATHENA_DIAGNOSTICS_REPORT" 2>&1
+
+if [[ -x "$VENV_DIR/bin/python" ]]; then
+    module load "$PYTHON_MODULE"
+fi
 
 section() {
     printf '\n===== %s =====\n' "$1"
@@ -41,6 +50,7 @@ echo "job_id=$SLURM_JOB_ID"
 echo "host=$(hostname -f)"
 echo "project_dir=$PROJECT_DIR"
 echo "venv_dir=$VENV_DIR"
+echo "python_module=$PYTHON_MODULE"
 echo "probe_tmp=$PROBE_TMP"
 
 section "SLURM AND GPU ENVIRONMENT"
@@ -165,7 +175,6 @@ try:
     cpus = max(1, int(os.environ.get("SLURM_CPUS_PER_TASK", "1")))
     ray.init(
         num_cpus=cpus,
-        num_gpus=1,
         include_dashboard=False,
         _temp_dir=os.environ["PROBE_TMP"],
     )

@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 if (-not $Destination) {
     $RepositoryRoot = Split-Path -Parent $PSScriptRoot
     $MainCodebase = Split-Path -Parent $RepositoryRoot
-    $Destination = Join-Path $MainCodebase "athena_duagnostics.txt"
+    $Destination = Join-Path $MainCodebase "athena_diagnostics.txt"
 }
 
 $Destination = [System.IO.Path]::GetFullPath($Destination)
