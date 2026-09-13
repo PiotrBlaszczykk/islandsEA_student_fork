@@ -1,5 +1,11 @@
 import json
 
+from islands_desync.geneticAlgorithm.utils.matplotlib_setup import (
+    configure_headless_matplotlib,
+)
+
+configure_headless_matplotlib()
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd

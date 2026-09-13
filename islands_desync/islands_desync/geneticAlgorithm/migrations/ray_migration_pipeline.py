@@ -1,4 +1,4 @@
-from typing import Dict, List
+import time
 
 import ray
 from jmetal.core.solution import Solution
@@ -17,27 +17,58 @@ class RayMigrationPipeline(RayMigration):
     def receive_individuals(
         self, step_num: int, evaluations: int
     ) -> tuple[list[Solution], MigrationInfo]:
-        new_individuals = ray.get(self.new_individuals_refs)
+        packet = ray.get(self.new_individuals_refs)
         self.new_individuals_refs = self.islandActor.get_immigrants.remote()
+        return self._decode_received(packet, step_num, evaluations)
 
-        new_individuals, migrant_iteration_numbers, ind_timestamps, src_island, fitness = zip(*new_individuals)
+    def finalize_metrics(self):
+        """Resolve, but do not refill, the final pipeline prefetch.
 
-        # migration_at_step_num = {
-        #     "step": step_num,
-        #     "ev": evaluations,
-        #     "iteration_numbers": migrant_iteration_numbers,
-        #     "timestamps": ind_timestamps,
-        #     "src_islands": src_island,
-        #     "fitnesses": fitness,
-        # }
+        The prefetch has already removed its batch from the Island actor.  By
+        recording it here we can reconcile every sent/enqueued/dequeued event
+        without changing which migrants the optimizer processed.
+        """
+        packet = ray.get(self.new_individuals_refs)
+        if isinstance(packet, dict) and "messages" in packet:
+            messages = packet["messages"]
+            fetch = packet.get("fetch")
+        else:
+            messages = packet
+            fetch = None
+        if fetch is not None:
+            fetch = dict(fetch)
+            fetch.update(
+                {
+                    "consumer_step": None,
+                    "consumer_evaluations": None,
+                    "consumer_observed_timestamp_unix": time.time(),
+                    "end_of_run_prefetch": True,
+                }
+            )
+            self.queue_fetches.append(fetch)
 
-        migration_at_step_num = MigrationInfo(
-            step=step_num,
-            ev=evaluations,
-            iteration_numbers=list(migrant_iteration_numbers),
-            timestamps=list(ind_timestamps),
-            src_islands=list(src_island),
-            fitnesses=list(fitness),
-        )
+        unprocessed = []
+        for message in messages:
+            if isinstance(message, dict) and "event" in message:
+                event = dict(message["event"])
+            else:
+                _, event = self._unpack_legacy_message(message)
+            event.update(
+                {
+                    "record_type": "process",
+                    "processed": False,
+                    "process_status": "prefetched_not_processed_at_end_of_run",
+                    "accepted_by_filter": None,
+                    "added_to_candidates": False,
+                    "survived_replacement": False,
+                    "survived_h_steps": None,
+                }
+            )
+            unprocessed.append(event)
 
-        return list(new_individuals), migration_at_step_num
+        return {
+            "sent_events": self.sent_events,
+            "queue_fetches": self.queue_fetches,
+            "prefetched_unprocessed_events": unprocessed,
+            "queued_unprocessed_events": [],
+        }

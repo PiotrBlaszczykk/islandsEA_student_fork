@@ -15,23 +15,29 @@ python --version
 python -m islands_desync.geneticAlgorithm.utils.benchmarks_refined --list
 ```
 
+Trwałe dane i logi nie są zapisywane w repo ani bezpośrednio w HOME. Wrappery
+`submit_*.sh` tworzą `$SCRATCH/islandsEA/{results,logs,checkpoints,tmp}` i
+kierują tam wyniki, audyt, logi SLURM i ewentualne logi awarii Ray. Repo i venv
+pozostają w HOME. Wspólnym źródłem ustawień jest `ares_storage.sh`; wszystkie
+ścieżki można nadpisać zmiennymi `ISLANDS_*_ROOT`.
+
 Korzystaj z działającego venv projektu. Pakiet nie dodaje zależności produkcyjnych: wystarczą dotychczasowy stos, NumPy i jMetalPy 1.5.5. Nie wymaga C, Internetu na workerach ani zmiany wersji Ray. Dla świeżego środowiska istnieje `smoke_run/setup_ares_venv.sh` z Pythonem 3.10 i pinami Ray 2.9.3; zawiera ścieżki konta `plgblaszczykk`. Nie uruchamiaj go ponownie tylko z powodu dodania benchmarków, jeśli masz już działające środowisko. Własną ścieżkę venv można ustawić przez `export ISLANDS_VENV_DIR=/sciezka/do/venv`.
 
 Najpierw walidacja na węźle obliczeniowym, następnie dwa małe uruchomienia Ray:
 
 ```bash
-sbatch hpc_benchmarks/validate_ares.sh
+bash hpc_benchmarks/submit_validation.sh
 
-sbatch hpc_benchmarks/run_ares.sh \
+bash hpc_benchmarks/submit_ares.sh \
   --problem b03_nk_k4 --dimension 60 --islands 2 --evaluations 128 \
   --topology complete --strategy maxDistance --acceptance plain
 
-sbatch hpc_benchmarks/run_ares.sh \
+bash hpc_benchmarks/submit_ares.sh \
   --problem r29_composition7 --dimension 200 --islands 2 --evaluations 128 \
   --topology complete --strategy best --acceptance plain
 ```
 
-Jeśli konto wymaga wskazania grantu lub partycji, dodaj właściwe `--account=...` i `--partition=...` **przed nazwą skryptu**. Skrypty nie wpisują cudzego grantu. Walidacja zapisuje `hpc_benchmarks/results/validation-<JOBID>.json`; oczekiwane: **17 testów, zero błędów i pominięć, `success: true`**. Każdy pilot powinien zakończyć się kodem 0 i linią `BENCHMARK_RUN_OK=...` w `slurm-<JOBID>.out`. Zweryfikuj również `State` i `ExitCode` przez `sacct`.
+Jeśli konto wymaga wskazania grantu lub partycji, dodaj właściwe opcje przy ręcznym `sbatch`; skrypty ogólne nie wpisują cudzego grantu. Walidacja zapisuje `$SCRATCH/islandsEA/results/validation/validation-<JOBID>.json`; oczekiwane: **17 testów, zero błędów i pominięć, `success: true`**. Każdy pilot powinien zakończyć się kodem 0 i linią `BENCHMARK_RUN_OK=...` w `$SCRATCH/islandsEA/logs/slurm/benchmark-<JOBID>.out`. Zweryfikuj również `State` i `ExitCode` przez `sacct`.
 
 Domyślna alokacja `run_ares.sh` to 1 węzeł, 6 CPU i 15 minut: dla pilota z 2 wyspami. Liczba wysp musi być podana jak wyżej, ponieważ launcher domyślnie wybiera 180. Walidator nie uruchamia klastra Ray; piloci sprawdzają rzeczywistą komunikację wysp. Wielowęzłową serię rozpocznij po tych testach i sprawdzeniu zasobów.
 
@@ -48,7 +54,11 @@ python hpc_benchmarks/run_benchmark.py \
 Przykład dla 180 wysp, 8000 ewaluacji na wyspę, populacji 16, czterech potomków, pięciu migrantów i interwału 5:
 
 ```bash
+source hpc_benchmarks/ares_storage.sh
+islandsea_configure_storage
 sbatch --nodes=8 --cpus-per-task=48 --time=01:00:00 \
+  --output="$ISLANDS_SLURM_LOG_DIR/benchmark-%j.out" \
+  --error="$ISLANDS_SLURM_LOG_DIR/benchmark-%j.err" \
   hpc_benchmarks/run_ares.sh \
   --problem r29_composition7 --dimension 200 --islands 180 \
   --evaluations 8000 --population 16 --offspring 4 \
@@ -69,7 +79,35 @@ W obecnym kodzie `Island` i `Computation` rezerwują po 1 CPU na wyspę, a `Sign
 
 48 rdzeni dotyczy standardowego węzła CPU opisanego w [dokumentacji Aresa](https://docs.hpc.cyfronet.pl/supercomputers/ares/). To rezerwacje obecnej architektury aktorów, nie obietnica stałego wykorzystania wszystkich CPU. Ich zmiana mogłaby wpływać na harmonogram i opóźnienia, dlatego nie jest częścią portu benchmarków.
 
+### Bezpieczny profil dla 200 wysp
+
+`run_ares_200.sh` utrwala profil 9 × 48 CPU, konto `plglscclass26-cpu`, partycję `plgrid`, 30-minutowy bezpiecznik walltime oraz 300 sekund na start dziewięciu węzłów. Skrypt zawsze dopisuje `--islands 200`; nie należy dodawać własnego `--islands`. Najpierw uruchom krótki canary, który tworzy pełne 401 aktorów Ray, lecz wykonuje mały budżet ewaluacji:
+
+```bash
+bash hpc_benchmarks/submit_ares_200.sh \
+  --problem r29_composition7 --dimension 200 --evaluations 128 \
+  --population 16 --offspring 4 --migrants 5 --interval 5 \
+  --topology complete --strategy best --acceptance plain \
+  --repeat 1 --seed 20260912
+```
+
+Po sukcesie canary (`State=COMPLETED`, `ExitCode=0:0`, `BENCHMARK_RUN_OK`) można uruchomić właściwy budżet. Limit czasu zwiększaj na podstawie zmierzonego przebiegu; opcja `sbatch` podana przed nazwą skryptu nadpisuje domyślne 30 minut:
+
+```bash
+ISLANDS_WALLTIME=01:00:00 bash hpc_benchmarks/submit_ares_200.sh \
+  --problem r29_composition7 --dimension 200 --evaluations 8000 \
+  --population 16 --offspring 4 --migrants 5 --interval 5 \
+  --topology complete --strategy best --acceptance plain \
+  --repeat 1 --seed 20260912
+```
+
+Przed startem Ray launcher wykonuje pełny `--dry-run`, sprawdza topologię i porównuje `2*N+1` z rzeczywistą alokacją. Za mały przydział kończy job kodem 2, zamiast pozostawić oczekującego aktora do walltime. Następnie każdy węzeł jednorazowo buduje własny cache Matplotlib w `/tmp/$USER/islandsea-$SLURM_JOB_ID/matplotlib`; workery dzielą gotowy cache tylko w obrębie lokalnego systemu plików węzła. Katalog tymczasowy jest usuwany z każdego węzła podczas kontrolowanego zakończenia.
+
+Profil 200-wyspowy nie zmienia ograniczeń stałych grafów ER/WS. `complete` i `ring` przyjmują 200, a torus może teraz dostać jawny kształt przez parę `--torus-rows/--torus-columns`, której iloczyn musi być równy liczbie wysp. Bez tych opcji zachowany jest historyczny układ `12 × (N/12)` i wymóg podzielności przez 12. ER1–ER4 mają 150 wierzchołków, a WS3/WS4 mają 144. Preflight odrzuca niezgodności przed startem klastra. Torus 10×20 dla 200 wysp jest przygotowany jako jawnie bramkowany wariant w `pilot_run/`; nie traktować jego obecności jako zatwierdzenia metodologii.
+
 Każdy węzeł uruchamia jeden proces Ray przez `srun`. Proces sterujący współdzieli przydział głównego węzła przez `--overlap`, z CPU wyłączonym z puli Ray. Znaczenie `--exact` i `--overlap` określa [dokumentacja SLURM](https://slurm.schedmd.com/srun.html). Wrapper kończy własne kroki zadania; nie wykonuje globalnego `ray stop`.
+
+Gotowy pełny pilot F1/D200, torus 10×20, `best/plain`, trzy powtórzenia oraz jego ścisły walidator są opisane w [`pilot_run/README.md`](../pilot_run/README.md). Nie składaj go ręcznie z trzech osobnych komend: skrypt zgłoszeniowy zapisuje wspólny manifest i uruchamia finalizer zależny od całej tablicy.
 
 ## Dobór benchmarku i topologii
 
@@ -84,11 +122,11 @@ Launcher używa dokładnie istniejących grafów. **Nie wszystkie obsługują do
 |---|---|
 | `complete` | Dowolna dodatnia liczba wysp |
 | `ring` | Do eksperymentów używaj co najmniej 3 wysp; istniejący graf zawiera również sąsiedztwo własne |
-| `torus` | `12 × (N/12)`, N≥24 i podzielne przez 12; w zakresie 150–200: 156,168,180,192 |
+| `torus` | Domyślnie historyczne `12 × (N/12)`, N≥24 i podzielne przez 12; opcjonalnie jawne `rows × columns = N` |
 | `er1`–`er4` | Gotowe grafy na 150 wysp |
 | `ws3`, `ws4` | Gotowe grafy na 144 wyspy |
 
-Preflight sprawdza rzeczywiste listy sąsiadów i przerywa przy niezgodności, np. torus150 albo ER180. Do porównania ER, WS i torusa przy **tej samej** liczbie 150–200 wysp potrzebne będą osobno uzgodnione, zapisane grafy. Port benchmarków nie generuje nowych topologii ani nie poprawia istniejących pętli własnych. Nawet przy grafie pełnym dotychczasowy `RandomSelect` wybiera jeden cel na migranta; nie jest to rozesłanie każdego migranta do wszystkich sąsiadów.
+Preflight sprawdza rzeczywiste listy sąsiadów i przerywa przy niezgodności, np. domyślny torus150 albo ER180. Jawny prostokątny torus rozwiązuje wyłącznie kwestię rozmiaru tej rodziny; do porównania ER, WS i torusa przy **tej samej** liczbie 150–200 wysp nadal potrzebne będą osobno uzgodnione, zapisane grafy ER/WS. Port benchmarków nie generuje tych grafów ani nie poprawia istniejących pętli własnych. Nawet przy grafie pełnym dotychczasowy `RandomSelect` wybiera jeden cel na migranta; nie jest to rozesłanie każdego migranta do wszystkich sąsiadów.
 
 ## Zachowane znaczenie parametrów
 
@@ -102,15 +140,16 @@ Fabryka dobiera BitFlip(1/liczba bitów) + SPX dla binarnych oraz dotychczasowe 
 
 Gotowe NPZ są w repozytorium; nie generuje się macierzy na workerach. Ustawienia BLAS/OMP=1 oraz parametry są przekazywane przez `runtime_env` Ray. Przed pętlą eksperymentu launcher sprawdza każdy węzeł: import i ewaluację problemu, identyczność instancji, kodu, konfiguracji, Pythona i wersji głównych zależności. Zapisuje dostępne zasoby i odmawia uruchomienia przy niedoborze CPU.
 
-Zachowane surowe wyniki trafiają do `islands_desync/logs/<data>/<prefiks><wymiar>/<czas>_<id> .../`. Znajdziesz tam dotychczasowe CSV/JSON, statystyki i podpisane opóźnienia migrantów oraz:
+Zachowane surowe wyniki trafiają domyślnie do `$SCRATCH/islandsEA/results/runs/<data>/<prefiks><wymiar>/<czas>_<id> .../`. Znajdziesz tam dotychczasowe CSV/JSON, statystyki i podpisane opóźnienia migrantów oraz:
 
 - `benchmark_manifest.json`: instancja, oficjalne lub projektowe dane, SHA-256 wzorów, rzeczywiste operatory;
 - `param.json`: dotychczasowe pola plus `active_operators` (stare tekstowe pole `operators` jest historyczne; używaj nowego pola do identyfikacji operatorów);
 - `experiment_manifest.json`: pełne argumenty, konfiguracja, seedy, wersje, commit i stan dirty, hash kodu runtime i launchera, kontrola węzłów, status wykonania;
+- `run_metadata.json`: agregowalne metadane konfiguracji naukowej, run/repeat/seed, topologii, zasobów, proweniencji i rozstrzygniętych ścieżek storage;
 - `topology.json`: dokładne skierowane listy sąsiadów, także pętle własne; `topology.png`: pomocniczy rysunek po zakończeniu, bez pełnego odwzorowania kierunków i pętli;
 - `iterations_per_second.json`: wyniki czasowe zwrócone przez wyspy.
 
-Kopia manifestu i topologii jest w `hpc_benchmarks/results/<data>_<czas>_<id>/`. Zachowuje również informację o błędzie nieudanego startu. Losowy identyfikator chroni przed kolizją nazw uruchomień; benchmarki mają unikalne prefiksy czteroznakowe. Wyniki są ignorowane przez Git, ale kod, dane i raport lokalnej walidacji należy przenieść razem.
+Kopia manifestu, metadanych i topologii jest w `$SCRATCH/islandsEA/results/audit/<data>_<czas>_<id>/`. Zachowuje również informację o błędzie nieudanego startu. Losowy identyfikator chroni przed kolizją nazw uruchomień; benchmarki mają unikalne prefiksy czteroznakowe. `--output-root` i `--audit-root` pozwalają jawnie zmienić te lokalizacje.
 
 W manifeście `configuration` oznacza JSON z nadpisanymi czterema parametrami GA i problemem. Aktywna liczba wysp, migranci, interwał i strategie pochodzą z `args`; pozostawione historyczne pola JSON o podobnych nazwach nie sterują migracją w tej ścieżce.
 

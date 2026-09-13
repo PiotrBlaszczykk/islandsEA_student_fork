@@ -11,6 +11,7 @@ from islands.topologies import RingTopology
 from islands_desync.geneticAlgorithm.run_hpc.run_algorithm_params import (
     RunAlgorithmParams,
 )
+from islands_desync.geneticAlgorithm.utils.filename import get_run_output_root
 from islands_desync.islands.topologies.TorusTopology import TorusTopology
 from islands_desync.islands.topologies.CompleteTopology import CompleteTopology
 from islands_desync.islands.topologies.ERTopology import ERTopology
@@ -58,13 +59,13 @@ def main():
 
     iterations = {result["island"]: result for result in results}
 
-    with open(
-        "logs/"
-        + "iterations_per_second"
+    summary_directory = get_run_output_root()
+    summary_directory.mkdir(parents=True, exist_ok=True)
+    with (summary_directory / (
+        "iterations_per_second"
         + datetime.now().strftime("%m-%d-%Y_%H%M")
-        + ".json",
-        "w",
-    ) as f:
+        + ".json"
+    )).open("w", encoding="utf-8") as f:
         json.dump(iterations, f)
 
 

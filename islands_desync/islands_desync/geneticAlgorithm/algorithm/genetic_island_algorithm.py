@@ -1,4 +1,6 @@
 import json
+import gzip
+import hashlib
 import os
 import random
 import statistics
@@ -251,6 +253,29 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         self.nowi = False
         self.bylLog = False
 
+        # Research telemetry is buffered in actor memory and compressed once at
+        # the end.  Synchronous per-message filesystem writes would perturb the
+        # very migration delays we want to measure.
+        self.metrics_schema_version = 1
+        self.metrics_started_timestamp_unix = time.time()
+        self.metrics_started_monotonic = time.monotonic()
+        self.effect_horizon_steps = int(
+            os.environ.get("ISLANDS_EFFECT_HORIZON_STEPS", "25")
+        )
+        self.processed_migration_events: list[dict] = []
+        self._migration_survival_watch: dict[str, dict] = {}
+        self._current_step_migration_events: list[dict] = []
+        self.fitness_history_full: list[dict] = []
+        self.best_fitness_seen = None
+        self.metrics_counters = {
+            "receive_calls": 0,
+            "empty_receive_calls": 0,
+            "received_before_filter": 0,
+            "accepted_by_filter": 0,
+            "rejected_by_filter": 0,
+            "survived_replacement": 0,
+        }
+
     def __str__(self):
         return "genetic_island_algorithm"
 
@@ -305,7 +330,13 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 return
 
             self.migration.migrate_individuals(
-                individuals_to_migrate, self.step_num, self.island, time.time(), self.island
+                individuals_to_migrate,
+                self.step_num,
+                self.island,
+                time.time(),
+                self.island,
+                self.evaluations,
+                float(self.lastBest),
             )
 
     # TODO: Fix SAS selection
@@ -372,6 +403,8 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 timestamps=[],
                 src_islands=[],
                 fitnesses=[],
+                events=[],
+                fetch=emigration_at_step_num.fetch,
             )
             return [], empty_emigration_info
 
@@ -448,6 +481,10 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             timestamps=[emigration_at_step_num.timestamps[i] for i in filtered_indices],
             src_islands=[emigration_at_step_num.src_islands[i] for i in filtered_indices],
             fitnesses=[emigration_at_step_num.fitnesses[i] for i in filtered_indices],
+            events=[copy.deepcopy(emigration_at_step_num.events[i]) for i in filtered_indices]
+            if emigration_at_step_num.events
+            else [],
+            fetch=emigration_at_step_num.fetch,
         )
 
         return [new_individuals[i] for i in filtered_indices], filtered_emigration_info
@@ -467,6 +504,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             emigration_info.timestamps = emigration_info.timestamps[:target_count]
             emigration_info.src_islands = emigration_info.src_islands[:target_count]
             emigration_info.fitnesses = emigration_info.fitnesses[:target_count]
+            emigration_info.events = emigration_info.events[:target_count]
             return copy.deepcopy(individuals[:target_count]), emigration_info
 
         fitnesses = [ind.objectives[0] for ind in individuals]
@@ -492,6 +530,12 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             emigration_info.timestamps.append(emigration_info.timestamps[selected_index])
             emigration_info.src_islands.append(emigration_info.src_islands[selected_index])
             emigration_info.fitnesses.append(emigration_info.fitnesses[selected_index])
+            if emigration_info.events:
+                duplicate_event = copy.deepcopy(emigration_info.events[selected_index])
+                duplicate_event["copy_of_event_id"] = duplicate_event.get("event_id")
+                duplicate_event["local_copy_index"] = len(duplicated_individuals) - 1
+                duplicate_event["is_local_duplicate"] = True
+                emigration_info.events.append(duplicate_event)
 
         return duplicated_individuals, emigration_info
 
@@ -501,6 +545,28 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         )
 
         initial_length = len(new_individuals)
+        self.metrics_counters["receive_calls"] += 1
+        self.metrics_counters["received_before_filter"] += initial_length
+        if initial_length == 0:
+            self.metrics_counters["empty_receive_calls"] += 1
+
+        if not emigration_at_step_num.events and initial_length:
+            emigration_at_step_num.events = [
+                {
+                    "schema_version": 0,
+                    "event_id": f"legacy:{self.island}:{self.step_num}:{index}",
+                    "batch_id": None,
+                    "source_island": emigration_at_step_num.src_islands[index],
+                    "source_step": emigration_at_step_num.iteration_numbers[index],
+                    "source_evaluations": None,
+                    "fitness_at_send": emigration_at_step_num.fitnesses[index],
+                    "send_timestamp_unix": emigration_at_step_num.timestamps[index],
+                }
+                for index in range(initial_length)
+            ]
+        for index, event in enumerate(emigration_at_step_num.events):
+            if not event.get("event_id"):
+                event["event_id"] = f"legacy:{self.island}:{self.step_num}:{index}"
 
         strategy, param, duplicate_after_filter = self.parse_acceptation_strategy()
 
@@ -511,6 +577,100 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
 
         if duplicate_after_filter:
             new_individuals, emigration_info = self.duplicate_individuals(new_individuals, emigration_info, initial_length)
+
+        accepted_event_ids = {
+            event.get("event_id") for event in emigration_info.events
+        }
+        decision_timestamp = time.time()
+        process_events = []
+        for event in emigration_at_step_num.events:
+            process_event = copy.deepcopy(event)
+            event_id = process_event.get("event_id")
+            accepted = event_id in accepted_event_ids
+            source_step = process_event.get("source_step")
+            send_timestamp = process_event.get("send_timestamp_unix")
+            process_event.update(
+                {
+                    "record_type": "process",
+                    "processed": True,
+                    "process_status": "accepted" if accepted else "rejected_by_filter",
+                    "destination_island": self.island,
+                    "process_step": self.step_num,
+                    "process_evaluations": self.evaluations,
+                    "process_timestamp_unix": decision_timestamp,
+                    "filter_decision_timestamp_unix": decision_timestamp,
+                    "recipient_best_before": float(self.lastBest),
+                    "recipient_population_size_before_candidates": len(
+                        self.solutions
+                    ),
+                    "migrant_selection_strategy": self.migrant_selection_type,
+                    "acceptance_strategy": self.migrant_acceptation_strategy,
+                    "accepted_by_filter": accepted,
+                    "rejection_reason": None
+                    if accepted
+                    else f"rejected_by_{strategy}",
+                    "added_to_candidates": accepted,
+                    "replacement_considered": accepted,
+                    "survived_replacement": None if accepted else False,
+                    "survived_h_steps": None,
+                    "signed_delay_steps": (
+                        source_step - self.step_num
+                        if source_step is not None
+                        else None
+                    ),
+                    "age_steps": (
+                        max(0, self.step_num - source_step)
+                        if source_step is not None
+                        else None
+                    ),
+                    "lead_steps": (
+                        max(0, source_step - self.step_num)
+                        if source_step is not None
+                        else None
+                    ),
+                    "send_to_process_latency_ms": (
+                        (decision_timestamp - send_timestamp) * 1000.0
+                        if send_timestamp is not None
+                        else None
+                    ),
+                    "strictly_better_than_recipient_best_before": (
+                        process_event.get("fitness_at_send") < self.lastBest
+                    ),
+                    "better_or_equal_to_recipient_best_before": (
+                        process_event.get("fitness_at_send") <= self.lastBest
+                    ),
+                }
+            )
+            process_events.append(process_event)
+
+        accepted_count = sum(
+            1 for event in process_events if event["accepted_by_filter"]
+        )
+        self.metrics_counters["accepted_by_filter"] += accepted_count
+        self.metrics_counters["rejected_by_filter"] += initial_length - accepted_count
+        self._current_step_migration_events.extend(process_events)
+
+        for individual, event in zip(new_individuals, emigration_info.events):
+            event_id = event.get("event_id")
+            try:
+                individual.migration_event_id = event_id
+                individual.migration_process_step = self.step_num
+            except (AttributeError, TypeError):
+                pass
+
+        for event in emigration_info.events:
+            if event.get("is_local_duplicate"):
+                duplicate_event = copy.deepcopy(event)
+                duplicate_event.update(
+                    {
+                        "record_type": "local_duplicate",
+                        "destination_island": self.island,
+                        "process_step": self.step_num,
+                        "accepted_by_filter": True,
+                        "added_to_candidates": True,
+                    }
+                )
+                self._current_step_migration_events.append(duplicate_event)
 
         imigr_src_islands = emigration_info.src_islands
         imigr_fitnsesses = emigration_info.fitnesses
@@ -527,6 +687,338 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             emigration_info.destinMaxFitness = self.lastBest
             self.emigrations_history[self.step_num] = emigration_info
             self.solutions.extend(list(new_individuals))
+
+    def _survivor_event_ids(self) -> set[str]:
+        return {
+            event_id
+            for solution in self.solutions
+            for event_id in [getattr(solution, "migration_event_id", None)]
+            if event_id is not None
+        }
+
+    def finalize_current_migration_events_after_replacement(self):
+        survivor_ids = self._survivor_event_ids()
+        replacement_timestamp = time.time()
+        recipient_best_after = float(self.solutions[0].objectives[0])
+        for event in self._current_step_migration_events:
+            if event.get("record_type") != "process":
+                self.processed_migration_events.append(event)
+                continue
+            if not event.get("accepted_by_filter"):
+                self.processed_migration_events.append(event)
+                continue
+
+            event_id = event.get("event_id")
+            survived = event_id in survivor_ids
+            event["survived_replacement"] = survived
+            event["replacement_observed_step"] = self.step_num
+            event["replacement_timestamp_unix"] = replacement_timestamp
+            event["recipient_best_after_replacement"] = recipient_best_after
+            event["recipient_improvement_after_replacement"] = (
+                event["recipient_best_before"] - recipient_best_after
+            )
+            event["recipient_population_size_after_replacement"] = len(
+                self.solutions
+            )
+            if survived:
+                self.metrics_counters["survived_replacement"] += 1
+                if self.effect_horizon_steps > 0:
+                    event["survival_deadline_step"] = (
+                        self.step_num + self.effect_horizon_steps
+                    )
+                    self._migration_survival_watch[event_id] = event
+                else:
+                    event["survived_h_steps"] = True
+                    event["survival_observation_complete"] = True
+                    self.processed_migration_events.append(event)
+            else:
+                event["survived_h_steps"] = False
+                event["survival_observation_complete"] = True
+                event["survival_observed_steps"] = 0
+                self.processed_migration_events.append(event)
+        self._current_step_migration_events = []
+        self.update_migration_survival_watch()
+
+    def update_migration_survival_watch(self):
+        survivor_ids = self._survivor_event_ids()
+        completed = []
+        observation_timestamp = time.time()
+        for event_id, event in self._migration_survival_watch.items():
+            process_step = event["process_step"]
+            deadline = event["survival_deadline_step"]
+            if event_id not in survivor_ids:
+                event["survived_h_steps"] = False
+                event["survival_observation_complete"] = True
+                event["survival_observed_steps"] = max(
+                    0, self.step_num - process_step
+                )
+                event["survival_observed_timestamp_unix"] = observation_timestamp
+                event["recipient_best_at_survival_observation"] = float(
+                    self.solutions[0].objectives[0]
+                )
+                completed.append(event_id)
+            elif self.step_num >= deadline:
+                event["survived_h_steps"] = True
+                event["survival_observation_complete"] = True
+                event["survival_observed_steps"] = self.effect_horizon_steps
+                event["survival_observed_timestamp_unix"] = observation_timestamp
+                event["recipient_best_at_survival_observation"] = float(
+                    self.solutions[0].objectives[0]
+                )
+                completed.append(event_id)
+        for event_id in completed:
+            self.processed_migration_events.append(
+                self._migration_survival_watch.pop(event_id)
+            )
+
+    def flush_incomplete_survival_watch(self):
+        survivor_ids = self._survivor_event_ids()
+        observation_timestamp = time.time()
+        for event_id, event in self._migration_survival_watch.items():
+            event["survived_h_steps"] = None
+            event["survival_observation_complete"] = False
+            event["present_at_end_of_run"] = event_id in survivor_ids
+            event["survival_observed_steps"] = max(
+                0, self.step_num - event["process_step"]
+            )
+            event["survival_observed_timestamp_unix"] = observation_timestamp
+            event["recipient_best_at_survival_observation"] = float(
+                self.solutions[0].objectives[0]
+            )
+            self.processed_migration_events.append(event)
+        self._migration_survival_watch = {}
+
+    def record_fitness_snapshot(self, phase: str, evaluations: int):
+        values = [float(solution.objectives[0]) for solution in self.solutions]
+        if not values:
+            return
+        current_best = min(values)
+        if self.best_fitness_seen is None:
+            self.best_fitness_seen = current_best
+        else:
+            self.best_fitness_seen = min(self.best_fitness_seen, current_best)
+        diversity = self.tab_diversity.get(self.step_num, {})
+        timestamp = time.time()
+        self.fitness_history_full.append(
+            {
+                "schema_version": 1,
+                "island": self.island,
+                "phase": phase,
+                "step": 0 if phase == "initial_population" else self.step_num,
+                "evaluations": int(evaluations),
+                "timestamp_unix": timestamp,
+                "elapsed_monotonic_seconds": (
+                    time.monotonic() - self.metrics_started_monotonic
+                ),
+                "elapsed_since_migration_measurement_start_seconds": (
+                    timestamp - self.migration.start
+                    if self.migration.start is not None
+                    else None
+                ),
+                "current_best": current_best,
+                "best_so_far": self.best_fitness_seen,
+                "population_mean": statistics.fmean(values),
+                "population_median": statistics.median(values),
+                "population_worst": max(values),
+                "population_std_ddof_0": statistics.pstdev(values),
+                "population_size_observed": len(values),
+                "unique_solution_count": diversity.get("y"),
+                "minimum_coordinate_std": diversity.get("y2"),
+                "mean_coordinate_std": diversity.get("y3"),
+            }
+        )
+
+    @staticmethod
+    def _json_safe(value):
+        if isinstance(value, dict):
+            return {
+                str(key): GeneticIslandAlgorithm._json_safe(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [GeneticIslandAlgorithm._json_safe(item) for item in value]
+        if isinstance(value, np.generic):
+            return value.item()
+        return value
+
+    @staticmethod
+    def _write_json_atomic(path: str, value):
+        temporary = path + ".tmp"
+        with open(temporary, "w", encoding="utf-8") as output:
+            json.dump(
+                GeneticIslandAlgorithm._json_safe(value),
+                output,
+                indent=2,
+                allow_nan=False,
+            )
+            output.write("\n")
+        os.replace(temporary, path)
+
+    @staticmethod
+    def _write_jsonl_gzip_atomic(path: str, records):
+        temporary = path + ".tmp"
+        with gzip.open(temporary, "wt", encoding="utf-8", compresslevel=6) as output:
+            for record in records:
+                output.write(
+                    json.dumps(
+                        GeneticIslandAlgorithm._json_safe(record),
+                        separators=(",", ":"),
+                        allow_nan=False,
+                    )
+                )
+                output.write("\n")
+        os.replace(temporary, path)
+
+    def _metrics_directory(self) -> str:
+        return os.path.join(self.path, "metrics", f"island_{self.island:03d}")
+
+    def write_runtime_metrics(self, runtime_metrics: dict):
+        metrics_directory = self._metrics_directory()
+        os.makedirs(metrics_directory, exist_ok=True)
+        self._write_json_atomic(
+            os.path.join(metrics_directory, "runtime.json"), runtime_metrics
+        )
+
+    def export_research_metrics(self, migration_telemetry: dict, runtime_metrics: dict):
+        self.flush_incomplete_survival_watch()
+        metrics_directory = self._metrics_directory()
+        os.makedirs(metrics_directory, exist_ok=True)
+        run_id = f"{self.par_date}_{self.par_time}"
+
+        sent_events = []
+        for event in migration_telemetry["sent_events"]:
+            sent_events.append(
+                {
+                    **event,
+                    "run_id": run_id,
+                    "recording_island": self.island,
+                    "migrant_selection_strategy": self.migrant_selection_type,
+                    "acceptance_strategy": self.migrant_acceptation_strategy,
+                }
+            )
+        process_events = [
+            {
+                **event,
+                "run_id": run_id,
+                "recording_island": self.island,
+            }
+            for event in (
+                self.processed_migration_events
+                + migration_telemetry["prefetched_unprocessed_events"]
+                + migration_telemetry["queued_unprocessed_events"]
+            )
+        ]
+        migration_events = sent_events + process_events
+        migration_events.sort(
+            key=lambda event: (
+                event.get("send_timestamp_unix") or 0.0,
+                event.get("event_id") or "",
+                event.get("record_type") or "",
+            )
+        )
+        self._write_jsonl_gzip_atomic(
+            os.path.join(metrics_directory, "migration_events.jsonl.gz"),
+            migration_events,
+        )
+        self._write_jsonl_gzip_atomic(
+            os.path.join(metrics_directory, "queue_fetches.jsonl.gz"),
+            migration_telemetry["queue_fetches"],
+        )
+        self._write_jsonl_gzip_atomic(
+            os.path.join(metrics_directory, "fitness_history.jsonl.gz"),
+            self.fitness_history_full,
+        )
+
+        best_solution = self.get_result()
+        variables = self._json_safe(list(decision_variables(best_solution)))
+        canonical_variables = json.dumps(
+            variables, separators=(",", ":"), allow_nan=False
+        ).encode("utf-8")
+        final_solution = {
+            "schema_version": 1,
+            "run_id": run_id,
+            "island": self.island,
+            "objectives": self._json_safe(list(best_solution.objectives)),
+            "variables": variables,
+            "variables_sha256": hashlib.sha256(canonical_variables).hexdigest(),
+            "variable_count": len(variables),
+            "from_island": getattr(best_solution, "from_island", None),
+            "from_evaluation": getattr(best_solution, "from_evaluation", None),
+            "migration_event_id": getattr(best_solution, "migration_event_id", None),
+        }
+        self._write_json_atomic(
+            os.path.join(metrics_directory, "final_solution.json"), final_solution
+        )
+
+        summary = {
+            "schema_version": 1,
+            "run_id": run_id,
+            "island": self.island,
+            "effect_horizon_steps": self.effect_horizon_steps,
+            "counters": self.metrics_counters,
+            "sent_event_records": len(sent_events),
+            "process_event_records": sum(
+                1 for event in process_events if event.get("record_type") == "process"
+            ),
+            "local_duplicate_records": sum(
+                1
+                for event in process_events
+                if event.get("record_type") == "local_duplicate"
+            ),
+            "prefetched_unprocessed_event_records": len(
+                migration_telemetry["prefetched_unprocessed_events"]
+            ),
+            "queued_unprocessed_event_records": len(
+                migration_telemetry["queued_unprocessed_events"]
+            ),
+            "queue_fetch_records": len(migration_telemetry["queue_fetches"]),
+            "fitness_snapshot_records": len(self.fitness_history_full),
+            "final_solution_variables_sha256": final_solution["variables_sha256"],
+        }
+        self._write_json_atomic(
+            os.path.join(metrics_directory, "summary.json"), summary
+        )
+        self.write_runtime_metrics(runtime_metrics)
+
+        if self.island == 0:
+            data_contract = {
+                "schema_version": 1,
+                "format": "IslandsEA research telemetry",
+                "storage": "one metrics/island_NNN directory per island",
+                "event_identity": "event_id is unique within run_id",
+                "event_record_types": {
+                    "send": "one source-side record per transmitted individual",
+                    "process": (
+                        "one destination-side terminal record: processed, final prefetch, "
+                        "or queued at end"
+                    ),
+                    "local_duplicate": "optional destination-only copy made by dup_* acceptance",
+                },
+                "delay_definition": "source_step - process_step (negative means stale/older)",
+                "time_fields": "Unix seconds; queue_residence_ms uses destination-process monotonic clock",
+                "files": {
+                    "migration_events.jsonl.gz": "send, process and optional local_duplicate records",
+                    "queue_fetches.jsonl.gz": "one record per asynchronous queue fetch",
+                    "fitness_history.jsonl.gz": "initial and per-step population summaries",
+                    "final_solution.json": "final genotype, objectives and canonical-variable SHA-256",
+                    "runtime.json": "actor placement, phases, evaluations and end queue state",
+                    "summary.json": "record counts and instrumentation counters",
+                },
+                "legacy_outputs_preserved": True,
+                "null_semantics": (
+                    "null means not observable/not applicable/incomplete; it must not be "
+                    "coerced to false or zero"
+                ),
+                "survival_semantics": (
+                    "survival tracks the exact migrant tag retained in the population; "
+                    "offspring do not inherit it, and incomplete horizons at run end "
+                    "are null rather than false"
+                ),
+            }
+            self._write_json_atomic(
+                os.path.join(self.path, "metrics", "data_contract.json"),
+                data_contract,
+            )
 
     def wytnij(self, lancuchZnakow):
         return lancuchZnakow.replace("\n", "")
@@ -714,7 +1206,13 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             self,
             self.want_run_end_communications,
         )
-        jsn.saveJson({step: asdict(info) for step, info in self.emigrations_history.items()})
+        legacy_history = {}
+        for step, info in self.emigrations_history.items():
+            record = asdict(info)
+            record.pop("events", None)
+            record.pop("fetch", None)
+            legacy_history[step] = record
+        jsn.saveJson(legacy_history)
 
     def createAllStepsDetailedPopulationJson(self):
         jsn = result_saver.Result_Saver(
@@ -878,6 +1376,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
             self.saveXiYiFittnessWhileJump()
             self.saveDetailedPopulationDescriptionForThisStepInTab()
             self.savePopulationDiversitiesThreeOfKindForThisStepInTab()
+            self.record_fitness_snapshot("initial_population", self.evaluations)
 
             # start measuring time
             self.migration.start_time_measure()
@@ -909,11 +1408,10 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         if self.number_of_islands > 1:
             self.migrate_individuals()
             # todo: SPR CZY MIGRANT POPRAWIŁ WYNIK WYSPY - best w population[0] > best
-            try:
-                # print("Island %s iter: %s get popu" % (self.island, self.step_num))
-                self.add_new_individuals()
-            except:
-                pass
+            # Empty queues are represented explicitly by RayMigrationPipeline.
+            # Any other exception is a real data-loss/actor failure and must
+            # fail the SLURM task instead of silently corrupting the experiment.
+            self.add_new_individuals()
 
         """if self.nowi:
             print("Step: "+str(self.step_num)+" eval: "+str(self.evaluations)+" NOWI "+str(self.island))"""
@@ -929,6 +1427,7 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         self.solutions = self.replacement(
             self.solutions, offspring_population
         )  # todo !!! zobacz GŁĘBIEJ ten replacement
+        self.finalize_current_migration_events_after_replacement()
         # print("*********------------*******", self.solutions.__len__())
 
         # Jeśli W KRZYŻWOANIU I MUTACJI POWSTAŁ LEPSZY
@@ -946,6 +1445,11 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         if self.step_num % 50 == 0:
             self.saveDetailedPopulationDescriptionForThisStepInTab()  # w tab_detailed_population
         self.savePopulationDiversitiesThreeOfKindForThisStepInTab()
+        evaluations_after_step = min(
+            self.termination_criterion.max_evaluations,
+            self.evaluations + len(offspring_population),
+        )
+        self.record_fitness_snapshot("after_replacement", evaluations_after_step)
 
         self.tab_all_steps_Y[
             self.step_num

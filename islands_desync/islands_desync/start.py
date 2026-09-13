@@ -3,8 +3,12 @@ import sys
 from datetime import datetime
 import os
 os.environ["RAY_DEDUP_LOGS"] = "0"
-os.environ.setdefault("MPLBACKEND", "Agg")
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+from islands_desync.geneticAlgorithm.utils.matplotlib_setup import (
+    configure_headless_matplotlib,
+)
+
+configure_headless_matplotlib()
+
 import ray
 from islands.core.IslandRunner import IslandRunner
 from islands.selectAlgorithm import RandomSelect
@@ -13,6 +17,7 @@ from islands.topologies import RingTopology
 from islands_desync.geneticAlgorithm.run_hpc.run_algorithm_params import (
     RunAlgorithmParams,
 )
+from islands_desync.geneticAlgorithm.utils.filename import get_run_output_root
 from islands_desync.islands.topologies.TorusTopology import TorusTopology
 from islands_desync.islands.topologies.CompleteTopology import CompleteTopology
 from islands_desync.islands.topologies.ERTopology import ERTopology
@@ -29,9 +34,21 @@ from islands_desync.islands.topologies.WS4Topology import WS4Topology
 
 
 def main():
+    ray_runtime_env = {
+        "env_vars": {
+            "MPLBACKEND": os.environ["MPLBACKEND"],
+            "MPLCONFIGDIR": os.environ["MPLCONFIGDIR"],
+            **{
+                key: value
+                for key, value in os.environ.items()
+                if key.startswith("ISLANDS_")
+            },
+        }
+    }
+
     if sys.argv[2] != " ":
         #ray.init()
-        ray.init(_temp_dir=sys.argv[2])
+        ray.init(_temp_dir=sys.argv[2], runtime_env=ray_runtime_env)
 
     #topol = "ring"
     #topol = "torus"
@@ -88,13 +105,13 @@ def main():
     #print(results, "--- testpoint 2 ---")           todo: w results moze da sie przeniec bestResult tej wyspy
     iterations = {result["island"]: result for result in results}
 
-    with open(
-        "logs/"
-        + "iterations_per_second"
+    summary_directory = get_run_output_root()
+    summary_directory.mkdir(parents=True, exist_ok=True)
+    with (summary_directory / (
+        "iterations_per_second"
         + datetime.now().strftime("%m-%d-%Y_%H%M")
-        + ".json",
-        "w",
-    ) as f:
+        + ".json"
+    )).open("w", encoding="utf-8") as f:
         json.dump(iterations, f)
 
 

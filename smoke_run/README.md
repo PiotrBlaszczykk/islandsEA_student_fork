@@ -33,9 +33,9 @@ Instaluje wymagania projektu oraz `ray==2.9.3`, `scikit-learn==1.1.3` i `setupto
 ## 2. Wysłanie smoke joba
 
 ```bash
-cd ~/islandsEA_student_fork/smoke_run
-JOB_ID=$(sbatch --parsable run_smoke.sh)
-echo "JOB_ID=${JOB_ID}"
+cd ~/islandsEA_student_fork
+bash smoke_run/submit_smoke.sh
+# przepisz wypisany JOB_ID
 squeue -j "${JOB_ID}"
 ```
 
@@ -45,7 +45,7 @@ Jeżeli konto nie ma domyślnego grantu SLURM, dodaj właściwy `#SBATCH --accou
 Po zakończeniu:
 
 ```bash
-cat "slurm-${JOB_ID}.out"
+cat "$SCRATCH/islandsEA/logs/slurm/smoke-${JOB_ID}.out"
 ```
 
 Poprawny wynik kończy się linią:
@@ -77,7 +77,7 @@ przydzielonych CPU, ostatnich jobach, systemach plików, quota, repozytorium ora
 pakietów w venvie. Jest zapisywany poza repozytorium w:
 
 ```text
-/net/people/plgrid/plgblaszczykk/artifacts/diagnostics/
+$SCRATCH/islandsEA/results/diagnostics/
 ```
 
 Ostatnia linia polecenia podaje dokładną ścieżkę jako `DIAGNOSTICS_READY=...`.
@@ -93,7 +93,7 @@ source /net/people/plgrid/plgblaszczykk/venvs/islands-ray/bin/activate
 python slurm_job_cost.py JOB_ID \
   --planned-runs 1800 \
   --overhead-percent 20 \
-  --json-output /net/people/plgrid/plgblaszczykk/artifacts/diagnostics/job_cost.json
+  --json-output "$SCRATCH/islandsEA/results/diagnostics/job_cost.json"
 ```
 
 Można podać kilka pilotów. Skrypt liczy koszt z `AllocCPUS × ElapsedRaw`, uśrednia wyłącznie
@@ -108,4 +108,6 @@ Reguła w `.gitattributes`:
 ```
 
 wymusza linuksowe końce linii LF dla skryptów Bash. `.gitignore` ignoruje natomiast pliki
-`slurm-*.out`, cache Pythona i lokalne venvy.
+`slurm-*.out`, cache Pythona i lokalne venvy. Wrapper `submit_smoke.sh` kieruje
+trwały log do `$SCRATCH/islandsEA/logs/slurm/`; `/tmp` w nagłówku skryptu jest
+wyłącznie awaryjnym fallbackiem dla ręcznego `sbatch`.

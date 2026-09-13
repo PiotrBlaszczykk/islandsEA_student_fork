@@ -2,9 +2,10 @@
 set -uo pipefail
 
 DIAG_USER="${USER:?USER is not set}"
-DIAG_PROJECT_DIR="/net/people/plgrid/plgblaszczykk/islandsEA_student_fork"
-DIAG_VENV_DIR="/net/people/plgrid/plgblaszczykk/venvs/islands-ray"
-DIAG_ARTIFACT_DIR="/net/people/plgrid/plgblaszczykk/artifacts/diagnostics"
+DIAG_PROJECT_DIR="${ISLANDS_PROJECT_DIR:-${HOME}/islandsEA_student_fork}"
+DIAG_VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
+DIAG_STORAGE_BASE="${SCRATCH:-${HOME}}"
+DIAG_ARTIFACT_DIR="${ISLANDS_DIAGNOSTICS_ROOT:-${DIAG_STORAGE_BASE}/islandsEA/results/diagnostics}"
 DIAG_TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 DIAG_REPORT="${DIAG_ARTIFACT_DIR}/ares_diagnostics_${DIAG_TIMESTAMP}.txt"
 DIAG_RECENT_START="$(date -d '7 days ago' +%F)"
@@ -44,7 +45,7 @@ run_command() {
     run_command "CPU DESCRIPTION" lscpu
 
     section "ENVIRONMENT VARIABLES"
-    env | grep -E '^(SLURM|PLG|MODULE|LMOD|PATH|LD_LIBRARY_PATH|VIRTUAL_ENV)=' | sort || true
+    env | grep -E '^(SLURM|PLG|SCRATCH|HOME|MODULE|LMOD|PATH|LD_LIBRARY_PATH|VIRTUAL_ENV)=' | sort || true
 
     section "MODULES"
     module list 2>&1 || true
@@ -76,7 +77,8 @@ run_command() {
 
     section "FILESYSTEMS"
     df -h \
-        "/net/people/plgrid/plgblaszczykk" \
+        "${HOME}" \
+        "${DIAG_STORAGE_BASE}" \
         "${DIAG_PROJECT_DIR}" \
         "${DIAG_ARTIFACT_DIR}" \
         /tmp 2>&1 || true
@@ -86,7 +88,7 @@ run_command() {
     section "DIRECTORY SIZES"
     du -sh \
         "${DIAG_PROJECT_DIR}" \
-        "/net/people/plgrid/plgblaszczykk/artifacts" \
+        "${DIAG_STORAGE_BASE}/islandsEA" \
         "${DIAG_VENV_DIR}" 2>&1 || true
 
     section "GIT"
@@ -155,4 +157,3 @@ PY
 
 echo
 echo "DIAGNOSTICS_READY=${DIAG_REPORT}"
-

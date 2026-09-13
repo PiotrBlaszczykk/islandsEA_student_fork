@@ -12,3 +12,6 @@ class RunAlgorithmParams:
     topology: str
     strategy: str
     strategy2: str
+    torus_rows: int | None = None
+    torus_columns: int | None = None
+    actor_startup_timeout: float = 300.0

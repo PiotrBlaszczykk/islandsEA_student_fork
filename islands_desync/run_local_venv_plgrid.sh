@@ -7,7 +7,8 @@
 #SBATCH --mem-per-cpu=250M
 #SBATCH -p plgrid-gpu-a100
 #SBATCH -A plgintobl-gpu-a100
-#SBATCH --output=slurm-%j.out
+#SBATCH --output=/tmp/islands-delay-legacy-%j.out
+#SBATCH --error=/tmp/islands-delay-legacy-%j.err
 
 set -euo pipefail
 set -x
@@ -22,7 +23,10 @@ if [[ ! -f "islands_desync/start.py" ]]; then
 fi
 
 repo_root="$(cd .. && pwd)"
-venv_path="${VENV_PATH:-$repo_root/.venv}"
+source "$repo_root/hpc_benchmarks/ares_storage.sh"
+islandsea_configure_storage
+venv_path="${VENV_PATH:-${ISLANDS_VENV_DIR:-$HOME/venvs/islands-ray}}"
+exec > >(tee -a "$ISLANDS_SLURM_LOG_DIR/legacy-delay-${SLURM_JOB_ID}.log") 2>&1
 
 module load Python/3.10.4
 
@@ -49,7 +53,6 @@ export MPLCONFIGDIR="${MPLCONFIGDIR:-/tmp/matplotlib-$USER-$SLURM_JOB_ID}"
 export PYTHONPATH="$PWD:${PYTHONPATH:-}"
 
 mkdir -p "$MPLCONFIGDIR"
-mkdir -p logs
 
 python --version
 python -c "import ray; print('ray', ray.__version__)"
@@ -111,20 +114,20 @@ python -u islands_desync/start.py \
     "$selection_strategy" \
     "$acceptance_strategy"
 
-problem_dir="logs/$dda/Sphe200"
+problem_dir="$ISLANDS_RUN_OUTPUT_ROOT/$dda/Sphe200"
 migrant_code="${selection_strategy:0:1}"
 topology_code="${topology:0:1}"
 run_dir="$problem_dir/$tta ${number_of_islands}${migrant_code}${topology_code}-co${migration_interval}ilu${number_of_migrants}"
 
 echo "Run directory: $run_dir"
 
-archive_dir="$repo_root/log_archives"
+archive_dir="$ISLANDS_RESULTS_ROOT/legacy_delay_archives"
 mkdir -p "$archive_dir"
 
 archive_name="${dda}_${tta}_${number_of_islands}${migrant_code}${topology_code}-co${migration_interval}ilu${number_of_migrants}_${selection_strategy}_${acceptance_strategy}_job${SLURM_JOB_ID}.tar.gz"
 archive_path="$archive_dir/$archive_name"
 
-tar -czf "$archive_path" "$run_dir"
+tar -czf "$archive_path" -C "$(dirname "$run_dir")" "$(basename "$run_dir")"
 
 ray stop --force || true
 

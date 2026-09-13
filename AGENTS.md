@@ -65,7 +65,15 @@ Historical notes describe both RabbitMQ and Ray flows. Both code paths exist, bu
 - BinarySolution stores a nested bit vector. `utils/decision_variables.py` flattens it for distance, diversity and population logging; logged problem size is number of bits. `maxDistance` sums squared bit differences (Hamming), keeping existing selection and tie order. Continuous distance arithmetic is preserved.
 - `--seed` and `--repeat` give seed `seed + (repeat-1)*1000000 + island_id`; these seeds do not change benchmark instances or guarantee deterministic asynchronous ordering. Old launches without `ISLANDS_SEED` preserve their RNG policy.
 - Existing actor reservations require `2*N+1` logical Ray CPUs; the SLURM wrapper reserves one additional head CPU for the driver. BLAS/OMP threads are restricted to 1. Code, instance, configuration, Python and dependency versions are checked on every node before the timed run.
-- `benchmark_manifest.json` is written before the evolutionary loop; `experiment_manifest.json`, exact `topology.json`, a post-run topology plot and `iterations_per_second.json` accompany the original raw logs. Do not replace raw migrant logs with only summary statistics.
+- `hpc_benchmarks/run_ares.sh` now runs the benchmark dry-run and resource calculation before starting Ray, then prewarms a job-scoped, node-local Matplotlib cache once per node. `hpc_benchmarks/run_ares_200.sh` is the fixed Ares profile for 200 islands: 9 nodes × 48 CPUs, hence 431 Ray CPUs after reserving the driver CPU versus 401 required. It uses `plgrid` / `plglscclass26-cpu`, a 30-minute default walltime and a 300-second startup timeout. Start with the documented 128-evaluation canary and do not submit a campaign before it passes.
+- The 200-island profile does not make fixed-size ER/WS topologies compatible with 200: ER1–ER4 are 150-node graphs and WS3/WS4 are 144-node graphs. `ring` and `complete` accept 200. Torus preserves its historical 12-column default, but the benchmark launcher can now accept an explicit `--torus-rows/--torus-columns` product; the 10×20 pilot is methodology-gated in `pilot_run/`. The preflight intentionally rejects invalid combinations before allocating Ray actors.
+- `pilot_run/` is the authoritative single-configuration Ares pilot: F1/r01 continuous D=200, 200 islands, explicit 10×20 torus, best/plain, fixed study settings and repeats 1–3. First submit its 128-evaluation/10-minute canary; the full `submit_pilot.sh` requires a clean commit, `CONFIRM_TORUS_200=1` and `PILOT_CANARY_JOB_ID`, then verifies that canary from `sacct` and its files before creating a concurrency-limited SLURM array plus an `afterany` finalizer. It never retries automatically. Treat `pilot_spec.json` as the source of full-run arguments. Success requires `pilot_summary.json` with all three repeats valid, not only a SLURM `COMPLETED` state.
+- **Ares storage contract (September 13, 2026):** source `hpc_benchmarks/ares_storage.sh` and call `islandsea_configure_storage` in submitters and jobs. With `$SCRATCH` available, generated data lives under `$SCRATCH/islandsEA/`: raw runs in `results/runs`, compact audit in `results/audit`, pilot archives/summaries in `results/pilot_runs`, SLURM logs in `logs/slurm`, failure-only Ray logs in `logs/ray_failures`, and reserved roots in `checkpoints` and `tmp`. Repo/config and the existing venv remain in HOME. The fallback is `$HOME/islandsEA` with a warning. Do not reintroduce output under the repo, `~/artifacts`, or relative `logs/` in an Ares launcher. Submit via `pilot_run/submit_*.sh`, `hpc_benchmarks/submit_*.sh`, or `smoke_run/submit_smoke.sh`, because `#SBATCH` does not expand shell variables; `/tmp` in job headers is only a safe non-HOME fallback.
+- Every named benchmark run writes `run_metadata.json` as well as `experiment_manifest.json`. `run_metadata.json` is the aggregation contract: it records a unique `run_id`, stable SHA-256 `experiment_key`, all benchmark/GA/migration/topology settings, repeat and seed policy, topology hash, resources/SLURM IDs, Git/code/dependency provenance and resolved storage/output paths. The pilot validator must reject missing or inconsistent metadata.
+- The pilot requires metrics profile `research-v1-full-buffered`. Each island writes `metrics/island_NNN/{migration_events,queue_fetches,fitness_history}.jsonl.gz`, `final_solution.json`, `runtime.json` and `summary.json`; the root `metrics/data_contract.json` defines the schema. Migration records share `(run_id,event_id)` across send/process and retain enqueue/dequeue timestamps, queue depth/residence, pre-filter decision, replacement survival and a 25-step survival observation. Fitness includes the initial population and every step on evaluation/time axes. Telemetry stays in actor memory during optimization and is compressed only after the finish barrier; never replace it with per-migrant synchronous I/O.
+- Empty Ray migration fetches now return explicit empty `MigrationInfo` objects. Unexpected receive/decode failures intentionally propagate and fail the SLURM task; do not restore the historical broad `except: pass`. Legacy `W* Imigrants.json` files remain post-filter compatibility outputs, while research conclusions should use the new pre-filter records.
+- `Computation.ready()` now makes actor construction an explicit barrier. `IslandRunner` first waits for island 0 (which prepares shared output metadata), then waits for all Computation actors with the configured timeout before starting the algorithms. The legacy 15-second pause remains, so the safety change does not silently shorten the historical start staging.
+- `benchmark_manifest.json` is written before the evolutionary loop; `experiment_manifest.json`, `run_metadata.json`, exact `topology.json`, a post-run topology plot and `iterations_per_second.json` accompany the original raw logs. Do not replace raw migrant logs with only summary statistics.
 - **Migration interval currently measures evaluation-counter differences**, not generations: `evaluations - last_migration_evolution >= migration_interval`. The port does not change this or signed delay / immigrant acceptance methods.
 - Evidence: `hpc_benchmarks/validation_local.json` and the package `validation_report.json`. Locally, 17 tests and two genuine two-island Ray runs (NK60/maxDistance and F29 200D/best, 128 evaluations each) passed. These ran on Windows/Python 3.12/Ray 2.31. Ares/Python 3.10/SLURM and multiple physical nodes still require target-environment validation. Do not infer a need to upgrade the existing Ares Ray version from the local test version.
 
@@ -149,7 +157,7 @@ Expected run directory naming:
 Observed local resource caveat:
 - `Island`, `Computation`, and `SignalActor` each reserve `num_cpus=1`.
 - Practical local island count on a `16`-thread machine is therefore closer to `7` than to `16`.
-- `torus` is not a good first local topology because `IslandRunner.py` hardcodes `12 x (island_count // 12)`.
+- `torus` is not a good first legacy local topology because the default remains `12 x (island_count // 12)`; the benchmark launcher can pass an explicitly validated shape.
 
 Validated local output from the command above:
 - run directory: `logs/260505/Sphe200/120000 7rr-co5ilu5`
@@ -458,7 +466,7 @@ Not every imported operator is active in the current default run path; many are 
 ### Implementations
 - `RingTopology`: current implementation returns `[self, next]` neighbors (non-standard ring; includes self-loop).
 - `TorusTopology`: uses 4-neighbor wrapped grid.
-- `IslandRunner` hardcodes torus dimensions as `create(12, island_count // 12)`, so torus runs assume `island_count` divisible by 12.
+- `IslandRunner` retains `create(12, island_count // 12)` as the compatibility default. The benchmark launcher may provide explicit rows/columns whose product equals the island count; record that shape as a methodology parameter.
 
 ### Known broken/stale topology files
 `ERTopology.py`, `WSTopology.py`, `WS1Topology.py`, `WS2Topology.py` reference undefined `topol` variable (commented dict placeholder).  
@@ -560,8 +568,8 @@ This section captures operational knowledge from validated HPC runs and common f
 2. Check if still running:
    - `squeue -j <JOBID>`
    - `sacct -j <JOBID> --format=JobID,State,ExitCode,Elapsed,NodeList -X`
-3. Get head node from SLURM log:
-   - `HEAD=$(grep -m1 "Starting HEAD at" slurm-<JOBID>.out | awk '{print $4}')`
+3. Get head node from the scratch-backed SLURM log:
+   - `HEAD=$(grep -m1 "Starting HEAD at" "$SCRATCH/islandsEA/logs/slurm/<log-for-JOBID>.out" | awk '{print $4}')`
 4. Validate dashboard from login node:
    - `curl -sS -m 5 http://$HEAD:8265/api/version`
 5. From **laptop/local terminal**, open SSH tunnel:
@@ -580,16 +588,17 @@ For per-island fitness curves, read `resultsEveryStepW*.json` in run directory a
 
 Required pattern:
 1. Set and **export** run directory variable (spaces are common in path names):
-   - `export RUN_DIR="logs/<date>/<prob4><dim>/<time> <tag>"`
+   - `export RUN_DIR="$SCRATCH/islandsEA/results/runs/<date>/<prob4><dim>/<time> <tag>"`
 2. Run plotting snippet (inline Python or helper script) that saves:
    - `$RUN_DIR/fitness_all_islands.png`
 
 ### File transfer gotchas
 - `scp ... .` copies into the current shell location. If run on Ares, file stays on Ares.
 - To download to laptop, run `scp` from laptop terminal.
-- With space-heavy paths, easiest method:
-  1. on cluster: `cp "$RUN_DIR/fitness_all_islands.png" "$HOME/fitness_all_islands.png"`
-  2. on laptop: `scp <user>@login01.ares.cyfronet.pl:~/fitness_all_islands.png .`
+- For the finalized pilot, run `pilot_run/download_pilot.ps1 -JobId <ARRAY_JOB_ID>`
+  on the Windows laptop. It resolves remote `$SCRATCH`, downloads into the
+  workspace-level `artifacts/pilot_runs/` directory and verifies archive hashes
+  and `pilot_summary.json`. Do not stage large transfers through HOME.
 
 ---
 

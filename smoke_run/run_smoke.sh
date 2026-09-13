@@ -5,14 +5,20 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=4G
 #SBATCH --time=00:05:00
-#SBATCH --output=slurm-%j.out
+#SBATCH --output=/tmp/islandsea-smoke-%j.out
+#SBATCH --error=/tmp/islandsea-smoke-%j.err
 
 set -euo pipefail
 
-VENV_DIR="/net/people/plgrid/plgblaszczykk/venvs/islands-ray"
-SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
+VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
+source "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh"
+islandsea_configure_storage
 JOB_TOKEN="${SLURM_JOB_ID:-manual-$$}"
 RAY_TMP_DIR="/tmp/${USER}/islandsea-smoke-${JOB_TOKEN}"
+export TMPDIR="${RAY_TMP_DIR}/tmp"
+export XDG_CACHE_HOME="${RAY_TMP_DIR}/xdg-cache"
 
 module load python/3.10.4-gcccore-11.3.0
 
@@ -22,7 +28,13 @@ if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
     exit 1
 fi
 
-mkdir -p "${RAY_TMP_DIR}"
+mkdir -p "${TMPDIR}" "${XDG_CACHE_HOME}"
+cleanup() {
+    if [[ "$RAY_TMP_DIR" == "/tmp/${USER}/islandsea-smoke-${JOB_TOKEN}" ]]; then
+        rm -rf -- "$RAY_TMP_DIR"
+    fi
+}
+trap cleanup EXIT
 
 echo "SLURM_JOB_ID=${SLURM_JOB_ID:-brak}"
 echo "SLURMD_NODENAME=${SLURMD_NODENAME:-brak}"

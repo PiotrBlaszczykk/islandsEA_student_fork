@@ -1,3 +1,20 @@
+import os
+from pathlib import Path
+
+
+def get_run_output_root():
+    output_root = os.environ.get("ISLANDS_RUN_OUTPUT_ROOT")
+    if output_root is not None:
+        return Path(output_root)
+    storage_root = os.environ.get("ISLANDS_STORAGE_ROOT")
+    if storage_root is None:
+        storage_base = os.environ.get("SCRATCH") or os.environ.get("HOME")
+        storage_root = (
+            str(Path(storage_base) / "islandsEA") if storage_base else "islandsEA"
+        )
+    return Path(storage_root) / "results" / "runs"
+
+
 class Filename:
     def __init__(self, kto, czy_kom):
         self.czy_kom = czy_kom
@@ -48,14 +65,8 @@ class Filename:
         coilemigr,
         ilumigr,
     ):
-        return (
-            "logs/"
-            + str(dta)
-            + "/"
-            + problem
-            + str(size)
-            + "/"
-            + godz
+        run_name = (
+            godz
             + " "
             + str(ilwysp)
             + typmigrantow
@@ -65,6 +76,7 @@ class Filename:
             + "ilu"
             + str(ilumigr)
         )
+        return str(get_run_output_root() / str(dta) / (problem + str(size)) / run_name)
 
     # def getshortpath(self, dta, problem):
     #    return "logs/"+str(dta)+"/"+problem

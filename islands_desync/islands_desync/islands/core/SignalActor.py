@@ -10,6 +10,7 @@ class SignalActor:
         self.current_number: int = 0
         self.ready_event = asyncio.Event()
         self.finish_event = asyncio.Event()
+        self.delivery_event = asyncio.Event()
 
     def send(self, event_type="start"):
         self.current_number += 1
@@ -28,7 +29,11 @@ class SignalActor:
     def load_event(self, event_type) -> asyncio.Event:
         if event_type == "start":
             event = self.ready_event
-        else:
+        elif event_type == "finish":
             event = self.finish_event
+        elif event_type == "delivery":
+            event = self.delivery_event
+        else:
+            raise ValueError(f"Unknown synchronization event: {event_type}")
         return event
 
