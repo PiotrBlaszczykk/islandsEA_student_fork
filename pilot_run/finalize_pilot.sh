@@ -12,6 +12,7 @@
 
 set -euo pipefail
 [[ "$#" -eq 1 ]] || { echo "Usage: $0 ARRAY_JOB_ID" >&2; exit 2; }
+: "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
 
 ARRAY_JOB_ID="$1"
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -25,6 +26,17 @@ PILOT_DIR="$ARTIFACT_ROOT/$ARRAY_JOB_ID"
 mkdir -p "$PILOT_DIR"
 module load python/3.10.4-gcccore-11.3.0
 source "$VENV_DIR/bin/activate"
+cd "$PROJECT_DIR"
+ACTUAL_COMMIT=$(git rev-parse HEAD)
+[[ "$ACTUAL_COMMIT" == "$PILOT_EXPECTED_COMMIT" ]] || {
+    echo "Finalizer blocked: expected commit $PILOT_EXPECTED_COMMIT, found $ACTUAL_COMMIT." >&2
+    exit 2
+}
+[[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
+    echo "Finalizer blocked: checkout became dirty after submission." >&2
+    git status --short >&2
+    exit 2
+}
 export PYTHONPATH="$PROJECT_DIR/islands_desync${PYTHONPATH:+:$PYTHONPATH}"
 export MPLBACKEND=Agg
 export MPLCONFIGDIR="/tmp/${USER}/islandsea-finalize-${SLURM_JOB_ID}/matplotlib"
@@ -37,7 +49,6 @@ sacct -n -P -j "$ARRAY_JOB_ID" \
     --format=JobIDRaw,JobName,Partition,State,ExitCode,ElapsedRaw,AllocCPUS,CPUTimeRAW,TotalCPU,MaxRSS,MaxVMSize,AveRSS,ReqMem,ConsumedEnergyRaw \
     > "$PILOT_DIR/sacct.txt" || true
 
-cd "$PROJECT_DIR"
 "$VENV_DIR/bin/python" "$SCRIPT_DIR/pilot_tools.py" finalize \
     --array-job-id "$ARRAY_JOB_ID" \
     --artifact-root "$ARTIFACT_ROOT"

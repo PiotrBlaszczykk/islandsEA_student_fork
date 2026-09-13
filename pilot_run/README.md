@@ -50,7 +50,24 @@ Przy trzech równoległych elementach maksymalna chwilowa alokacja to 27 węzł�
 maksymalnie 1 CPUh. To limit bezpieczeństwa, nie prognoza czasu. Nie ma
 automatycznych retry.
 
-## Przed wysłaniem
+## Jednokomendowe uruchomienie całego pipeline'u
+
+Po `git pull --ff-only` jeden launcher wykonuje testy, dry-run, sprawdza czysty
+commit i storage pod `$SCRATCH`, wysyła canary, a następnie mały job-bramkę.
+Bramka działa przez zależność SLURM `afterany`, więc nie wymaga otwartej sesji
+SSH. Sprawdza wynik canary i **tylko po pełnej walidacji** automatycznie wysyła
+trzy właściwe powtórzenia oraz finalizer:
+
+```bash
+bash pilot_run/launch_pilot.sh --confirm-torus200-and-722-cpuh
+```
+
+Argument jest celowo długi: stanowi jawną zgodę na torus 10×20 i koszt pełnego
+pilota. Canary oraz właściwe joby są przypięte do commita obecnego przy
+uruchomieniu. Zmiana checkoutu lub brudne drzewo przed startem któregokolwiek
+etapu bezpiecznie zatrzyma pipeline. Launcher nie wykonuje automatycznych retry.
+
+## Ręczne uruchomienie etapami
 
 Na Aresie, z katalogu repozytorium:
 

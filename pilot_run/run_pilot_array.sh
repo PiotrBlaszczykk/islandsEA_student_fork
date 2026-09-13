@@ -13,6 +13,7 @@
 set -euo pipefail
 : "${SLURM_ARRAY_JOB_ID:?Submit through pilot_run/submit_pilot.sh}"
 : "${SLURM_ARRAY_TASK_ID:?Missing SLURM_ARRAY_TASK_ID}"
+: "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
@@ -28,6 +29,17 @@ RESULT_POINTER="$RUN_ARTIFACT_DIR/result_pointer.json"
 mkdir -p "$RUN_ARTIFACT_DIR"
 module load python/3.10.4-gcccore-11.3.0
 source "$VENV_DIR/bin/activate"
+cd "$PROJECT_DIR"
+ACTUAL_COMMIT=$(git rev-parse HEAD)
+[[ "$ACTUAL_COMMIT" == "$PILOT_EXPECTED_COMMIT" ]] || {
+    echo "Pilot blocked: expected commit $PILOT_EXPECTED_COMMIT, found $ACTUAL_COMMIT." >&2
+    exit 2
+}
+[[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
+    echo "Pilot blocked: checkout became dirty after submission." >&2
+    git status --short >&2
+    exit 2
+}
 
 "$VENV_DIR/bin/python" "$SCRIPT_DIR/pilot_tools.py" record-attempt \
     --path "$ATTEMPT" --status running --repeat "$REPEAT"

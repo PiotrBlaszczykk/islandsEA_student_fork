@@ -57,6 +57,11 @@ cd "$PROJECT_DIR"
     git status --short >&2
     exit 2
 }
+GIT_COMMIT=$(git rev-parse HEAD)
+if [[ -n "${PILOT_EXPECTED_COMMIT:-}" && "$GIT_COMMIT" != "$PILOT_EXPECTED_COMMIT" ]]; then
+    echo "Submission blocked: expected commit $PILOT_EXPECTED_COMMIT, found $GIT_COMMIT." >&2
+    exit 2
+fi
 
 "$VENV_DIR/bin/python" "$SCRIPT_DIR/pilot_tools.py" verify-canary \
     --artifact-root "$ARTIFACT_ROOT" \
@@ -67,14 +72,14 @@ ARRAY_SUBMISSION=$(sbatch --parsable \
     --array="1-3%${MAX_PARALLEL}" \
     --output="$ISLANDS_SLURM_LOG_DIR/pilot-%A_%a.out" \
     --error="$ISLANDS_SLURM_LOG_DIR/pilot-%A_%a.err" \
-    --export="ALL,ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR}" \
+    --export="ALL,ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR},PILOT_EXPECTED_COMMIT=${GIT_COMMIT}" \
     "$SCRIPT_DIR/run_pilot_array.sh")
 ARRAY_JOB_ID="${ARRAY_SUBMISSION%%;*}"
 FINALIZER_SUBMISSION=$(sbatch --parsable \
     --dependency="afterany:${ARRAY_JOB_ID}" \
     --output="$ISLANDS_SLURM_LOG_DIR/pilot-finalize-%j.out" \
     --error="$ISLANDS_SLURM_LOG_DIR/pilot-finalize-%j.err" \
-    --export="ALL,ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR}" \
+    --export="ALL,ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR},PILOT_EXPECTED_COMMIT=${GIT_COMMIT}" \
     "$SCRIPT_DIR/finalize_pilot.sh" "$ARRAY_JOB_ID")
 FINALIZER_JOB_ID="${FINALIZER_SUBMISSION%%;*}"
 

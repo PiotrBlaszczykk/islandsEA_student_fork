@@ -12,6 +12,7 @@
 
 set -euo pipefail
 : "${SLURM_JOB_ID:?Submit through pilot_run/submit_canary.sh}"
+: "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
@@ -21,11 +22,21 @@ ARTIFACT_ROOT="$ISLANDS_ARTIFACT_ROOT"
 CANARY_DIR="$ARTIFACT_ROOT/pilot_canaries/$SLURM_JOB_ID"
 
 mkdir -p "$CANARY_DIR"
+cd "$PROJECT_DIR"
+ACTUAL_COMMIT=$(git rev-parse HEAD)
+[[ "$ACTUAL_COMMIT" == "$PILOT_EXPECTED_COMMIT" ]] || {
+    echo "Canary blocked: expected commit $PILOT_EXPECTED_COMMIT, found $ACTUAL_COMMIT." >&2
+    exit 2
+}
+[[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
+    echo "Canary blocked: checkout became dirty after submission." >&2
+    git status --short >&2
+    exit 2
+}
 export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
 export ISLANDS_RAY_FAILURE_DIR="$ISLANDS_RAY_FAILURE_ROOT/pilot-canary-$SLURM_JOB_ID"
 export ISLANDS_EFFECT_HORIZON_STEPS=25
 islandsea_print_storage
-cd "$PROJECT_DIR"
 bash "$PROJECT_DIR/hpc_benchmarks/run_ares.sh" \
     --problem r01_elliptic \
     --dimension 200 \
