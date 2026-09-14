@@ -51,13 +51,6 @@ def _nvidia_smi() -> str:
     return result.stdout.strip()
 
 
-def _cpu_f1_batch(vectors, shift, matrix, weights):
-    import numpy as np
-
-    transformed = (vectors - shift) @ matrix.T
-    return np.sum(weights * transformed * transformed, axis=1) + 100.0
-
-
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project-dir", type=Path, required=True)
@@ -81,6 +74,7 @@ def _run(args: argparse.Namespace) -> dict:
     from islands_desync.geneticAlgorithm.utils.benchmarks_refined import (
         create_evaluator,
     )
+    from islands_desync.geneticAlgorithm.utils.benchmarks_refined.batch import NumpyBatchBackend
 
     if not os.environ.get("SLURM_JOB_ID"):
         raise RuntimeError("This test must run inside a SLURM allocation")
@@ -100,16 +94,15 @@ def _run(args: argparse.Namespace) -> dict:
         raise RuntimeError("Ray memory caps leave less than 21 GiB of the 125 GiB job allocation")
 
     evaluator = create_evaluator("r01_elliptic", 200)
-    shift = np.asarray(evaluator._shifts[0], dtype=np.float64)
-    matrix = np.asarray(evaluator._matrices[0], dtype=np.float64)
-    weights = 10.0 ** (6.0 * np.arange(200, dtype=np.float64) / 199.0)
+    cpu_backend = NumpyBatchBackend()
+    cpu_backend.prepare("r01_elliptic", 200)
     rng = np.random.RandomState(20260914)
     validation_vectors = rng.uniform(-100.0, 100.0, size=(VALIDATION_BATCH_SIZE, 200))
 
     # The public scalar evaluator remains the correctness oracle. A vectorized
     # NumPy form is checked against it before being used for timing.
     scalar_reference = np.asarray([evaluator(row) for row in validation_vectors])
-    cpu_batch_reference = _cpu_f1_batch(validation_vectors, shift, matrix, weights)
+    cpu_batch_reference = cpu_backend.evaluate_batch("r01_elliptic", validation_vectors)
     np.testing.assert_allclose(cpu_batch_reference, scalar_reference, rtol=1e-12, atol=1e-6)
 
     cpu_timings = []
@@ -120,7 +113,7 @@ def _run(args: argparse.Namespace) -> dict:
         samples = []
         for _ in range(REPEATS):
             started = time.perf_counter()
-            values = _cpu_f1_batch(host_batch, shift, matrix, weights)
+            values = cpu_backend.evaluate_batch("r01_elliptic", host_batch)
             samples.append(time.perf_counter() - started)
         if not np.all(np.isfinite(values)):
             raise FloatingPointError(f"CPU batch {batch_size} produced non-finite values")
@@ -134,6 +127,7 @@ def _run(args: argparse.Namespace) -> dict:
         )
 
     ray.init(
+        address="local",
         num_cpus=cpus,
         num_gpus=1,
         include_dashboard=False,
@@ -144,40 +138,24 @@ def _run(args: argparse.Namespace) -> dict:
 
     @ray.remote(num_cpus=1, num_gpus=1, max_restarts=0, max_task_retries=0)
     class F1GpuActor:
-        def __init__(self, shift_array, matrix_array, weight_array):
+        def __init__(self):
             import cupy as cp
+            from islands_desync.geneticAlgorithm.utils.benchmarks_refined.batch import CupyBatchBackend
 
             self.cp = cp
-            self.shift = cp.asarray(shift_array, dtype=cp.float64)
-            self.matrix_t = cp.asarray(matrix_array.T, dtype=cp.float64)
-            self.weights = cp.asarray(weight_array, dtype=cp.float64)
-            # Force context creation and CuPy kernel compilation before timing.
-            warm = cp.zeros((4, self.shift.size), dtype=cp.float64)
-            self._evaluate_device(warm)
-            cp.cuda.Stream.null.synchronize()
-
-        def _evaluate_device(self, vectors):
-            transformed = (vectors - self.shift) @ self.matrix_t
-            return self.cp.sum(self.weights * transformed * transformed, axis=1) + 100.0
+            self.backend = CupyBatchBackend()
+            self.backend.prepare("r01_elliptic", 200)
+            self.backend.evaluate_batch("r01_elliptic", np.zeros((4, 200)))
 
         def evaluate(self, host_vectors):
-            cp = self.cp
             total_started = time.perf_counter()
-            device_vectors = cp.asarray(host_vectors, dtype=cp.float64)
-            h2d_finished = time.perf_counter()
-            event_start = cp.cuda.Event()
-            event_end = cp.cuda.Event()
-            event_start.record()
-            device_values = self._evaluate_device(device_vectors)
-            event_end.record()
-            event_end.synchronize()
-            kernel_seconds = float(cp.cuda.get_elapsed_time(event_start, event_end) / 1000.0)
-            host_values = cp.asnumpy(device_values)
+            host_values = self.backend.evaluate_batch("r01_elliptic", host_vectors)
+            profile = self.backend.last_profile
             total_finished = time.perf_counter()
             return {
                 "values": host_values,
-                "h2d_submit_seconds": h2d_finished - total_started,
-                "kernel_seconds": kernel_seconds,
+                "h2d_device_seconds": profile["h2d_device_seconds"],
+                "kernel_seconds": profile["kernel_device_seconds"],
                 "actor_end_to_end_seconds": total_finished - total_started,
             }
 
@@ -201,7 +179,7 @@ def _run(args: argparse.Namespace) -> dict:
                 "device_total_memory_bytes": int(total_memory),
             }
 
-    actor = F1GpuActor.remote(shift, matrix, weights)
+    actor = F1GpuActor.remote()
     actor_environment = ray.get(actor.environment.remote(), timeout=120)
     if actor_environment["ray_gpu_ids"] != [0]:
         raise RuntimeError(f"Unexpected Ray GPU ids: {actor_environment['ray_gpu_ids']}")
@@ -227,7 +205,7 @@ def _run(args: argparse.Namespace) -> dict:
                 {
                     "ray_roundtrip_seconds": roundtrip_seconds,
                     "actor_end_to_end_seconds": measurement["actor_end_to_end_seconds"],
-                    "h2d_submit_seconds": measurement["h2d_submit_seconds"],
+                    "h2d_device_seconds": measurement["h2d_device_seconds"],
                     "kernel_seconds": measurement["kernel_seconds"],
                 }
             )
@@ -266,7 +244,7 @@ def _run(args: argparse.Namespace) -> dict:
     ray.shutdown()
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "ok",
         "created_timestamp_unix": time.time(),
         "purpose": "Athena one-A100 readiness; not an IslandsEA experiment",
@@ -297,7 +275,9 @@ def _run(args: argparse.Namespace) -> dict:
             "dimension": 200,
             "dtype": "float64",
             "data_sha256": evaluator.metadata()["data_sha256"],
-            "implementation_sha256": evaluator.metadata().get("implementation_sha256"),
+            "implementation_sha256": cpu_backend.metadata("r01_elliptic", 200)["implementation_sha256"],
+            "batch_backend_version": cpu_backend.metadata("r01_elliptic", 200)["batch_version"],
+            "timing_contract": "CPU now includes batch input validation; H2D is CUDA-event time, not old host submit time",
             "validation_batch_size": VALIDATION_BATCH_SIZE,
             "rtol": 1e-12,
             "atol": 1e-6,
@@ -338,6 +318,12 @@ def main() -> int:
         _atomic_json(args.output, payload)
         print(f"ATHENA_GPU_READINESS_FAILED={type(error).__name__}", file=sys.stderr)
         return 1
+    finally:
+        # Only this Python driver owns this Ray cluster. Shell cleanup handles
+        # abrupt termination without stopping other jobs on the shared node.
+        ray_module = sys.modules.get("ray")
+        if ray_module is not None and ray_module.is_initialized():
+            ray_module.shutdown()
 
     _atomic_json(args.output, payload)
     print("ATHENA_CUPY_KERNEL_OK=1")

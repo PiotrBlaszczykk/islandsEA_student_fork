@@ -2,6 +2,13 @@
 
 # Login-node submitter for the one-A100 readiness canary.
 set -euo pipefail
+MODE=f1
+case "${1:-}" in
+    "") ;;
+    --suite) MODE=suite; shift ;;
+    *) echo "Usage: $0 [--suite]" >&2; exit 2 ;;
+esac
+[[ "$#" -eq 0 ]] || { echo "Unexpected arguments" >&2; exit 2; }
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
@@ -44,8 +51,21 @@ case "$STORAGE_ROOT/" in
         exit 2
         ;;
 esac
-RESULT_ROOT="${ATHENA_READINESS_ROOT:-$STORAGE_ROOT/results/athena_gpu_readiness}"
+if [[ "$MODE" == suite ]]; then
+    RESULT_ROOT="${ATHENA_BENCHMARK_VALIDATION_ROOT:-$STORAGE_ROOT/results/athena_benchmark_validation}"
+    RESULT_FILE=validation.json
+else
+    RESULT_ROOT="${ATHENA_READINESS_ROOT:-$STORAGE_ROOT/results/athena_gpu_readiness}"
+    RESULT_FILE=readiness.json
+fi
 LOG_ROOT="${ISLANDS_SLURM_LOG_DIR:-$STORAGE_ROOT/logs/slurm}"
+SCRATCH_REAL=$(realpath -m -- "$SCRATCH")
+for path in "$RESULT_ROOT" "$LOG_ROOT"; do
+    case "$(realpath -m -- "$path")/" in
+        "$SCRATCH_REAL"/*) ;;
+        *) echo "Result/log path must remain below SCRATCH: $path" >&2; exit 2 ;;
+    esac
+done
 mkdir -p "$RESULT_ROOT" "$LOG_ROOT"
 
 SUBMISSION=$(sbatch --parsable \
@@ -60,13 +80,14 @@ SUBMISSION=$(sbatch --parsable \
     --gres=gpu:1 \
     --output="$LOG_ROOT/athena-gpu-readiness-%j.out" \
     --error="$LOG_ROOT/athena-gpu-readiness-%j.err" \
-    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_VENV_DIR=${VENV_DIR},ATHENA_READINESS_ROOT=${RESULT_ROOT},ATHENA_EXPECTED_COMMIT=${LOCAL_COMMIT}" \
+    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_VENV_DIR=${VENV_DIR},ATHENA_READINESS_ROOT=${RESULT_ROOT},ATHENA_EXPECTED_COMMIT=${LOCAL_COMMIT},ATHENA_VALIDATION_MODE=${MODE}" \
     "$SCRIPT_DIR/run_readiness.sh")
 JOB_ID="${SUBMISSION%%;*}"
 [[ "$JOB_ID" =~ ^[0-9]+$ ]] || { echo "Invalid sbatch response: $SUBMISSION" >&2; exit 1; }
 
 echo "ATHENA_GPU_READINESS_JOB_ID=$JOB_ID"
-echo "ATHENA_GPU_READINESS_RESULT=$RESULT_ROOT/$JOB_ID/readiness.json"
+echo "ATHENA_VALIDATION_MODE=$MODE"
+echo "ATHENA_GPU_READINESS_RESULT=$RESULT_ROOT/$JOB_ID/$RESULT_FILE"
 echo "ATHENA_GPU_READINESS_STDOUT=$LOG_ROOT/athena-gpu-readiness-$JOB_ID.out"
 echo "ATHENA_GPU_READINESS_STDERR=$LOG_ROOT/athena-gpu-readiness-$JOB_ID.err"
 echo "MAX_GPU_HOURS=0.25"

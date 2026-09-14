@@ -6,6 +6,8 @@ Ta kopia pakietu została przeniesiona z `help_codebase` do aktywnej ścieżki R
 
 Pełne definicje, źródła, rozbieżności między wzorami w raporcie CEC i oficjalnym kodem oraz ograniczenia porównywalności opisuje [RESEARCH.md](RESEARCH.md).
 
+Na branchu Athena dodano osobne [API batchowe NumPy/CuPy dla wszystkich 40 funkcji](BATCH.md). Korzysta z tych samych danych i pozostawia dotychczasowe API/adaptery CPU bez zmian. Testy NumPy przeszły; pełny test nowego backendu CuPy na A100 jest przygotowany, ale jeszcze niewykonany. Samo dodanie tej warstwy nie przełącza istniejącego IslandsEA na GPU.
+
 ## Wymiary i zależności
 
 - CEC2014: **D = 10, 30, 50, 100, 200**, domyślnie 30; każda współrzędna w `[-100, 100]`. Pierwsze cztery wymiary mają oficjalne dane Part A; **D=200 to rozszerzenie IslandsEA**, z ustalonymi wygenerowanymi instancjami dla wszystkich 30 funkcji.

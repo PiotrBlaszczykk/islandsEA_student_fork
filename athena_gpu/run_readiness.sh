@@ -18,28 +18,49 @@ set -euo pipefail
 : "${ISLANDS_VENV_DIR:?Submitter must export the Athena venv path}"
 : "${ATHENA_READINESS_ROOT:?Submitter must export the result root}"
 : "${ATHENA_EXPECTED_COMMIT:?Submitter must pin the Git commit}"
+: "${SCRATCH:?GPU artifacts and caches require SCRATCH}"
 
 PROJECT_DIR="$ISLANDS_PROJECT_DIR"
 SCRIPT_DIR="$PROJECT_DIR/athena_gpu"
 VENV_DIR="$ISLANDS_VENV_DIR"
 RUN_DIR="$ATHENA_READINESS_ROOT/$SLURM_JOB_ID"
 RAY_TMP_DIR="/tmp/r${SLURM_JOB_ID}"
+MODE="${ATHENA_VALIDATION_MODE:-f1}"
+case "$MODE" in
+    f1) PYTHON_SCRIPT=gpu_readiness.py; RESULT_FILE=readiness.json ;;
+    suite) PYTHON_SCRIPT=gpu_validation.py; RESULT_FILE=validation.json ;;
+    *) echo "Unknown validation mode: $MODE" >&2; exit 2 ;;
+esac
+PYTHON_JOB_PID=""
 
 [[ "$RAY_TMP_DIR" =~ ^/tmp/r[0-9]+$ ]] || {
     echo "Unsafe Ray tmp path: $RAY_TMP_DIR" >&2
     exit 2
 }
-[[ -f "$SCRIPT_DIR/gpu_readiness.py" ]] || {
+[[ -f "$SCRIPT_DIR/$PYTHON_SCRIPT" ]] || {
     echo "Invalid ISLANDS_PROJECT_DIR: $PROJECT_DIR" >&2
     exit 2
 }
 [[ -x "$VENV_DIR/bin/python" ]] || { echo "Missing venv: $VENV_DIR" >&2; exit 2; }
 
-mkdir -p "$RUN_DIR" "$RAY_TMP_DIR/tmp" "$RAY_TMP_DIR/xdg-cache" "$RAY_TMP_DIR/cupy-cache"
+SCRATCH_REAL=$(realpath -m -- "$SCRATCH")
+case "$(realpath -m -- "$RUN_DIR")/" in
+    "$SCRATCH_REAL"/*) ;;
+    *) echo "RUN_DIR must remain below SCRATCH" >&2; exit 2 ;;
+esac
+[[ ! -L "$RAY_TMP_DIR" ]] || { echo "Ray tmp cannot be a symlink" >&2; exit 2; }
+mkdir -p "$RUN_DIR/cache/cupy" "$RUN_DIR/cache/pip" "$RUN_DIR/cache/xdg" "$RUN_DIR/tmp" "$RAY_TMP_DIR"
 cleanup() {
     local status=$?
     trap - EXIT INT TERM
-    "$VENV_DIR/bin/ray" stop --force >/dev/null 2>&1 || true
+    # Never use host-wide `ray stop --force`: other jobs of this user may
+    # share the node. This process group belongs only to this validation job.
+    if [[ "$PYTHON_JOB_PID" =~ ^[0-9]+$ ]]; then
+        kill -TERM -- "-$PYTHON_JOB_PID" 2>/dev/null || true
+    fi
+    if [[ "$status" -ne 0 && -d "$RAY_TMP_DIR/session_latest/logs" ]]; then
+        cp -a -- "$RAY_TMP_DIR/session_latest/logs" "$RUN_DIR/ray-failure-logs" || true
+    fi
     if [[ "$RAY_TMP_DIR" =~ ^/tmp/r[0-9]+$ ]]; then
         rm -rf -- "$RAY_TMP_DIR"
     fi
@@ -53,9 +74,10 @@ module load Python/3.10.4
 module load CUDA/11.7.0
 source "$VENV_DIR/bin/activate"
 
-export TMPDIR="$RAY_TMP_DIR/tmp"
-export XDG_CACHE_HOME="$RAY_TMP_DIR/xdg-cache"
-export CUPY_CACHE_DIR="$RAY_TMP_DIR/cupy-cache"
+export TMPDIR="$RUN_DIR/tmp"
+export XDG_CACHE_HOME="$RUN_DIR/cache/xdg"
+export CUPY_CACHE_DIR="$RUN_DIR/cache/cupy"
+export PIP_CACHE_DIR="$RUN_DIR/cache/pip"
 export PYTHONPATH="$PROJECT_DIR/islands_desync${PYTHONPATH:+:$PYTHONPATH}"
 export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
@@ -76,6 +98,7 @@ ACTUAL_COMMIT=$(git rev-parse HEAD)
 }
 
 echo "=== ATHENA GPU READINESS ==="
+echo "validation_mode=$MODE"
 echo "job_id=$SLURM_JOB_ID"
 echo "host=$(hostname -f)"
 echo "commit=$ACTUAL_COMMIT"
@@ -134,12 +157,21 @@ esac
 "$VENV_DIR/bin/python" -m pip check
 "$VENV_DIR/bin/python" -m pip freeze > "$RUN_DIR/pip-freeze.txt"
 
-"$VENV_DIR/bin/python" -u "$SCRIPT_DIR/gpu_readiness.py" \
+flock -u 9
+exec 9>&-
+command -v setsid >/dev/null || { echo "setsid is required for job-scoped cleanup" >&2; exit 2; }
+setsid "$VENV_DIR/bin/python" -u "$SCRIPT_DIR/$PYTHON_SCRIPT" \
     --project-dir "$PROJECT_DIR" \
-    --output "$RUN_DIR/readiness.json" \
+    --output "$RUN_DIR/$RESULT_FILE" \
     --ray-temp-dir "$RAY_TMP_DIR" \
     --ray-memory-gib 96 \
-    --object-store-gib 8
+    --object-store-gib 8 &
+PYTHON_JOB_PID=$!
+wait "$PYTHON_JOB_PID"
 
-echo "ATHENA_GPU_READINESS_RESULT=$RUN_DIR/readiness.json"
-echo "ATHENA_GPU_READINESS_OK=1"
+echo "ATHENA_GPU_READINESS_RESULT=$RUN_DIR/$RESULT_FILE"
+if [[ "$MODE" == f1 ]]; then
+    echo "ATHENA_GPU_READINESS_OK=1"
+else
+    echo "ATHENA_40_GPU_VALIDATION_JOB_OK=1"
+fi
