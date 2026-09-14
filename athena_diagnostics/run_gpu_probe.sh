@@ -162,7 +162,7 @@ print(json.dumps(result or {"gpu_python_frameworks": "NOT_INSTALLED"}, indent=2,
 PY
 
     section "RAY GPU RESOURCE PROBE"
-    PROBE_TMP="$PROBE_TMP" "$VENV_DIR/bin/python" - <<'PY'
+    if PROBE_TMP="$PROBE_TMP" "$VENV_DIR/bin/python" - <<'PY'
 import json
 import os
 import socket
@@ -175,8 +175,11 @@ try:
     cpus = max(1, int(os.environ.get("SLURM_CPUS_PER_TASK", "1")))
     ray.init(
         num_cpus=cpus,
+        num_gpus=1,
         include_dashboard=False,
         _temp_dir=os.environ["PROBE_TMP"],
+        _memory=96 * 1024**3,
+        object_store_memory=8 * 1024**3,
     )
 
     @ray.remote(num_cpus=1, num_gpus=1)
@@ -196,20 +199,39 @@ try:
             "nvidia_smi_stderr": smi.stderr.strip(),
         }
 
-    print(json.dumps({
+    result = {
         "ray_version": ray.__version__,
         "cluster_resources": ray.cluster_resources(),
         "available_resources": ray.available_resources(),
         "gpu_task": ray.get(gpu_actor_probe.remote(), timeout=120),
-    }, indent=2, sort_keys=True))
+    }
+    resources = result["cluster_resources"]
+    if resources.get("CPU") != cpus or resources.get("GPU") != 1.0:
+        raise RuntimeError(f"Ray resource mismatch: {resources}")
+    if resources.get("memory", 0) > 96 * 1024**3 + 16 * 1024**2:
+        raise RuntimeError(f"Ray memory is not capped: {resources}")
+    if resources.get("object_store_memory", 0) > 8 * 1024**3 + 16 * 1024**2:
+        raise RuntimeError(f"Ray object store is not capped: {resources}")
+    if result["gpu_task"]["ray_gpu_ids"] != [0] or result["gpu_task"]["nvidia_smi_exit_code"] != 0:
+        raise RuntimeError(f"Ray actor did not receive the A100: {result['gpu_task']}")
+    print(json.dumps(result, indent=2, sort_keys=True))
     ray.shutdown()
 except Exception:
     print("RAY_GPU_PROBE_FAILED")
     traceback.print_exc()
+    raise
 PY
+    then
+        echo "ATHENA_RAY_GPU_OK=1"
+    else
+        echo "ATHENA_RAY_GPU_OK=0"
+        exit 1
+    fi
 else
     echo "MISSING_VENV_PYTHON=$VENV_DIR/bin/python"
     echo "RAY_GPU_PROBE_SKIPPED=1"
+    echo "ATHENA_RAY_GPU_OK=0"
+    exit 1
 fi
 
 section "GPU PROBE COMPLETION"

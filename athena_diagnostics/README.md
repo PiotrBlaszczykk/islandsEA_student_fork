@@ -58,8 +58,13 @@ grep ATHENA_GPU_PROBE_COMPLETE "$HOME/artifacts/athena_duagnostics.txt"
 Raport jest kompletny dopiero po obecności:
 
 ```text
+ATHENA_RAY_GPU_OK=1
 ATHENA_GPU_PROBE_COMPLETE=1
 ```
+
+Od wersji po diagnostyce `3167517` wyjątek Ray, brak A100 albo nieskuteczne
+limity pamięci kończą sondę niezerowym kodem. Samo dopisanie raportu nie może
+już dać fałszywego sukcesu.
 
 Logi techniczne joba trafiają domyślnie pod
 `$SCRATCH/islandsEA/logs/slurm/`, a nie do repozytorium.
