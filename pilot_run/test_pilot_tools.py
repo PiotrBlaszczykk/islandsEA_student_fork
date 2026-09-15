@@ -37,7 +37,7 @@ class PilotContractTests(unittest.TestCase):
                 )
                 generated = Path(
                     Filename(None, False).getpath(
-                        "260913", "r01_", 200, "run", 200, "b", "t", 5, 5
+                        "260913", "r01_", 200, "run", 144, "b", "t", 5, 5
                     )
                 )
                 self.assertTrue(
@@ -60,46 +60,46 @@ class PilotContractTests(unittest.TestCase):
         pairs = dict(zip(arguments[::2], arguments[1::2]))
         self.assertEqual("r01_elliptic", pairs["--problem"])
         self.assertEqual("200", pairs["--dimension"])
-        self.assertEqual("200", pairs["--islands"])
+        self.assertEqual("144", pairs["--islands"])
         self.assertEqual("8000", pairs["--evaluations"])
         self.assertEqual("16", pairs["--population"])
         self.assertEqual("4", pairs["--offspring"])
         self.assertEqual("5", pairs["--migrants"])
         self.assertEqual("5", pairs["--interval"])
-        self.assertEqual("10", pairs["--torus-rows"])
-        self.assertEqual("20", pairs["--torus-columns"])
+        self.assertEqual("12", pairs["--torus-rows"])
+        self.assertEqual("12", pairs["--torus-columns"])
         self.assertEqual("best", pairs["--strategy"])
         self.assertEqual("plain", pairs["--acceptance"])
         self.assertEqual("2", pairs["--repeat"])
 
     def test_exact_torus_adjacency(self):
         adjacency = pilot_tools.expected_torus(pilot_tools.load_spec())
-        self.assertEqual(200, len(adjacency))
-        self.assertEqual([180, 1, 20, 19], adjacency["0"])
-        self.assertEqual([179, 180, 19, 198], adjacency["199"])
+        self.assertEqual(144, len(adjacency))
+        self.assertEqual([132, 1, 12, 11], adjacency["0"])
+        self.assertEqual([131, 132, 11, 142], adjacency["143"])
 
     def test_explicit_shape_is_accepted(self):
         args = SimpleNamespace(
-            topology="torus", torus_rows=10, torus_columns=20, islands=200
+            topology="torus", torus_rows=12, torus_columns=12, islands=144
         )
         self.assertEqual(
-            {"rows": 10, "columns": 20, "mode": "explicit"},
+            {"rows": 12, "columns": 12, "mode": "explicit"},
             torus_shape(args),
         )
 
     def test_bad_explicit_shape_is_rejected(self):
         args = SimpleNamespace(
-            topology="torus", torus_rows=10, torus_columns=19, islands=200
+            topology="torus", torus_rows=12, torus_columns=11, islands=144
         )
         with self.assertRaisesRegex(ValueError, "must equal"):
             torus_shape(args)
 
     def test_historical_torus_default_is_preserved(self):
         args = SimpleNamespace(
-            topology="torus", torus_rows=None, torus_columns=None, islands=180
+            topology="torus", torus_rows=None, torus_columns=None, islands=144
         )
         self.assertEqual(
-            {"rows": 15, "columns": 12, "mode": "historical-default"},
+            {"rows": 12, "columns": 12, "mode": "historical-default"},
             torus_shape(args),
         )
 
@@ -343,20 +343,20 @@ class PilotContractTests(unittest.TestCase):
             rows = []
             for repeat in (1, 2, 3):
                 rows.append(
-                    f"123_{repeat}|job|plgrid|COMPLETED|0:0|10|432|4320|00:09:00||||2Gc|0|"
+                    f"123_{repeat}|job|plgrid|COMPLETED|0:0|10|336|3360|00:09:00||||2Gc|0|"
                 )
                 rows.append(
-                    f"123_{repeat}.batch|batch||COMPLETED|0:0|10|432|4320|00:09:00|512M||||0|"
+                    f"123_{repeat}.batch|batch||COMPLETED|0:0|10|336|3360|00:09:00|512M||||0|"
                 )
             (pilot / "sacct.txt").write_text("\n".join(rows), encoding="utf-8")
             parsed = pilot_tools.parse_sacct(
                 pilot, "123", {"repeats": [1, 2, 3]}
             )
             self.assertAlmostEqual(
-                3.6, parsed["aggregate"]["allocated_cpu_hours"]
+                2.8, parsed["aggregate"]["allocated_cpu_hours"]
             )
             self.assertEqual(512 * 1024**2, parsed["aggregate"]["maximum_rss_bytes_across_steps"])
-            self.assertAlmostEqual(0.125, parsed["repeats"]["1"]["cpu_efficiency"])
+            self.assertAlmostEqual(540 / 3360, parsed["repeats"]["1"]["cpu_efficiency"])
 
     def test_rich_delay_statistics(self):
         matplotlib = types.ModuleType("matplotlib")

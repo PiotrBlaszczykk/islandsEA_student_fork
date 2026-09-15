@@ -15,8 +15,8 @@ set -euo pipefail
 : "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
 
 ARRAY_JOB_ID="$1"
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
+PROJECT_DIR="${ISLANDS_PROJECT_DIR:-${SLURM_SUBMIT_DIR:?Missing submission directory}}"
+SCRIPT_DIR="$PROJECT_DIR/pilot_run"
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
 source "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh"
 islandsea_configure_storage

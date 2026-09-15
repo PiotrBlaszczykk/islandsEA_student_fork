@@ -72,14 +72,14 @@ def load_spec() -> dict:
     checks = (
         (spec["benchmark"] == "r01_elliptic", "pilot must use the first continuous benchmark"),
         (spec["dimension"] == 200, "pilot dimension must be 200"),
-        (spec["islands"] == 200, "pilot island count must be 200"),
+        (spec["islands"] == 144, "pilot island count must be 144"),
         (spec["evaluations_per_island"] == 8000, "pilot evaluation budget must be 8000 per island"),
         (spec["population"] == 16, "pilot population must be 16"),
         (spec["offspring"] == 4, "pilot offspring population must be 4"),
         (spec["migrants"] == 5, "pilot migrant group must contain 5 individuals"),
         (spec["migration_interval"] == 5, "pilot migration interval must be 5"),
         (spec["topology"] == "torus", "pilot topology must be torus"),
-        (spec["torus_rows"] == 10 and spec["torus_columns"] == 20, "pilot torus must be 10x20"),
+        (spec["torus_rows"] == 12 and spec["torus_columns"] == 12, "pilot torus must be 12x12"),
         (spec["torus_rows"] * spec["torus_columns"] == spec["islands"], "torus shape must cover every island"),
         (spec["migrant_selection"] == "best", "pilot migrant selection must be best"),
         (spec["migrant_acceptance"] == "plain", "pilot migrant acceptance must be plain"),
@@ -88,9 +88,9 @@ def load_spec() -> dict:
         (spec["metrics"]["synchronous_writes_during_optimization"] is False, "pilot telemetry must not write synchronously during optimization"),
         ((spec["evaluations_per_island"] - spec["population"]) % spec["offspring"] == 0, "evaluation budget must contain whole offspring batches"),
         (required_steps == spec["expected_steps_per_island"], "expected step count does not match the evaluation budget"),
-        (spec["slurm"]["nodes_per_repeat"] == 9, "pilot must allocate 9 nodes per repeat"),
+        (spec["slurm"]["nodes_per_repeat"] == 7, "pilot must allocate 7 nodes per repeat"),
         (spec["slurm"]["cpus_per_node"] == 48, "pilot must allocate 48 CPUs per node"),
-        (spec["slurm"]["allocated_cpus_per_repeat"] == 432, "pilot must allocate 432 CPUs per repeat"),
+        (spec["slurm"]["allocated_cpus_per_repeat"] == 336, "pilot must allocate 336 CPUs per repeat"),
     )
     for passed, message in checks:
         if not passed:
@@ -244,8 +244,9 @@ def command_record_submission(args) -> None:
             "pilot": spec["name"],
             "source_methodology_status": spec["methodology_status"],
             "methodology_confirmation": {
-                "torus_10x20_confirmed_by_submitter": True,
-                "mechanism": "submit_pilot.sh required CONFIRM_TORUS_200=1",
+                "approved_islands": 144,
+                "approved_torus": "12x12",
+                "mechanism": "research instructions: 144 islands approved by supervisor email",
             },
             "spec": spec,
             "spec_sha256": sha256_file(SPEC_PATH),
@@ -436,8 +437,8 @@ def check_manifest(
     }
     for key, expected_value in expected.items():
         require(values.get(key) == expected_value, f"manifest arg {key!r} is {values.get(key)!r}, expected {expected_value!r}", errors)
-    require(manifest.get("required_ray_cpus") == 401, "manifest does not record the expected 401 Ray CPUs", errors)
-    require(manifest.get("required_slurm_cpus") == 402, "manifest does not record the expected minimum 402 SLURM CPUs", errors)
+    require(manifest.get("required_ray_cpus") == 289, "manifest does not record the expected 289 Ray CPUs", errors)
+    require(manifest.get("required_slurm_cpus") == 290, "manifest does not record the expected minimum 290 SLURM CPUs", errors)
     require(len(manifest.get("node_checks", [])) == spec["slurm"]["nodes_per_repeat"], "not every allocated node passed the runtime probe", errors)
     metrics = manifest.get("metrics_profile", {})
     require(metrics.get("name") == spec["metrics_profile"], "manifest has the wrong metrics profile", errors)
@@ -455,7 +456,7 @@ def check_topology(topology: dict, spec: dict, errors: list[str]) -> None:
     require(shape.get("columns") == spec["torus_columns"], "saved torus has the wrong column count", errors)
     require(shape.get("mode") == "explicit", "saved torus was not created in explicit-shape mode", errors)
     expected_adjacency = expected_torus(spec)
-    require(topology.get("adjacency") == expected_adjacency, "saved torus adjacency differs from the approved 10x20 graph", errors)
+    require(topology.get("adjacency") == expected_adjacency, "saved torus adjacency differs from the approved 12x12 graph", errors)
     canonical = json.dumps(
         expected_adjacency, sort_keys=True, separators=(",", ":"), allow_nan=False
     ).encode("utf-8")

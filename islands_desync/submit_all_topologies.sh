@@ -8,6 +8,10 @@
 
 set -euo pipefail
 
+# The old campaign uses acceptance variants and now-retired launchers.
+echo "Old campaign disabled: follow STUDY_144.md; ER4 needs a corrected 144-node attachment. No jobs submitted." >&2
+exit 2
+
 SLEEP_SECONDS=60
 SCRIPT="run_delay_experiment.sh"
 

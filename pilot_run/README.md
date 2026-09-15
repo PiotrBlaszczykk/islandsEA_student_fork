@@ -1,4 +1,10 @@
-# Pilot Ares: torus 10×20, F1 200D, trzy powtórzenia
+> Aktualizacja 2026-09-15: obowiązuje **144 wyspy**, torus **12×12**,
+> complete oraz wybrane **ER4 / WS3 / BA**. Źródło aktualnych ustawień i status
+> załączników: [STUDY_144.md](../STUDY_144.md). ER4 dostarczono jako 150 węzłów;
+> jego uruchomienie przy 144 jest zablokowane do rozstrzygnięcia. Historyczne
+> pomiary sprzętu pozostają niezmienione; D=200 oznacza wymiar benchmarku.
+
+# Pilot Ares: torus 12×12, F1 200D, trzy powtórzenia
 
 Ten katalog definiuje **jeden wariant eksperymentu** uruchomiony w trzech
 równoległych powtórzeniach jako tablica SLURM. Nie jest to lokalny benchmark.
@@ -10,8 +16,8 @@ Autorytatywna konfiguracja znajduje się w `pilot_spec.json`.
 |---|---:|
 | benchmark | `r01_elliptic` (pierwszy ciągły z 40) |
 | wymiar | 200 |
-| wyspy | 200 |
-| topologia | torus 10 wierszy × 20 kolumn |
+| wyspy | 144 |
+| topologia | torus 12 wierszy × 12 kolumn |
 | selekcja migrantów | `best` |
 | akceptacja migrantów | `plain` |
 | interwał / liczba migrantów | 5 / 5 |
@@ -27,13 +33,7 @@ traktuje trzy warianty jako strategie **wyboru** migrantów; dokument nie narzuc
 osobnej strategii przyjęcia. F1 w 200D jest utrwalonym rozszerzeniem IslandsEA,
 nie oficjalnym wymiarem CEC2014.
 
-Torus 10×20 jest najbliższym kwadratowi rozkładem 200 wierzchołków. Ponieważ
-historyczny kod tworzył wyłącznie torus `12 × (N/12)`, ten kształt jest nową,
-jawną decyzją metodologiczną. `submit_pilot.sh` wymaga
-`CONFIRM_TORUS_200=1`, aby nie uruchomić kosztownego wariantu przed odpowiedzią
-prowadzącego. Pełny pilot wymaga dodatkowo ID zaliczonego canary na tej samej
-konfiguracji infrastruktury. Brak któregokolwiek dowodu kończy się przed
-`sbatch`.
+144 wyspy zatwierdzono w mailu; torus12×12 zachowuje dotychczasowe 12 kolumn. Bramka CONFIRM_TORUS_200 została usunięta. Nadal wymagane są ID poprawnego canary na tej samej konfiguracji oraz przypięty czysty commit.
 
 ## Co jest wysyłane
 
@@ -43,10 +43,10 @@ Domyślnie `submit_pilot.sh` tworzy:
 2. jeden mały job końcowy zależny przez `afterany`, który waliduje, analizuje i
    archiwizuje wszystkie trzy wyniki.
 
-Każde powtórzenie rezerwuje 9 węzłów × 48 CPU = 432 CPU, czyli 401 wymaganych
+Każde powtórzenie rezerwuje 7 węzłów × 48 CPU = 336 CPU, czyli 289 wymaganych
 CPU Ray, zapas na procesy Ray i jeden CPU wyłączony z puli Ray dla drivera.
-Przy trzech równoległych elementach maksymalna chwilowa alokacja to 27 węzłów i
-1296 CPU. Limit 30 minut daje sufit **648 CPUh** dla obliczeń; finalizer dodaje
+Przy trzech równoległych elementach maksymalna chwilowa alokacja to 21 węzłów i
+1008 CPU. Limit 30 minut daje sufit **504 CPUh** dla obliczeń; finalizer dodaje
 maksymalnie 1 CPUh. To limit bezpieczeństwa, nie prognoza czasu. Nie ma
 automatycznych retry.
 
@@ -59,11 +59,10 @@ SSH. Sprawdza wynik canary i **tylko po pełnej walidacji** automatycznie wysył
 trzy właściwe powtórzenia oraz finalizer:
 
 ```bash
-bash pilot_run/launch_pilot.sh --confirm-torus200-and-722-cpuh
+bash pilot_run/launch_pilot.sh --confirm-144-and-562-cpuh
 ```
 
-Argument jest celowo długi: stanowi jawną zgodę na torus 10×20 i koszt pełnego
-pilota. Canary oraz właściwe joby są przypięte do commita obecnego przy
+Argument jest celowo długi: potwierdza koszt pipeline’u ≤561.5 CPUh (zaokrąglony limit 562). Canary oraz właściwe joby są przypięte do commita obecnego przy
 uruchomieniu. Zmiana checkoutu lub brudne drzewo przed startem któregokolwiek
 etapu bezpiecznie zatrzyma pipeline. Launcher nie wykonuje automatycznych retry.
 
@@ -106,22 +105,21 @@ wyniki i audyt także argumentami `--output-root` i `--audit-root`. Brak
 `$SCRATCH` powoduje jawne ostrzeżenie i fallback do `$HOME/islandsEA`.
 
 `git status --short` ma być pusty. Dry-run nie startuje Ray ani obliczeń; powinien
-pokazać m.in. 200 wysp, torus 10×20, 401 CPU Ray oraz 402 minimalne CPU SLURM.
+pokazać m.in. 144 wysp, torus 12×12, 289 CPU Ray oraz 290 minimalne CPU SLURM.
 
-Po potwierdzeniu metodologii uruchom najpierw canary: te same 200 wysp i pełne
-401 aktorów Ray wraz z torusem, ale tylko 128 ewaluacji na wyspę oraz 10 minut walltime. Jego sufit to
-72 CPUh:
+Uruchom najpierw canary: te same 144 wysp i pełne
+289 aktorów Ray wraz z torusem, ale tylko 128 ewaluacji na wyspę oraz 10 minut walltime. Jego sufit to
+56 CPUh:
 
 ```bash
-CONFIRM_TORUS_200=1 bash pilot_run/submit_canary.sh
+bash pilot_run/submit_canary.sh
 ```
 
 Skrypt wypisze `PILOT_CANARY_JOB_ID`. Po zakończeniu nie wystarczy samo spojrzenie
-na `squeue`; pełny submit sam sprawdzi `sacct`, kod 0, manifesty, topologię, 200
+na `squeue`; pełny submit sam sprawdzi `sacct`, kod 0, manifesty, topologię, 144
 krzywych i obecność migracji z katalogu canary. Dopiero wtedy:
 
 ```bash
-CONFIRM_TORUS_200=1 \
 PILOT_CANARY_JOB_ID=TU_WSTAW_ID \
 bash pilot_run/submit_pilot.sh
 ```
@@ -146,16 +144,16 @@ sprawdza między innymi:
 
 - zgodność manifestu z pełną specyfikacją, czysty commit i sondy wszystkich
   dziewięciu węzłów;
-- dokładną listę sąsiadów torusa 10×20;
-- 200 kompletnych krzywych po 1996 kroków, skończone fitnessy i wyniki końcowe;
+- dokładną listę sąsiadów torusa 12×12;
+- 144 kompletnych krzywych po 1996 kroków, skończone fitnessy i wyniki końcowe;
 - komplet plików migrantów i rankingów dla każdej wyspy;
-- 200 rekordów czasu/iterations-per-second;
-- pełny profil `research-v1-full-buffered` dla każdej z 200 wysp: zdarzenia
+- 144 rekordów czasu/iterations-per-second;
+- pełny profil `research-v1-full-buffered` dla każdej z 144 wysp: zdarzenia
   migracji, kolejki, fitness, placement aktora i końcowy genotyp;
 - punkt początkowy i każdy z 1996 kroków historii fitness oraz diversity;
 - identyfikatory źródła/celu migrantów, zgodność liczników i brak odrzucenia
   przez strategię `plain`;
-- 200 końcowych wektorów długości 200 wraz ze sprawdzonym SHA-256;
+- 144 końcowych wektorów długości 200 wraz ze sprawdzonym SHA-256;
 - zgodność metadanych benchmarku, w tym oznaczenie D=200 jako rozszerzenia.
 
 Docelowy katalog to:

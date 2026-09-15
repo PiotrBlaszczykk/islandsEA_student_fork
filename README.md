@@ -2,6 +2,15 @@
 
 Research codebase for asynchronous island-model evolutionary computation, focused on migration-delay behavior and topology effects.
 
+## Current study: 144 islands
+
+Read [STUDY_144.md](STUDY_144.md) for the approved 144-island configuration,
+selected torus12x12/complete/WS3/BA graphs, and the ER4 attachment mismatch
+(150 supplied nodes; its 144-island run is blocked). Ares uses the CPU profile
+`submit_ares_144.sh`; Athena shares these exact graph data but still needs its
+full GPU island runner integrated. The same 40 benchmark definitions and
+research metric semantics are retained.
+
 ## Named benchmarks on Ares
 
 The active Ray builder supports the validated **30 continuous + 10 binary** benchmark suite, including the separately identified IslandsEA 200D extension. See [the HPC guide](hpc_benchmarks/README.md) for SLURM validation, small pilots, resource sizing and full experiment commands. [Local validation evidence](hpc_benchmarks/validation_local.json) includes two completed Ray runs; Ares/SLURM validation remains to be performed on the cluster.
@@ -31,34 +40,22 @@ Notes:
 
 ## Run Locally
 
-Run from the outer `islands_desync/` directory, not from the repository root.
-
-Example validated local run:
+Use the repository root and an environment containing the project dependencies:
 
 ```bash
-source .venv/bin/activate
-cd islandsEA/islands_desync
-dda=$(date +%y%m%d)
-tta=$(date +%H%M%S)
-PYTHONPATH="$PWD" python -u islands_desync/start.py 7 /tmp/islands-ray 5 5 "$dda" "$tta" ring random plain
+python hpc_benchmarks/run_benchmark.py --problem r01_elliptic --dimension 200 --topology ws3 --dry-run
+python hpc_benchmarks/run_benchmark.py --problem b03_nk_k4 --dimension 60 --topology complete --diagnostic --islands 2 --evaluations 128 --ray-address local --local-cpus 6
 ```
 
-Argument order for `start.py`:
-1. `island_count`
-2. Ray temp directory
-3. `number_of_emigrants`
-4. `migration_interval`
-5. date tag
-6. time tag
-7. topology
-8. migrant selection strategy
-9. migrant acceptance strategy
+The first command checks the 144-island study configuration without Ray. The
+second is a two-island diagnostic outside the study. Production runs require
+144 islands. Use the named launcher for complete topology/benchmark provenance.
 
 ## Generate Delay Plots
 
 After a run finishes, the output directory will be under `islands_desync/logs/...`.
 
-Example for the validated run above:
+Historical example from an earlier local run (paths are archival):
 
 ```bash
 cd islandsEA/islands_desync

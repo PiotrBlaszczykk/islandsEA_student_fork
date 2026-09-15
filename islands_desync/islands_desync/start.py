@@ -10,30 +10,28 @@ from islands_desync.geneticAlgorithm.utils.matplotlib_setup import (
 configure_headless_matplotlib()
 
 import ray
-from islands.core.IslandRunner import IslandRunner
-from islands.selectAlgorithm import RandomSelect
-from islands.topologies import RingTopology
+from islands_desync.islands.core.IslandRunner import IslandRunner
+from islands_desync.islands.selectAlgorithm import RandomSelect
 
 from islands_desync.geneticAlgorithm.run_hpc.run_algorithm_params import (
     RunAlgorithmParams,
 )
 from islands_desync.geneticAlgorithm.utils.filename import get_run_output_root
-from islands_desync.islands.topologies.TorusTopology import TorusTopology
-from islands_desync.islands.topologies.CompleteTopology import CompleteTopology
-from islands_desync.islands.topologies.ERTopology import ERTopology
-from islands_desync.islands.topologies.ER1Topology import ER1Topology
-from islands_desync.islands.topologies.ER2Topology import ER2Topology
-from islands_desync.islands.topologies.ER3Topology import ER3Topology
-from islands_desync.islands.topologies.ER4Topology import ER4Topology
-from islands_desync.islands.topologies.WSTopology import WSTopology
-from islands_desync.islands.topologies.WS1Topology import WS1Topology
-from islands_desync.islands.topologies.WS2Topology import WS2Topology
-from islands_desync.islands.topologies.WS3Topology import WS3Topology
-from islands_desync.islands.topologies.WS4Topology import WS4Topology
+import importlib
+from islands_desync.islands.topologies.study import TOPOLOGIES, validate_study
 
 
 
 def main():
+    if len(sys.argv) != 10:
+        raise ValueError("Expected 9 positional arguments; prefer hpc_benchmarks/run_benchmark.py")
+    count, name = int(sys.argv[1]), sys.argv[7]
+    validate_study(count, name)
+    topology_class_name = TOPOLOGIES[name]
+    topology_class = getattr(importlib.import_module(
+        "islands_desync.islands.topologies." + topology_class_name), topology_class_name)
+    topology = topology_class(count, lambda i: i)
+    topology.create(12, 12) if name == "torus" else topology.create()
     ray_runtime_env = {
         "env_vars": {
             "MPLBACKEND": os.environ["MPLBACKEND"],
@@ -71,34 +69,7 @@ def main():
         strategy2=strateg2
     )
 
-    if topol=="torus":
-        computation_refs = IslandRunner(TorusTopology, RandomSelect, params).create()
-    if topol=="ring":
-        computation_refs = IslandRunner(RingTopology, RandomSelect, params).create()
-    if topol=="complete":
-        computation_refs = IslandRunner(CompleteTopology, RandomSelect, params).create()
-    if topol=="er":
-        computation_refs = IslandRunner(ERTopology, RandomSelect, params).create()
-    if topol=="er1":
-        computation_refs = IslandRunner(ER1Topology, RandomSelect, params).create()
-    if topol=="er2":
-        computation_refs = IslandRunner(ER2Topology, RandomSelect, params).create()
-    if topol=="er3":
-        computation_refs = IslandRunner(ER3Topology, RandomSelect, params).create()
-    if topol=="er4":
-        computation_refs = IslandRunner(ER4Topology, RandomSelect, params).create()
-
-    if topol=="ws":
-        computation_refs = IslandRunner(WSTopology, RandomSelect, params).create()
-    if topol=="ws1":
-        computation_refs = IslandRunner(WS1Topology, RandomSelect, params).create()
-    if topol=="ws2":
-        computation_refs = IslandRunner(WS2Topology, RandomSelect, params).create()
-    if topol=="ws3":
-        computation_refs = IslandRunner(WS3Topology, RandomSelect, params).create()
-    if topol=="ws4":
-        computation_refs = IslandRunner(WS4Topology, RandomSelect, params).create()
-
+    computation_refs = IslandRunner(topology_class, RandomSelect, params).create()
 
     #print("--- testpoint 1 ---")
     results = ray.get(computation_refs)

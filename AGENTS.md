@@ -1,5 +1,16 @@
 # AGENTS.md
 
+## Active study update (2026-09-15)
+
+- Read [STUDY_144.md](STUDY_144.md) first: approved study uses **144 islands** in torus12x12, complete, ER4, WS3 and BA.
+- Exact selected graphs and provenance are identical in both CPU/GPU repos. Supplied **ER4 has 150 nodes**; block its study run until a corrected 144-node graph or explicit transformation approval arrives. Never silently truncate, symmetrize, regenerate or remove loops.
+- Production `run_benchmark.py` defaults to and requires 144. Small smoke runs/ring require `--diagnostic`. D=200 is still a benchmark dimension, not an island count.
+- Ares profile: `submit_ares_144.sh`, 7x48=336 CPUs, 289 Ray CPUs required plus driver. Old 200-island and stale legacy HPC scripts fail closed.
+- Pilot: `pilot_spec.json`, 144 islands, torus12x12, F1 D=200, best/plain, repeats1–3. `launch_pilot.sh --confirm-144-and-562-cpuh`; no methodology confirmation variable required after supervisor approval. Clean commit, canary, scratch, finalizer and no-retry guards remain.
+- Batch benchmarking on Athena includes 144/288/576/864/1152/1728/2304. Full GPU island runner is still pending; shared CPU runner must not be represented as a completed GPU port.
+- Preserve `research-v1-full-buffered` and all existing metric semantics. Current changes do not modify GA/migration/benchmark mathematics.
+- Historical small positional `start.py` examples below are archival; use named launcher with `--diagnostic` for current smoke tests.
+
 ## Scope
 This repository is a research codebase for asynchronous island-model evolutionary computation.  
 Treat experiment correctness, comparability, and reproducibility as the primary goal. Do not optimize for refactor cleanliness at the cost of changing semantics.
@@ -65,10 +76,6 @@ Historical notes describe both RabbitMQ and Ray flows. Both code paths exist, bu
 - BinarySolution stores a nested bit vector. `utils/decision_variables.py` flattens it for distance, diversity and population logging; logged problem size is number of bits. `maxDistance` sums squared bit differences (Hamming), keeping existing selection and tie order. Continuous distance arithmetic is preserved.
 - `--seed` and `--repeat` give seed `seed + (repeat-1)*1000000 + island_id`; these seeds do not change benchmark instances or guarantee deterministic asynchronous ordering. Old launches without `ISLANDS_SEED` preserve their RNG policy.
 - Existing actor reservations require `2*N+1` logical Ray CPUs; the SLURM wrapper reserves one additional head CPU for the driver. BLAS/OMP threads are restricted to 1. Code, instance, configuration, Python and dependency versions are checked on every node before the timed run.
-- `hpc_benchmarks/run_ares.sh` now runs the benchmark dry-run and resource calculation before starting Ray, then prewarms a job-scoped, node-local Matplotlib cache once per node. `hpc_benchmarks/run_ares_200.sh` is the fixed Ares profile for 200 islands: 9 nodes × 48 CPUs, hence 431 Ray CPUs after reserving the driver CPU versus 401 required. It uses `plgrid` / `plglscclass26-cpu`, a 30-minute default walltime and a 300-second startup timeout. Start with the documented 128-evaluation canary and do not submit a campaign before it passes.
-- The 200-island profile does not make fixed-size ER/WS topologies compatible with 200: ER1–ER4 are 150-node graphs and WS3/WS4 are 144-node graphs. `ring` and `complete` accept 200. Torus preserves its historical 12-column default, but the benchmark launcher can now accept an explicit `--torus-rows/--torus-columns` product; the 10×20 pilot is methodology-gated in `pilot_run/`. The preflight intentionally rejects invalid combinations before allocating Ray actors.
-- `pilot_run/` is the authoritative single-configuration Ares pilot: F1/r01 continuous D=200, 200 islands, explicit 10×20 torus, best/plain, fixed study settings and repeats 1–3. First submit its 128-evaluation/10-minute canary; the full `submit_pilot.sh` requires a clean commit, `CONFIRM_TORUS_200=1` and `PILOT_CANARY_JOB_ID`, then verifies that canary from `sacct` and its files before creating a concurrency-limited SLURM array plus an `afterany` finalizer. It never retries automatically. Treat `pilot_spec.json` as the source of full-run arguments. Success requires `pilot_summary.json` with all three repeats valid, not only a SLURM `COMPLETED` state.
-- The preferred unattended entry point is `pilot_run/launch_pilot.sh --confirm-torus200-and-722-cpuh`. It performs preflight, submits the canary, then uses a lightweight `afterany` SLURM gate to validate it and submit the full array only on success; it does not require an open login session.
 - Canary, gate, full array and finalizer are pinned to the same clean Git commit. Changing or dirtying the shared checkout while they are queued makes the affected stage fail closed.
 - **Ares storage contract (September 13, 2026):** source `hpc_benchmarks/ares_storage.sh` and call `islandsea_configure_storage` in submitters and jobs. With `$SCRATCH` available, generated data lives under `$SCRATCH/islandsEA/`: raw runs in `results/runs`, compact audit in `results/audit`, pilot archives/summaries in `results/pilot_runs`, SLURM logs in `logs/slurm`, failure-only Ray logs in `logs/ray_failures`, and reserved roots in `checkpoints` and `tmp`. Repo/config and the existing venv remain in HOME. The fallback is `$HOME/islandsEA` with a warning. Do not reintroduce output under the repo, `~/artifacts`, or relative `logs/` in an Ares launcher. Submit via `pilot_run/submit_*.sh`, `hpc_benchmarks/submit_*.sh`, or `smoke_run/submit_smoke.sh`, because `#SBATCH` does not expand shell variables; `/tmp` in job headers is only a safe non-HOME fallback.
 - Every named benchmark run writes `run_metadata.json` as well as `experiment_manifest.json`. `run_metadata.json` is the aggregation contract: it records a unique `run_id`, stable SHA-256 `experiment_key`, all benchmark/GA/migration/topology settings, repeat and seed policy, topology hash, resources/SLURM IDs, Git/code/dependency provenance and resolved storage/output paths. The pilot validator must reject missing or inconsistent metadata.
@@ -173,8 +180,8 @@ python analyze_migration_delays.py "logs/260505/Sphe200/120000 7rr-co5ilu5"
 `IslandRunner.py` already uses `enumerate(..., start=1)` for islands 1..N-1, so the earlier note about shifted topology indices is obsolete. The benchmark port leaves this code unchanged. Torus requires N divisible by 12; ER1..ER4 use fixed 150-node graphs; WS3/WS4 use fixed 144-node graphs. The new benchmark launcher validates the actual adjacency before starting Ray. Do not silently regenerate graphs to fit a requested N.
 
 ### SLURM script status
-- `run144tr-hpc.sh`, `run150rr-hpc.sh` call `start.py` but currently pass only 8 args.
-- Several scripts call `start_bm.py`, which is **not present** in this repo.
+- Old `run*-hpc.sh` launchers are retired fail-closed stubs; previously some passed only 8 args.
+- Historical `.sh.txt` archives still refer to missing `start_bm.py`; do not use them.
 - `run_smoke_ring.sh` is **not present** in this repository snapshot (it may exist only in local/HPC-side working copies).
 - Many scripts contain cluster-specific hardcoded grant/env paths; treat as templates, not ready-to-run defaults.
 
@@ -463,7 +470,7 @@ Not every imported operator is active in the current default run path; many are 
 ## Topology Semantics and Caveats
 
 ### Selection
-`start.py` selects topology via `topol` string (`ring`, `torus`, `complete`, `er*`, `ws*`).
+`start.py` uses the selected study registry (torus, complete, er4, ws3, ba), with exactly 144 islands. Ring is diagnostic-only via the named launcher.
 
 ### Implementations
 - `RingTopology`: current implementation returns `[self, next]` neighbors (non-standard ring; includes self-loop).

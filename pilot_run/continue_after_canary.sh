@@ -19,8 +19,8 @@ set -euo pipefail
 : "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
 
 CANARY_JOB_ID="$1"
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
+PROJECT_DIR="${ISLANDS_PROJECT_DIR:-${SLURM_SUBMIT_DIR:?Missing submission directory}}"
+SCRIPT_DIR="$PROJECT_DIR/pilot_run"
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
 source "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh"
 islandsea_configure_storage
@@ -59,7 +59,6 @@ done
 
 echo "Validating canary $CANARY_JOB_ID for pinned commit $PILOT_EXPECTED_COMMIT"
 echo "canary_state=$CANARY_STATE"
-export CONFIRM_TORUS_200=1
 export PILOT_CANARY_JOB_ID="$CANARY_JOB_ID"
 export PILOT_EXPECTED_COMMIT
 CANARY_DIR="$ISLANDS_ARTIFACT_ROOT/pilot_canaries/$CANARY_JOB_ID"

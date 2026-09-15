@@ -1,3 +1,9 @@
+> Aktualizacja 2026-09-15: obowiązuje **144 wyspy**, torus **12×12**,
+> complete oraz wybrane **ER4 / WS3 / BA**. Źródło aktualnych ustawień i status
+> załączników: [STUDY_144.md](../STUDY_144.md). ER4 dostarczono jako 150 węzłów;
+> jego uruchomienie przy 144 jest zablokowane do rozstrzygnięcia. Historyczne
+> pomiary sprzętu pozostają niezmienione; D=200 oznacza wymiar benchmarku.
+
 # Benchmarki w main: Ray i Ares
 
 Do aktywnej ścieżki wyspowej przeniesiono z `help_codebase` pakiet **30 ciągłych + 10 binarnych** wraz z gotowymi danymi, testami i pochodzeniem instancji. Wzory i dane są identyczne z pakietem źródłowym. Launcher uruchamia istniejący `IslandRunner` i algorytm z **main**, z jego strategiami akceptacji migrantów.
@@ -29,17 +35,17 @@ Najpierw walidacja na węźle obliczeniowym, następnie dwa małe uruchomienia R
 bash hpc_benchmarks/submit_validation.sh
 
 bash hpc_benchmarks/submit_ares.sh \
-  --problem b03_nk_k4 --dimension 60 --islands 2 --evaluations 128 \
+  --problem b03_nk_k4 --dimension 60 --diagnostic --islands 2 --evaluations 128 \
   --topology complete --strategy maxDistance --acceptance plain
 
 bash hpc_benchmarks/submit_ares.sh \
-  --problem r29_composition7 --dimension 200 --islands 2 --evaluations 128 \
+  --problem r29_composition7 --dimension 200 --diagnostic --islands 2 --evaluations 128 \
   --topology complete --strategy best --acceptance plain
 ```
 
 Jeśli konto wymaga wskazania grantu lub partycji, dodaj właściwe opcje przy ręcznym `sbatch`; skrypty ogólne nie wpisują cudzego grantu. Walidacja zapisuje `$SCRATCH/islandsEA/results/validation/validation-<JOBID>.json`; oczekiwane: **17 testów, zero błędów i pominięć, `success: true`**. Każdy pilot powinien zakończyć się kodem 0 i linią `BENCHMARK_RUN_OK=...` w `$SCRATCH/islandsEA/logs/slurm/benchmark-<JOBID>.out`. Zweryfikuj również `State` i `ExitCode` przez `sacct`.
 
-Domyślna alokacja `run_ares.sh` to 1 węzeł, 6 CPU i 15 minut: dla pilota z 2 wyspami. Liczba wysp musi być podana jak wyżej, ponieważ launcher domyślnie wybiera 180. Walidator nie uruchamia klastra Ray; piloci sprawdzają rzeczywistą komunikację wysp. Wielowęzłową serię rozpocznij po tych testach i sprawdzeniu zasobów.
+Domyślna konfiguracja badawcza to 144 wyspy i 7×48 CPU. Dla diagnostyki 1–2 wysp `submit_ares.sh` wybiera 1 węzeł × 6 CPU; wymagane jest `--diagnostic`. Właściwe badania uruchamiaj przez `submit_ares_144.sh`.
 
 ## Parametry pełnego eksperymentu
 
@@ -47,20 +53,20 @@ Sprawdzenie konfiguracji bez Ray i bez utworzenia wyników:
 
 ```bash
 python hpc_benchmarks/run_benchmark.py \
-  --problem r29_composition7 --dimension 200 --islands 180 \
+  --problem r29_composition7 --dimension 200 --islands 144 \
   --topology torus --strategy best --acceptance plain --dry-run
 ```
 
-Przykład dla 180 wysp, 8000 ewaluacji na wyspę, populacji 16, czterech potomków, pięciu migrantów i interwału 5:
+Przykład dla 144 wysp, 8000 ewaluacji na wyspę, populacji 16, czterech potomków, pięciu migrantów i interwału 5:
 
 ```bash
 source hpc_benchmarks/ares_storage.sh
 islandsea_configure_storage
-sbatch --nodes=8 --cpus-per-task=48 --time=01:00:00 \
+sbatch --nodes=7 --cpus-per-task=48 --time=01:00:00 \
   --output="$ISLANDS_SLURM_LOG_DIR/benchmark-%j.out" \
   --error="$ISLANDS_SLURM_LOG_DIR/benchmark-%j.err" \
   hpc_benchmarks/run_ares.sh \
-  --problem r29_composition7 --dimension 200 --islands 180 \
+  --problem r29_composition7 --dimension 200 --islands 144 \
   --evaluations 8000 --population 16 --offspring 4 \
   --migrants 5 --interval 5 --topology torus \
   --strategy best --acceptance plain --repeat 1 --seed 20260912
@@ -73,18 +79,16 @@ W obecnym kodzie `Island` i `Computation` rezerwują po 1 CPU na wyspę, a `Sign
 | Wyspy | Minimum CPU Ray | Przykładowa alokacja | CPU dostępne dla Ray |
 |---:|---:|---:|---:|
 | 2 | 5 | 1 × 6 | 5 |
-| 150 | 301 | 7 × 48 | 335 |
-| 180 | 361 | 8 × 48 | 383 |
-| 200 | 401 | 9 × 48 | 431 |
+| 144 | 289 | 7 × 48 | 335 |
 
 48 rdzeni dotyczy standardowego węzła CPU opisanego w [dokumentacji Aresa](https://docs.hpc.cyfronet.pl/supercomputers/ares/). To rezerwacje obecnej architektury aktorów, nie obietnica stałego wykorzystania wszystkich CPU. Ich zmiana mogłaby wpływać na harmonogram i opóźnienia, dlatego nie jest częścią portu benchmarków.
 
-### Bezpieczny profil dla 200 wysp
+### Bezpieczny profil dla 144 wysp
 
-`run_ares_200.sh` utrwala profil 9 × 48 CPU, konto `plglscclass26-cpu`, partycję `plgrid`, 30-minutowy bezpiecznik walltime oraz 300 sekund na start dziewięciu węzłów. Skrypt zawsze dopisuje `--islands 200`; nie należy dodawać własnego `--islands`. Najpierw uruchom krótki canary, który tworzy pełne 401 aktorów Ray, lecz wykonuje mały budżet ewaluacji:
+`run_ares_144.sh` utrwala profil 7 × 48 CPU, konto `plglscclass26-cpu`, partycję `plgrid`, 30-minutowy bezpiecznik walltime oraz 300 sekund na start siedmiu węzłów. Skrypt zawsze dopisuje `--islands 144`; nie należy dodawać własnego `--islands`. Najpierw uruchom krótki canary, który tworzy pełne 289 aktorów Ray, lecz wykonuje mały budżet ewaluacji:
 
 ```bash
-bash hpc_benchmarks/submit_ares_200.sh \
+bash hpc_benchmarks/submit_ares_144.sh \
   --problem r29_composition7 --dimension 200 --evaluations 128 \
   --population 16 --offspring 4 --migrants 5 --interval 5 \
   --topology complete --strategy best --acceptance plain \
@@ -94,7 +98,7 @@ bash hpc_benchmarks/submit_ares_200.sh \
 Po sukcesie canary (`State=COMPLETED`, `ExitCode=0:0`, `BENCHMARK_RUN_OK`) można uruchomić właściwy budżet. Limit czasu zwiększaj na podstawie zmierzonego przebiegu; opcja `sbatch` podana przed nazwą skryptu nadpisuje domyślne 30 minut:
 
 ```bash
-ISLANDS_WALLTIME=01:00:00 bash hpc_benchmarks/submit_ares_200.sh \
+ISLANDS_WALLTIME=01:00:00 bash hpc_benchmarks/submit_ares_144.sh \
   --problem r29_composition7 --dimension 200 --evaluations 8000 \
   --population 16 --offspring 4 --migrants 5 --interval 5 \
   --topology complete --strategy best --acceptance plain \
@@ -103,11 +107,11 @@ ISLANDS_WALLTIME=01:00:00 bash hpc_benchmarks/submit_ares_200.sh \
 
 Przed startem Ray launcher wykonuje pełny `--dry-run`, sprawdza topologię i porównuje `2*N+1` z rzeczywistą alokacją. Za mały przydział kończy job kodem 2, zamiast pozostawić oczekującego aktora do walltime. Następnie każdy węzeł jednorazowo buduje własny cache Matplotlib w `/tmp/$USER/islandsea-$SLURM_JOB_ID/matplotlib`; workery dzielą gotowy cache tylko w obrębie lokalnego systemu plików węzła. Katalog tymczasowy jest usuwany z każdego węzła podczas kontrolowanego zakończenia.
 
-Profil 200-wyspowy nie zmienia ograniczeń stałych grafów ER/WS. `complete` i `ring` przyjmują 200, a torus może teraz dostać jawny kształt przez parę `--torus-rows/--torus-columns`, której iloczyn musi być równy liczbie wysp. Bez tych opcji zachowany jest historyczny układ `12 × (N/12)` i wymóg podzielności przez 12. ER1–ER4 mają 150 wierzchołków, a WS3/WS4 mają 144. Preflight odrzuca niezgodności przed startem klastra. Torus 10×20 dla 200 wysp jest przygotowany jako jawnie bramkowany wariant w `pilot_run/`; nie traktować jego obecności jako zatwierdzenia metodologii.
+Pięć topologii badania to torus12×12, complete, ER4, WS3 i BA. WS3/BA wczytują dokładne załączniki. ER4 ma w dostarczonym pliku 150 węzłów, dlatego preflight blokuje go przy wymaganych 144. Szczegóły i źródła grafów: [STUDY_144.md](../STUDY_144.md).
 
 Każdy węzeł uruchamia jeden proces Ray przez `srun`. Proces sterujący współdzieli przydział głównego węzła przez `--overlap`, z CPU wyłączonym z puli Ray. Znaczenie `--exact` i `--overlap` określa [dokumentacja SLURM](https://slurm.schedmd.com/srun.html). Wrapper kończy własne kroki zadania; nie wykonuje globalnego `ray stop`.
 
-Gotowy pełny pilot F1/D200, torus 10×20, `best/plain`, trzy powtórzenia oraz jego ścisły walidator są opisane w [`pilot_run/README.md`](../pilot_run/README.md). Nie składaj go ręcznie z trzech osobnych komend: skrypt zgłoszeniowy zapisuje wspólny manifest i uruchamia finalizer zależny od całej tablicy.
+Gotowy pełny pilot F1/D200, torus 12×12, `best/plain`, trzy powtórzenia oraz jego ścisły walidator są opisane w [`pilot_run/README.md`](../pilot_run/README.md). Nie składaj go ręcznie z trzech osobnych komend: skrypt zgłoszeniowy zapisuje wspólny manifest i uruchamia finalizer zależny od całej tablicy.
 
 ## Dobór benchmarku i topologii
 
@@ -126,7 +130,7 @@ Launcher używa dokładnie istniejących grafów. **Nie wszystkie obsługują do
 | `er1`–`er4` | Gotowe grafy na 150 wysp |
 | `ws3`, `ws4` | Gotowe grafy na 144 wyspy |
 
-Preflight sprawdza rzeczywiste listy sąsiadów i przerywa przy niezgodności, np. domyślny torus150 albo ER180. Jawny prostokątny torus rozwiązuje wyłącznie kwestię rozmiaru tej rodziny; do porównania ER, WS i torusa przy **tej samej** liczbie 150–200 wysp nadal potrzebne będą osobno uzgodnione, zapisane grafy ER/WS. Port benchmarków nie generuje tych grafów ani nie poprawia istniejących pętli własnych. Nawet przy grafie pełnym dotychczasowy `RandomSelect` wybiera jeden cel na migranta; nie jest to rozesłanie każdego migranta do wszystkich sąsiadów.
+Preflight sprawdza rzeczywiste listy sąsiadów i przerywa przy niezgodności, np. domyślny torus150 albo ER180. Jawny prostokątny torus rozwiązuje wyłącznie kwestię rozmiaru tej rodziny; do porównania ER, WS i torusa przy **tej samej** liczbie 150–144 wysp nadal potrzebne będą osobno uzgodnione, zapisane grafy ER/WS. Port benchmarków nie generuje tych grafów ani nie poprawia istniejących pętli własnych. Nawet przy grafie pełnym dotychczasowy `RandomSelect` wybiera jeden cel na migranta; nie jest to rozesłanie każdego migranta do wszystkich sąsiadów.
 
 ## Zachowane znaczenie parametrów
 
@@ -161,6 +165,6 @@ Lokalny odpowiednik pilota, w środowisku z zależnościami projektu:
 
 ```bash
 python hpc_benchmarks/run_benchmark.py \
-  --problem b03_nk_k4 --dimension 60 --islands 2 --evaluations 128 \
+  --problem b03_nk_k4 --dimension 60 --diagnostic --islands 2 --evaluations 128 \
   --topology complete --strategy maxDistance --ray-address local --local-cpus 6
 ```
