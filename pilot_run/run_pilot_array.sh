@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=island-pilot
-#SBATCH --nodes=9
+#SBATCH --nodes=7
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=48
 #SBATCH --mem-per-cpu=2G
@@ -15,8 +15,8 @@ set -euo pipefail
 : "${SLURM_ARRAY_TASK_ID:?Missing SLURM_ARRAY_TASK_ID}"
 : "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
+PROJECT_DIR="${ISLANDS_PROJECT_DIR:-${SLURM_SUBMIT_DIR:?Missing submission directory}}"
+SCRIPT_DIR="$PROJECT_DIR/pilot_run"
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
 source "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh"
 islandsea_configure_storage

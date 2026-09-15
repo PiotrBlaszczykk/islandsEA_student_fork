@@ -31,17 +31,17 @@ class JMetalIntegrationTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("hpc_benchmark_launcher_test", path)
         launcher = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(launcher)
-        base = ["--problem", "r29_composition7", "--dimension", "200", "--islands", "180", "--topology", "torus"]
+        base = ["--problem", "r29_composition7", "--dimension", "200", "--islands", "144", "--topology", "torus"]
         args = launcher.parser().parse_args(base)
         with patch.dict(os.environ, launcher.environment(args)):
             configuration, problem, _, adjacency = launcher.validate(args)
         self.assertEqual(200, problem.number_of_variables)
         self.assertEqual(8000, configuration["number_of_evaluations"])
-        self.assertEqual(180, len(adjacency))
+        self.assertEqual(144, len(adjacency))
         self.assertTrue(all(len(targets) == 4 for targets in adjacency.values()))
         for invalid in (["--dimension", "20"], ["--offspring", "3"], ["--evaluations", "17"],
                         ["--migrants", "17"], ["--islands", "150"], ["--acceptance", "typo"],
-                        ["--islands", "2", "--topology", "er1"]):
+                        ["--islands", "2", "--topology", "er4"]):
             args = launcher.parser().parse_args(base + invalid)
             with self.subTest(invalid=invalid), patch.dict(os.environ, launcher.environment(args)), self.assertRaises(ValueError):
                 launcher.validate(args)
@@ -110,6 +110,7 @@ class JMetalIntegrationTests(unittest.TestCase):
         ga_root = Path(create_algorithm_hpc.__code__.co_filename).resolve().parents[1]
 
         class LocalMigration:
+            start = 0.0
             # No Ray actors/communication: this tests the actual builder and GA
             # step with one island, not distributed timing or SLURM scheduling.
             def wait_for_all_start(self):

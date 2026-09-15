@@ -19,9 +19,9 @@
   "how_many_data_intervals": 50,
   "plot_population_interval": 500,
 
-  "number_of_islands": 5,
+  "number_of_islands": 144,
   "number_of_migrants": 5,
-  "migration_interval": 35,
+  "migration_interval": 5,
 
   "island_delays": {
     "0": [-1,  0, -1, -1, -1, -1, -1, -1, -1,  0],

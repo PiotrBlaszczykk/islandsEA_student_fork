@@ -11,16 +11,16 @@ VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
 CONFIRMATION="${1:-}"
 MAX_PARALLEL="${PILOT_MAX_PARALLEL:-3}"
 
-[[ "$#" -eq 1 && "$CONFIRMATION" == "--confirm-torus200-and-722-cpuh" ]] || {
+[[ "$#" -eq 1 && "$CONFIRMATION" == "--confirm-144-and-562-cpuh" ]] || {
     cat >&2 <<'EOF'
-Usage: bash pilot_run/launch_pilot.sh --confirm-torus200-and-722-cpuh
+Usage: bash pilot_run/launch_pilot.sh --confirm-144-and-562-cpuh
 
-This explicitly confirms the 10x20 torus and authorizes:
-  * canary: 9 x 48 CPUs, 10 min walltime (maximum 72 CPUh),
-  * full pilot after a valid canary: 3 x 9 x 48 CPUs, 30 min walltime
-    (maximum 648 CPUh),
+This authorizes the approved 144-island / 12x12 torus pilot allocation:
+  * canary: 7 x 48 CPUs, 10 min walltime (maximum 56 CPUh),
+  * full pilot after a valid canary: 3 x 7 x 48 CPUs, 30 min walltime
+    (maximum 504 CPUh),
   * finalizer: maximum 1 CPUh.
-The combined safety ceiling is 721.5 CPUh (rounded up to 722); no automatic retry.
+The combined safety ceiling is 561.5 CPUh (rounded up to 562); no automatic retry.
 EOF
     exit 2
 }
@@ -63,8 +63,8 @@ cd "$PROJECT_DIR"
     exit 2
 }
 BRANCH=$(git branch --show-current)
-[[ "$BRANCH" == "summer_benchmarks" ]] || {
-    echo "Submission blocked: expected branch summer_benchmarks, found ${BRANCH:-detached HEAD}." >&2
+[[ "$BRANCH" == "summer_benchmarks_ares" ]] || {
+    echo "Submission blocked: expected branch summer_benchmarks_ares, found ${BRANCH:-detached HEAD}." >&2
     exit 2
 }
 COMMIT=$(git rev-parse HEAD)
@@ -74,7 +74,7 @@ UPSTREAM=$(git rev-parse '@{upstream}' 2>/dev/null) || {
 }
 [[ "$COMMIT" == "$UPSTREAM" ]] || {
     echo "Submission blocked: HEAD differs from the locally known upstream." >&2
-    echo "Run: git pull --ff-only origin summer_benchmarks" >&2
+    echo "Run: git pull --ff-only origin summer_benchmarks_ares" >&2
     exit 2
 }
 
@@ -100,14 +100,14 @@ printf '%s\n' "$PLAN_JSON"
 "$VENV_DIR/bin/python" -c '
 import json, sys
 p = json.loads(sys.argv[1])
-expected = {"islands": 200, "dimension": 200, "required_ray_cpus": 401, "required_slurm_cpus": 402}
+expected = {"islands": 144, "dimension": 200, "required_ray_cpus": 289, "required_slurm_cpus": 290}
 bad = {key: (p.get(key), value) for key, value in expected.items() if p.get(key) != value}
 if bad:
     raise SystemExit(f"Invalid dry-run resource plan: {bad}")
 print("PILOT_DRY_RUN_OK")
 ' "$PLAN_JSON"
 
-export CONFIRM_TORUS_200=1
+export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
 export PILOT_EXPECTED_COMMIT="$COMMIT"
 CANARY_OUTPUT=$(bash "$SCRIPT_DIR/submit_canary.sh")
 printf '%s\n' "$CANARY_OUTPUT"

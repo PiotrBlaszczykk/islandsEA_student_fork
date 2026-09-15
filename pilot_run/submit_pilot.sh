@@ -33,11 +33,6 @@ rollback_submission() {
 }
 trap rollback_submission EXIT
 
-[[ "${CONFIRM_TORUS_200:-0}" == "1" ]] || {
-    echo "Submission blocked: the 10x20 torus for 200 islands is a pending methodology choice." >&2
-    echo "After it is approved, run: CONFIRM_TORUS_200=1 pilot_run/submit_pilot.sh" >&2
-    exit 2
-}
 [[ "$MAX_PARALLEL" =~ ^[1-3]$ ]] || {
     echo "PILOT_MAX_PARALLEL must be 1, 2 or 3" >&2
     exit 2
@@ -52,6 +47,8 @@ trap rollback_submission EXIT
 }
 
 cd "$PROJECT_DIR"
+[[ "$(git branch --show-current)" == "summer_benchmarks_ares" ]] || { echo "Use the Ares CPU checkout for this submitter." >&2; exit 2; }
+export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
     echo "Refusing a non-reproducible submission: commit or remove all local changes first." >&2
     git status --short >&2

@@ -1,3 +1,16 @@
+> **Aktualizacja badania: 144 wyspy (mail 2026-09-15).**
+> Aktualne instrukcje: [STUDY_144.md](../STUDY_144.md). Obowiązują torus12×12,
+> complete, WS3 i BA z załączników. Dostarczony ER4 ma 150 węzłów i jest
+> zablokowany dla badania144 do rozstrzygnięcia. Ares: 7×48=336CPU,
+> wymagane289Ray+driver; pilot≤561.5CPUh, `--confirm-144-and-562-cpuh`.
+> Athena: te same grafy144; pełny runner wysp GPU nadal wymaga integracji.
+>
+> **Poniżej zachowano historyczną migawkę debugowania i planów.** Liczby
+> 150/180/200 dotyczące wysp, stare profile `*_ares_200.sh`, kształt10×20,
+> CONFIRM_TORUS_200 i dawne polecenia uruchomienia zostały zastąpione.
+> Nie używać ich jako aktualnej instrukcji. Historyczne joby, rachunki i pomiary
+> zachowano bez przepisywania; D=200 nadal jest poprawnym wymiarem benchmarku.
+
 # Athena / Cyfronet — stan środowiska i plan portu IslandsEA
 
 Ostatnia aktualizacja: **2026-09-14**  

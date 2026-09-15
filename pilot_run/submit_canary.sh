@@ -11,13 +11,11 @@ ARTIFACT_ROOT="$ISLANDS_ARTIFACT_ROOT"
 
 module load python/3.10.4-gcccore-11.3.0
 
-[[ "${CONFIRM_TORUS_200:-0}" == "1" ]] || {
-    echo "Submission blocked: confirm the proposed 10x20 torus with CONFIRM_TORUS_200=1" >&2
-    exit 2
-}
 [[ -x "$VENV_DIR/bin/python" ]] || { echo "Missing project venv: $VENV_DIR" >&2; exit 2; }
 
 cd "$PROJECT_DIR"
+[[ "$(git branch --show-current)" == "summer_benchmarks_ares" ]] || { echo "Use the Ares CPU checkout for this submitter." >&2; exit 2; }
+export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
     echo "Refusing a non-reproducible canary: commit or remove all local changes first." >&2
     git status --short >&2

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=island-pilot-canary
-#SBATCH --nodes=9
+#SBATCH --nodes=7
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=48
 #SBATCH --mem-per-cpu=2G
@@ -14,8 +14,8 @@ set -euo pipefail
 : "${SLURM_JOB_ID:?Submit through pilot_run/submit_canary.sh}"
 : "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
+PROJECT_DIR="${ISLANDS_PROJECT_DIR:-${SLURM_SUBMIT_DIR:?Missing submission directory}}"
+SCRIPT_DIR="$PROJECT_DIR/pilot_run"
 source "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh"
 islandsea_configure_storage
 ARTIFACT_ROOT="$ISLANDS_ARTIFACT_ROOT"
@@ -40,15 +40,15 @@ islandsea_print_storage
 bash "$PROJECT_DIR/hpc_benchmarks/run_ares.sh" \
     --problem r01_elliptic \
     --dimension 200 \
-    --islands 200 \
+    --islands 144 \
     --evaluations 128 \
     --population 16 \
     --offspring 4 \
     --migrants 5 \
     --interval 5 \
     --topology torus \
-    --torus-rows 10 \
-    --torus-columns 20 \
+    --torus-rows 12 \
+    --torus-columns 12 \
     --strategy best \
     --acceptance plain \
     --repeat 1 \

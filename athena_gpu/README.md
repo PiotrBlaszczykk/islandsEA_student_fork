@@ -1,3 +1,9 @@
+> Aktualizacja 2026-09-15: obowiązuje **144 wyspy**, torus **12×12**,
+> complete oraz wybrane **ER4 / WS3 / BA**. Źródło aktualnych ustawień i status
+> załączników: [STUDY_144.md](../STUDY_144.md). ER4 dostarczono jako 150 węzłów;
+> jego uruchomienie przy 144 jest zablokowane do rozstrzygnięcia. Historyczne
+> pomiary sprzętu pozostają niezmienione; D=200 oznacza wymiar benchmarku.
+
 # Athena: walidacja 40 benchmarków na GPU
 
 Stan 2026-09-14: `benchmarks_refined/batch.py` i `batch_kernels.py` implementują
@@ -36,7 +42,7 @@ Python 3.10, Ray 2.9.3, NumPy 1.21.4, SciPy 1.7.3, jMetalPy 1.5.5,
 CuPy 10.6.0, runtime CUDA 11.7 oraz model A100. Wykonuje wspólną macierz
 wszystkich 40 funkcji (w tym wszystkie wymiary CEC i projektowe 200D).
 Potem mierzy F1, F6, F22, F30, LABS i NK przy D/N=200 oraz
-B=200/400/800/1200/1600/2400/3200, z warmupem i trzema próbkami na rozmiar.
+B=144/288/576/864/1152/1728/2304, z warmupem i trzema próbkami na rozmiar.
 Raport rozdziela lokalny CPU batch, kernel GPU, transfery, aktora i Ray
 roundtrip; nie obiecuje przyspieszenia każdej funkcji.
 
@@ -87,7 +93,7 @@ z dawnym hostowym czasem submitu w jobie 3167902. Tamten job potwierdził
 poprzednią implementację F1, nie wszystkie nowe funkcje.
 
 Ten katalog przygotowuje jeden tani, automatyczny test przed portem IslandsEA
-na GPU. Nie uruchamia 200 wysp ani właściwego pilota.
+na GPU. Nie uruchamia 144 wysp ani właściwego pilota.
 
 Canary sprawdza:
 

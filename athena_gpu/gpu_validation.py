@@ -18,7 +18,7 @@ import traceback
 from gpu_readiness import _atomic_json, _nvidia_smi
 
 GIB = 1024 ** 3
-SIZES = (200, 400, 800, 1200, 1600, 2400, 3200)
+SIZES = (144, 288, 576, 864, 1152, 1728, 2304)
 
 
 def _check_commit(project_dir):

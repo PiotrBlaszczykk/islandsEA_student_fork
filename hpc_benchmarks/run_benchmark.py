@@ -25,9 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = ROOT / "islands_desync"
 sys.path.insert(0, str(PACKAGE_ROOT))
 
-TOPOLOGIES = {name: name for name in ("ER1", "ER2", "ER3", "ER4", "WS3", "WS4")}
-TOPOLOGIES = {key.lower(): value + "Topology" for key, value in TOPOLOGIES.items()}
-TOPOLOGIES.update({"ring": "RingTopology", "torus": "TorusTopology", "complete": "CompleteTopology"})
+from islands_desync.islands.topologies.study import ISLANDS, TOPOLOGIES, validate_study
+from islands_desync.islands.topologies.fixed_graph import graph_parameters
 ACCEPTANCE = {"plain", "better", "newer", "older", "oldest", "stochastic", "rejectTooOld", "window"}
 
 
@@ -35,7 +34,8 @@ def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--problem", required=True)
     p.add_argument("--dimension", type=int, required=True)
-    p.add_argument("--islands", type=int, default=180)
+    p.add_argument("--islands", type=int, default=ISLANDS)
+    p.add_argument("--diagnostic", action="store_true", help="Explicitly allow small smoke runs outside the 144-island study")
     p.add_argument("--evaluations", type=int, default=8000)
     p.add_argument("--population", type=int, default=16)
     p.add_argument("--offspring", type=int, default=4)
@@ -87,6 +87,13 @@ def torus_shape(args):
             "otherwise provide an explicitly approved --torus-rows/--torus-columns shape"
         )
     return {"rows": args.islands // 12, "columns": 12, "mode": "historical-default"}
+
+
+def selected_topology_parameters(args):
+    shape = torus_shape(args)
+    if args.topology in ("er4", "ws3", "ba"):
+        return graph_parameters(args.topology)
+    return shape
 
 
 def storage_paths(args):
@@ -167,6 +174,7 @@ def environment(args):
 
 
 def validate(args):
+    validate_study(args.islands, args.topology, args.diagnostic)
     from islands_desync.geneticAlgorithm.run_hpc.benchmark_configuration import create_problem, load_configuration
     if args.islands < 1 or args.repeat < 1 or args.seed < 0 or args.interval < 1:
         raise ValueError("islands/repeat/interval must be positive and seed nonnegative")
@@ -220,6 +228,7 @@ def node_probe(name, dimension):
     return {"python": sys.version, "executable": sys.executable, "cwd": str(cwd),
             "required_runtime_path": str(required_runtime_path), "required_runtime_path_exists": required_runtime_path.is_file(),
             "runtime_sha256": runtime_sha256(),
+            "selected_graphs": {name: graph_parameters(name) for name in ("er4", "ws3", "ba")},
             "versions": {p: importlib.metadata.version(p) for p in ("numpy", "jmetalpy", "ray", "scikit-learn")},
             "implementation_sha256": implementation_sha256(),
             "benchmark": problem.benchmark_metadata() if hasattr(problem, "benchmark_metadata") else {"name": problem.get_name()},
@@ -326,6 +335,7 @@ def topology_payload(args, adjacency):
         "name": args.topology,
         "islands": args.islands,
         "torus_shape": torus_shape(args),
+        "parameters": selected_topology_parameters(args),
         "adjacency": adjacency,
         "graph_metrics": topology_metrics(args, adjacency),
         "note": "Exact outgoing neighbour lists; migration selects one destination per migrant",
@@ -358,7 +368,7 @@ def run(args):
     os.environ.update(env)
     os.chdir(PACKAGE_ROOT)
     configuration, problem, topology_class, adjacency = validate(args)
-    topology_parameters = torus_shape(args)
+    topology_parameters = selected_topology_parameters(args)
     required_cpus = 2 * args.islands + 1  # Existing Island, Computation and SignalActor reservations.
     required_slurm_cpus = required_cpus + 1  # One physical head CPU is reserved for the driver.
     if args.dry_run:
@@ -374,7 +384,7 @@ def run(args):
                           "metrics_profile": "research-v1-full-buffered",
                           "effect_horizon_steps": int(env["ISLANDS_EFFECT_HORIZON_STEPS"]),
                           "delivery_ack_timeout_seconds": float(env["ISLANDS_DELIVERY_TIMEOUT_SECONDS"]),
-                          "dry_run": True}, indent=2))
+                          "diagnostic": args.diagnostic, "dry_run": True}, indent=2))
         return
 
     import ray
@@ -403,6 +413,7 @@ def run(args):
     dirty = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True)
     benchmark_metadata = problem.benchmark_metadata() if hasattr(problem, "benchmark_metadata") else {"name": problem.get_name()}
     scientific_configuration = {
+        "study": "diagnostic" if args.diagnostic else "approved-144",
         "benchmark": benchmark_metadata,
         "algorithm_configuration": configuration,
         "dimension": args.dimension,
@@ -460,6 +471,7 @@ def run(args):
                 "run_directory": str(raw), "versions": versions, "git_commit": git.stdout.strip() or None,
                 "git_dirty": bool(dirty.stdout) if dirty.returncode == 0 else None,
                 "runtime_sha256": runtime_sha256(),
+                "selected_graphs": {name: graph_parameters(name) for name in ("er4", "ws3", "ba")},
                 "launcher_sha256": hashlib.sha256(Path(__file__).read_bytes().replace(b"\r\n", b"\n")).hexdigest(),
                 "started_utc": datetime.now(timezone.utc).isoformat(),
                 "invocation": {"argv": sys.argv, "cwd": str(Path.cwd()), "hostname": socket.gethostname(),
@@ -560,9 +572,10 @@ def run(args):
             configuration["problem"], args.dimension) for node in nodes], timeout=args.startup_timeout)
         baseline = probes[0]
         for entry in probes:
-            if any(entry[key] != baseline[key] for key in ("implementation_sha256", "runtime_sha256", "benchmark", "configuration", "python", "versions")):
+            if any(entry[key] != baseline[key] for key in ("implementation_sha256", "runtime_sha256", "selected_graphs", "benchmark", "configuration", "python", "versions")):
                 raise RuntimeError("Ray nodes disagree on code, benchmark instance, Python or configuration")
-            if entry["runtime_sha256"] != manifest["runtime_sha256"] or entry["versions"] != versions:
+            if (entry["runtime_sha256"] != manifest["runtime_sha256"] or entry["versions"] != versions
+                    or entry["selected_graphs"] != manifest["selected_graphs"]):
                 raise RuntimeError("Worker runtime/dependencies differ from the driver")
             if hasattr(problem, "benchmark_metadata") and entry["benchmark"] != manifest["benchmark"]:
                 raise RuntimeError("Worker benchmark differs from the driver")
