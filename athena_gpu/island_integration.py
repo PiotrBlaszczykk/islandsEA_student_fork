@@ -82,21 +82,28 @@ class ResourcePlan:
 
 @dataclass(frozen=True)
 class BatchPolicy:
-    target_rows: int = 800
+    initial_target_rows: int = 3200
+    steady_target_rows: int = 800
     max_rows: int = 3200
-    max_wait_ms: float = 5.0
+    initial_max_wait_ms: float = 50.0
+    steady_max_wait_ms: float = 2.0
     max_pending_per_island: int = 1
     backend_max_rows: int = BACKEND_MAX_BATCH_ROWS
 
     def validate(self) -> None:
-        _positive_int("target_rows", self.target_rows)
+        _positive_int("initial_target_rows", self.initial_target_rows)
+        _positive_int("steady_target_rows", self.steady_target_rows)
         _positive_int("max_rows", self.max_rows)
         _positive_int("max_pending_per_island", self.max_pending_per_island)
         _positive_int("backend_max_rows", self.backend_max_rows)
-        if isinstance(self.max_wait_ms, bool) or self.max_wait_ms <= 0:
-            raise ValueError("max_wait_ms must be positive")
-        if self.target_rows > self.max_rows:
-            raise ValueError("target_rows cannot exceed max_rows")
+        for name in ("initial_max_wait_ms", "steady_max_wait_ms"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or value <= 0:
+                raise ValueError(f"{name} must be positive")
+        if self.initial_target_rows > self.max_rows:
+            raise ValueError("initial_target_rows cannot exceed max_rows")
+        if self.steady_target_rows > self.max_rows:
+            raise ValueError("steady_target_rows cannot exceed max_rows")
         if self.max_rows > self.backend_max_rows:
             raise ValueError("max_rows exceeds the batch backend hard limit")
         if self.max_pending_per_island != 1:
@@ -236,9 +243,11 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--acceptance", default="plain")
     result.add_argument("--repeat", type=int, default=1)
     result.add_argument("--seed", type=int, default=20260912)
-    result.add_argument("--target-batch-rows", type=int, default=800)
+    result.add_argument("--initial-target-batch-rows", type=int, default=3200)
+    result.add_argument("--steady-target-batch-rows", type=int, default=800)
     result.add_argument("--max-batch-rows", type=int, default=3200)
-    result.add_argument("--max-wait-ms", type=float, default=5.0)
+    result.add_argument("--initial-max-wait-ms", type=float, default=50.0)
+    result.add_argument("--steady-max-wait-ms", type=float, default=2.0)
     result.add_argument("--diagnostic", action="store_true")
     return result
 
@@ -259,9 +268,11 @@ def main() -> int:
     )
     resources = ResourcePlan(island_shards=args.shards)
     batching = BatchPolicy(
-        target_rows=args.target_batch_rows,
+        initial_target_rows=args.initial_target_batch_rows,
+        steady_target_rows=args.steady_target_batch_rows,
         max_rows=args.max_batch_rows,
-        max_wait_ms=args.max_wait_ms,
+        initial_max_wait_ms=args.initial_max_wait_ms,
+        steady_max_wait_ms=args.steady_max_wait_ms,
     )
     print(json.dumps(build_plan(scientific, resources, batching, diagnostic=args.diagnostic), indent=2))
     return 0

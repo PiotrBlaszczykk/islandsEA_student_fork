@@ -58,16 +58,37 @@ ATHENA_40_GPU_VALIDATION_JOB_OK=1
 ```
 
 Skrypt wypisuje te markery dopiero po przejściu macierzy 40 benchmarków / 170
-instancji, wszystkich porównań i pomiarów. Błąd `libpython3.10.so.1.0` widziany
+instancji. Odczyt JSON potwierdził `status=passed`, 22 016 sprawdzonych wierszy,
+`global_rng_unchanged=true` i 42 rekordy timingów. Błąd
+`libpython3.10.so.1.0` widziany
 później pochodził z próby odczytu JSON-a na login node bez załadowania modułu
 `Python/3.10.4`; nie pochodził z joba.
 
-Od zwalidowanego commita do bieżącego `73eb517f...` nie zmieniły się
+Od zwalidowanego commita do lokalnego commita bazowego `dbe27de...` (HEAD
+w czasie analizy) nie zmieniły się
 `batch.py`, `batch_kernels.py`, dane ani wzory. Zmieniły się rozmiary pomiarowe
 w `gpu_validation.py` z 200/400/800/1200/1600/2400/3200 na wielokrotności 144,
 dokumentacja i test konfiguracji badania. Job jest zatem dowodem dla bieżącej
 implementacji backendu, natomiast dokładne mediany z jego JSON-a należy jeszcze
-dołączyć do decyzji o finalnym `target_batch_rows` i `max_wait_ms`.
+dołączyć do decyzji o finalnej polityce batchera.
+
+Reprezentatywne wyniki pełnego Ray roundtripu (speedup względem lokalnego
+NumPy batch na tym samym węźle):
+
+| Funkcja | Pierwsze B ze speedup > 1 | GPU roundtrip B=800 | Speedup B=800 | Speedup B=3200 |
+|---|---:|---:|---:|---:|
+| `r01_elliptic` | 2400 | 2.924 ms | 0.666x | 1.649x |
+| `r06_weierstrass` | 200 | 2.810 ms | 47.658x | 99.368x |
+| `r22_hybrid6` | 400 | 6.189 ms | 1.849x | 6.754x |
+| `r30_composition8` | 400 | 8.402 ms | 2.856x | 9.036x |
+| `b01_labs_binary` | 400 | 13.055 ms | 2.473x | 7.505x |
+| `b03_nk_k4` | 2400 | 3.302 ms | 0.583x | 1.626x |
+
+Wniosek: większe batche są korzystne, ale 200 wysp z offspring 4 może mieć
+maksymalnie 800 niezależnych kandydatów w locie bez spekulacji lub zmiany GA.
+Nie czekamy więc w krokach na nieosiągalne 2400/3200 tylko po to, aby poprawić
+speedup F1/NK. Inicjalizacja jest osobną fazą z naturalnym B=3200 przed startem
+pomiaru migracji i może użyć większego targetu.
 
 ## 3. Budżet jednej A100 i 16 CPU
 
@@ -254,11 +275,20 @@ steady:   200 * 4  =  800 kandydatów przy pełnym zbiegu requestów
 Pierwszy canary używa parametrów jawnych w CLI i metadanych:
 
 ```text
-target_batch_rows = 800
-max_batch_rows    = 3200
-max_wait_ms       = 5.0
+initial_target_batch_rows = 3200
+initial_max_wait_ms       = 50.0
+steady_target_batch_rows  = 800
+steady_max_wait_ms        = 2.0
+max_batch_rows            = 3200
 max_pending_per_island = 1
 ```
+
+Dłuższy timeout inicjalizacji nie wpływa na signed delays, ponieważ pomiar
+migracji zaczyna się dopiero po inicjalizacji i barierze startowej. Krótki
+timeout fazy steady ogranicza dodatkowe sprzężenie czasowe między wyspami;
+2 ms jest krótsze niż każdy zmierzony roundtrip B=800. Canary ma sprawdzić,
+czy wystarcza do zebrania sensownego batcha przy rzeczywistym napływie z
+12 shardów. Jeśli nie, decyzję zmieniamy jawnie i zapisujemy w metadanych.
 
 `target_batch_rows` nie jest barierą. Dispatch następuje po pierwszym z:
 
@@ -266,7 +296,8 @@ max_pending_per_island = 1
 - upływ czasu najstarszego requestu (`reason=timeout`);
 - jawny flush przy końcu runa (`reason=flush`).
 
-Request większy od wolnego miejsca można podzielić na fragmenty, ale odpowiedź
+Target zależy od pola `phase` (`initial` albo `offspring`). Request większy od
+wolnego miejsca można podzielić na fragmenty, ale odpowiedź
 wraca do callera dopiero po złożeniu wszystkich jego fragmentów w pierwotnej
 kolejności. Backendowy limit 8192 pozostaje twardy. Finalne wartości target/wait
 muszą wynikać z `validation.json` joba 3168014 i małego canary GA; nie wolno ich

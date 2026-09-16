@@ -50,7 +50,12 @@ class IslandIntegrationPlanTests(unittest.TestCase):
         resources = ResourcePlan(island_shards=4)
         with self.assertRaisesRegex(ValueError, "exactly 200"):
             build_plan(scientific, resources, BatchPolicy())
-        plan = build_plan(scientific, resources, BatchPolicy(target_rows=48, max_rows=192), diagnostic=True)
+        plan = build_plan(
+            scientific,
+            resources,
+            BatchPolicy(initial_target_rows=192, steady_target_rows=48, max_rows=192),
+            diagnostic=True,
+        )
         self.assertEqual("athena-integration-diagnostic", plan["profile"])
         self.assertEqual(12, len(plan["island_to_shard"]))
 
@@ -61,10 +66,21 @@ class IslandIntegrationPlanTests(unittest.TestCase):
             build_plan(
                 ScientificPlan(),
                 ResourcePlan(),
-                BatchPolicy(target_rows=800, max_rows=BACKEND_MAX_BATCH_ROWS + 1),
+                BatchPolicy(max_rows=BACKEND_MAX_BATCH_ROWS + 1),
             )
-        with self.assertRaisesRegex(ValueError, "target_rows"):
-            build_plan(ScientificPlan(), ResourcePlan(), BatchPolicy(target_rows=3201, max_rows=3200))
+        with self.assertRaisesRegex(ValueError, "steady_target_rows"):
+            build_plan(
+                ScientificPlan(),
+                ResourcePlan(),
+                BatchPolicy(steady_target_rows=3201, max_rows=3200),
+            )
+
+    def test_phase_specific_batch_policy_matches_two_hundred_islands(self):
+        plan = build_plan(ScientificPlan(), ResourcePlan(), BatchPolicy())
+        self.assertEqual(3200, plan["batching"]["initial_target_rows"])
+        self.assertEqual(800, plan["batching"]["steady_target_rows"])
+        self.assertEqual(50.0, plan["batching"]["initial_max_wait_ms"])
+        self.assertEqual(2.0, plan["batching"]["steady_max_wait_ms"])
 
     def test_cli_is_json_and_has_no_execution_side_effect(self):
         script = ROOT / "athena_gpu/island_integration.py"

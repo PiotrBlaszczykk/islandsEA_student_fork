@@ -33,10 +33,14 @@ NumPy 1.21.4 / CuPy 10.6.0 na docelowym sprzęcie.
 
 Job `3168014` na A100 (`t0029`) zakończył się `COMPLETED 0:0` w 47 s,
 utworzył `validation.json` i wypisał wszystkie trzy markery `ATHENA_40_*`.
+JSON potwierdził `passed`, 40 benchmarków, 170 instancji, 22 016 sprawdzonych
+wierszy oraz niezmieniony globalny RNG.
 Walidował commit `d9795315f28d06945ab9af46e9cc54e9c8bb8a39`. Do bieżącego HEAD
 nie zmieniła się implementacja ani dane backendu; zmieniono jedynie rozmiary
 pomiarowe z wielokrotności 200 na wielokrotności 144, dokumentację i test
-konfiguracji badania. Dokładne mediany pozostają częścią raportu JSON.
+konfiguracji badania. Dla profilu 200 czasy uzasadniają osobny batch inicjalny
+3200 oraz maksymalny osiągalny batch steady 800; szczegóły i tabela są w
+`ISLAND_INTEGRATION_200.md`.
 
 ## Zakończony validation job dla całej czterdziestki
 
