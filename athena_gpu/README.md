@@ -6,13 +6,23 @@
 
 # Athena: walidacja 40 benchmarków na GPU
 
+Projekt następnego, odseparowanego etapu znajduje się w
+[ISLAND_INTEGRATION_200.md](ISLAND_INTEGRATION_200.md). Opisuje 200 logicznych
+wysp na 12 shardach, wspólny batcher, router migracji oraz jedną A100 przy
+16 CPU. Jest to profil integracyjny, a nie zmiana zatwierdzonego badania 144.
+Maszynowo sprawdzalny plan, bez importu Ray/CuPy i bez możliwości submitu:
+
+```bash
+python athena_gpu/island_integration.py
+```
+
 Stan 2026-09-14: `benchmarks_refined/batch.py` i `batch_kernels.py` implementują
 30 CEC2014 oraz 10 funkcji binarnych jako batche NumPy/CuPy. Instrukcja API,
 matematyka, tolerancje i pomiary są w [BATCH.md](../islands_desync/islands_desync/geneticAlgorithm/utils/benchmarks_refined/BATCH.md).
 Wzory skalarne, dane i adaptery jMetalPy pozostają bez zmian. Główny IslandsEA
 nadal wykonuje ewaluację CPU; shardy wysp i agregator requestów są kolejnym etapem.
 
-**Lokalna walidacja przeszła; nowego backendu nie uruchamiano jeszcze na A100.**
+**Lokalna walidacja oraz pełna walidacja A100 przeszły.**
 [validation_cpu.json](validation_cpu.json) zapisuje Python 3.12.14,
 NumPy 2.3.5, 170 instancji, 22016 porównań i 1667 odrzuconych błędnych wejść.
 Przeszło 12 dotychczasowych testów wzorów i 4 nowe testy batchowe; jeden test
@@ -21,10 +31,17 @@ submittera przeszły z atrapami `git`/`sbatch`, bez kontaktu z klastrem.
 Syntax Python 3.10 i Bash sprawdzono lokalnie. To nie zastępuje walidacji
 NumPy 1.21.4 / CuPy 10.6.0 na docelowym sprzęcie.
 
-## Następny krok: jeden validation job dla całej czterdziestki
+Job `3168014` na A100 (`t0029`) zakończył się `COMPLETED 0:0` w 47 s,
+utworzył `validation.json` i wypisał wszystkie trzy markery `ATHENA_40_*`.
+Walidował commit `d9795315f28d06945ab9af46e9cc54e9c8bb8a39`. Do bieżącego HEAD
+nie zmieniła się implementacja ani dane backendu; zmieniono jedynie rozmiary
+pomiarowe z wielokrotności 200 na wielokrotności 144, dokumentację i test
+konfiguracji badania. Dokładne mediany pozostają częścią raportu JSON.
 
-Przygotowane, **niezgłoszone** uruchomienie. Po commit/push/pull użytkownika
-na czystym branchu `summer_benchmarks_athena`, z login node Atheny:
+## Zakończony validation job dla całej czterdziestki
+
+Poniższe polecenie dokumentuje sposób uruchomienia. Nie wykonywać ponownie
+walidacji bez osobnej potrzeby i jawnej decyzji użytkownika:
 
 ```bash
 cd "$HOME/islandsEA_student_fork"
