@@ -1354,7 +1354,14 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         )
 
     # MAIN PART - GENETIC ALGORITHM STEP
-    def step(self):
+    def prepare_step_for_evaluation(self):
+        """Run one legacy step up to (but excluding) objective evaluation.
+
+        The CPU path still calls :meth:`step`, which immediately evaluates the
+        returned offspring and completes the step.  Athena shards use this
+        boundary to batch only objective evaluation while retaining migration,
+        selection, reproduction and RNG ordering per logical island.
+        """
         self.step_num = self.step_num + 1
 
         if 1 == self.step_num:
@@ -1419,7 +1426,10 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
         # KRZYŻOWANIE, MUTOWANIE I SELEKCJA
         mating_population = self.selection(self.solutions)
         offspring_population = self.reproduction(mating_population)
-        offspring_population = self.evaluate(offspring_population)
+        return offspring_population
+
+    def complete_step_after_evaluation(self, offspring_population):
+        """Complete the unchanged legacy step with evaluated offspring."""
         # print("**************************", self.solutions.__len__())
 
         for i in offspring_population:
@@ -1554,6 +1564,12 @@ class GeneticIslandAlgorithm(GeneticAlgorithm):
                 # time.sleep(0.5)
                 # print('\a')
                 self.ctrl.endOfWholeProbe(self.seria)
+
+    def step(self):
+        """Preserve the historical synchronous CPU step exactly."""
+        offspring_population = self.prepare_step_for_evaluation()
+        offspring_population = self.evaluate(offspring_population)
+        self.complete_step_after_evaluation(offspring_population)
 
     def update_min_fitness_per_evaluation(self):
         min_fitness = min(self.solutions, key=lambda x: x.objectives[0])

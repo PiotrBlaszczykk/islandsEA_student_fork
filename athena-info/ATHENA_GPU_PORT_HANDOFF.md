@@ -3,7 +3,8 @@
 > complete, WS3 i BA z załączników. Dostarczony ER4 ma 150 węzłów i jest
 > zablokowany dla badania144 do rozstrzygnięcia. Ares: 7×48=336CPU,
 > wymagane289Ray+driver; pilot≤561.5CPUh, `--confirm-144-and-562-cpuh`.
-> Athena: te same grafy144; pełny runner wysp GPU nadal wymaga integracji.
+> Athena: te same grafy144; shardowany runner GPU jest zaimplementowany lokalnie
+> i wymaga pierwszego canary na A100 przed jednym normalnym runem.
 >
 > **Poniżej zachowano historyczną migawkę debugowania i planów.** Liczby
 > 150/180/200 dotyczące wysp, stare profile `*_ares_200.sh`, kształt10×20,

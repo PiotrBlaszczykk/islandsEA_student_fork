@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from islands_desync.geneticAlgorithm.utils import fileslister
 
 
@@ -19,10 +21,12 @@ class Controller:
 
     def endOfWholeProbe(self, proba):
         print("KAT", self.katalog)
-        ostatniSlash = self.katalog.rfind("/", 0, len(self.katalog))
-        self.ctrlFile = open(
-            self.katalog[:ostatniSlash] + "/" + "seriaEnd" + str(proba) + ".txt", "a"
-        )
+        # ``self.katalog`` is produced by ``pathlib`` and therefore uses the
+        # native separator.  The former literal '/' slicing corrupted the
+        # parent path during local Windows validation; on Linux this resolves
+        # to the exact same file as before.
+        marker = Path(self.katalog).parent / ("seriaEnd" + str(proba) + ".txt")
+        self.ctrlFile = open(marker, "a")
         self.ctrlFile.close()
 
     def isEndComplete(self, ilewysp):

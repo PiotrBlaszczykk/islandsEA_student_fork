@@ -92,12 +92,18 @@ inicjalne (144×16), 576 potomków na idealną falę (144×4), 1 152 000 ewaluac
 To opis obciążenia, nie dodatkowa bariera synchronizacji między wyspami.
 Walidator batchy uwzględnia rozmiary 144,288,576,864,1152,1728,2304.
 
-**Pełny GPU runner wysp nadal nie jest zaimplementowany**. Dostępny jest
-batch CPU/CuPy dla 40 funkcji i testy A100, a kod GA/Ray w repo pozostaje CPU.
-Nie przenosić profilu Ares7×48 na pojedynczą A10016CPU: 289 aktorów CPU się
-nie zmieści. Integracja shardów/batchera oraz porównanie kompletnych metryk
-na rzeczywistym GPU pozostają osobnym zadaniem. Zmiana liczby wysp nie
-oznacza potwierdzenia gotowości pełnej kampanii GPU.
+Athena-only runner jest zaimplementowany jako 12 shardów po 12 logicznych
+wysp, wspólny batcher, router migracji i jeden aktor A100. Zajmuje 15 CPU Ray
+oraz jeden CPU drivera. Nie dodaje bariery generacji, zachowuje osobne stany
+RNG wysp, historyczne częściowe opróżnianie kolejek i pełne metryki. Kod CPU
+pozostaje dotychczasową ścieżką; nie przenosić profilu Ares 7×48 na Athenę.
+
+Runner nie jest jeszcze certyfikowany na docelowym stosie. Najpierw należy
+ręcznie uruchomić `bash athena_gpu/submit_study.sh --canary` (12 wysp,
+128 ewaluacji, maks. 0.25 GPUh), sprawdzić `validation.json`, markery i logi.
+Dopiero zaliczony canary z tego samego commita odblokowuje ręczne zgłoszenie
+jednego normalnego runu F1/D200/torus12×12/best/plain/repeat1 z macierzy 1800.
+Nie ma retry, resubmitu ani automatycznego przejścia canary → full.
 
 ## Walidacja tej zmiany
 

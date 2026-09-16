@@ -39,6 +39,10 @@ esac
 printf '%s\\n' "$@" > "$MOCK_CAPTURE"
 echo 987654
 ''')
+        # MSYS mkdir cannot write through the Codex Windows sandbox ACL even
+        # though native Python owns this temporary workspace. Directory
+        # creation is outside these submission-argument tests.
+        self.write_executable(bin_dir / "mkdir", "#!/usr/bin/env bash\nexit 0\n")
         venv_bin = self.root / "venv" / "bin"
         venv_bin.mkdir(parents=True)
         self.write_executable(venv_bin / "python", "#!/usr/bin/env bash\nexit 99\n")
