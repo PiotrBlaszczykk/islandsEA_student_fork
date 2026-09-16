@@ -30,20 +30,21 @@ Nie należy interpretować go jako potwierdzenia, że pełny pilot został wykon
 |---|---|
 | SLURM + Python + venv + Ray na jednym węźle | **potwierdzone** przez smoke `21045868` |
 | 40 nazwanych benchmarków i dry-run konfiguracji | **zaimplementowane**; lokalne testy przechodziły |
-| Multi-node launcher Ray dla 144 wysp | **dotarł do startu head node** w canary `21076864`; CLI Ray zablokował dryf Click |
+| Multi-node launcher Ray dla 144 wysp | head Ray potwierdzony w canary `21077082`; poprawiany jest readiness check SLURM |
 | Storage wyników i logów pod `$SCRATCH/islandsEA` | **zaimplementowany** |
 | Pełna telemetria `research-v1-full-buffered` | **zaimplementowana**, wymaga walidacji na pełnym canary/pilocie |
 | Pipeline canary → gate → 3 powtórzenia → finalizer | **zaimplementowany**; pełne powtórzenia pozostają zablokowane do poprawnego canary |
-| Canary 144 wysp | job `21076864` potwierdził naprawę spool i plan 12×12, ale padł po 7 s przy imporcie CLI Ray |
+| Canary 144 wysp | `21076864` wykrył Click 8.5; `21077082` uruchomił zdrowy head Ray, lecz readiness przez zagnieżdżony `srun` nie przeszedł |
 | Pełny pilot: torus 12×12, 144 wyspy, 3 powtórzenia | **nie został wysłany** |
 | Kampania 1800 runów | **niegotowa**; potrzebuje pilotów, estymacji i decyzji topologicznych |
 
 Naprawa `/var/spool/slurmd` jest potwierdzona przez canary `21076864`: batch
 odczytał checkout przez absolutne `ISLANDS_PROJECT_DIR`, zweryfikował plan 144
 wysp, przygotował cache Matplotlib na siedmiu węzłach i dotarł do startu head
-node. Bieżący bloker to niezgodny Click w istniejącym venvie. CLI Ray 2.9.3
-kończy import błędem `is not a valid Sentinel`; środowisko trzeba przywrócić do
-pinu `click==8.2.1` i sprawdzić przez `ray --version` przed kolejnym submittem.
+node. Click przywrócono z 8.5.0 do zatwierdzonego 8.2.1. Canary `21077082`
+potwierdził następnie zdrowy GCS i raylet, ale pomocniczy readiness check przez
+osobny krok `srun` nie dotarł do GCS. Bieżąca poprawka wykonuje `ray status`
+bezpośrednio z procesu batch na head node i zachowuje wynik ostatniej próby.
 
 ## 2. Źródła prawdy i poziom pewności
 
@@ -199,7 +200,7 @@ Potwierdzone wersje:
 |---|---:|
 | Python | `3.10.4` |
 | Ray | `2.9.3` |
-| Click | docelowo `8.2.1`; wersja obecna wymaga ponownego odczytu po awarii CLI |
+| Click | `8.2.1` po cofnięciu z niezgodnego `8.5.0` |
 | jMetalPy | `1.5.5` |
 | NumPy | `1.21.4` |
 | SciPy | `1.7.3` |
@@ -457,10 +458,32 @@ ValueError: <object object at ...> is not a valid Sentinel
 Ray head exited during startup
 ```
 
-To znana niezgodność CLI Ray z Click 8.3. Nie uruchomiono benchmarku, nie ma
+To znana niezgodność CLI Ray z Click 8.3 i nowszym. Nie uruchomiono benchmarku, nie ma
 `BENCHMARK_RUN_OK` ani artefaktów naukowych. Koszt alokacji wyniósł
 2352 CPU-sekund, czyli około 0.65 CPUh. Przed następnym canary należy przypiąć
 `click==8.2.1`, potwierdzić `ray --version` i pozostawić pełny pilot zablokowany.
+
+### Canary 144 po naprawie Click: `21077082`
+
+Canary uruchomiono z commita `14de749`. Ray 2.9.3 i Click 8.2.1 przeszły
+preflight. Rozliczenie:
+
+```text
+21077082 island-pilot-canary FAILED 1:0 00:01:05 AllocCPUS=336 CPUTimeRAW=21840
+```
+
+Head Ray wystartował na `ac0111` pod `172.22.16.111:37082`. Logi awarii
+potwierdzają, że GCS nasłuchiwał, raylet zarejestrował head node z 47 CPU, a
+`gcs_server.err` i `raylet.err` były puste. Ostrzeżenie o niedostępnym agencie
+metryk jawnie zaznacza, że nie wpływa na Ray. Mimo tego 30 prób readiness przez
+dodatkowy `srun --overlap ... ray status` nie dotarło do GCS i po około minucie
+launcher zakończył zdrowy proces head.
+
+Nie uruchomiono workerów ani benchmarku; brak `BENCHMARK_RUN_OK` i artefaktów
+naukowych. Koszt wyniósł 21840 CPU-sekund, czyli około 6.07 CPUh. Launcher ma
+wykonywać readiness bezpośrednio z procesu batch na head node, zapisywać pełny
+wynik ostatniego `ray status` oraz używać jawnego `--overlap --exact` dla
+drivera. Przed trzema powtórzeniami nadal wymagany jest nowy poprawny canary.
 
 ## 13. Naprawa błędu `/var/spool/slurmd`
 

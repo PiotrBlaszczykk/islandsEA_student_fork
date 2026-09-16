@@ -282,6 +282,23 @@ export -f git module mkdir sacct sbatch bash
                 )
                 self.assertIn('islandsea_validate_ray_cli "$VENV_DIR"', content)
 
+    def test_ray_readiness_does_not_create_a_nested_slurm_step(self):
+        content = (self.project / "hpc_benchmarks" / "run_ares.sh").read_text(
+            encoding="utf-8"
+        )
+        readiness = content.split('HEAD_STATUS_LOG=', 1)[1].split(
+            'for node in "${NODES[@]:1}"', 1
+        )[0]
+        self.assertFalse(
+            any(line.lstrip().startswith("srun ") for line in readiness.splitlines())
+        )
+        self.assertIn('"$VENV_DIR/bin/ray" status --address="$ADDRESS"', readiness)
+        self.assertIn('cat "$HEAD_STATUS_LOG"', readiness)
+        self.assertIn(
+            "srun --overlap --exact --nodes=1 --ntasks=1 --cpus-per-task=1",
+            content,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -109,7 +109,13 @@ Przed startem Ray launcher wykonuje pełny `--dry-run`, sprawdza topologię i po
 
 Pięć topologii badania to torus12×12, complete, ER4, WS3 i BA. WS3/BA wczytują dokładne załączniki. ER4 ma w dostarczonym pliku 150 węzłów, dlatego preflight blokuje go przy wymaganych 144. Szczegóły i źródła grafów: [STUDY_144.md](../STUDY_144.md).
 
-Każdy węzeł uruchamia jeden proces Ray przez `srun`. Proces sterujący współdzieli przydział głównego węzła przez `--overlap`, z CPU wyłączonym z puli Ray. Znaczenie `--exact` i `--overlap` określa [dokumentacja SLURM](https://slurm.schedmd.com/srun.html). Wrapper kończy własne kroki zadania; nie wykonuje globalnego `ray stop`.
+Każdy węzeł uruchamia jeden proces Ray przez `srun`. Readiness head node jest
+sprawdzany bezpośrednio z procesu batch, który już działa na pierwszym węźle;
+nie tworzy dodatkowego kroku `srun` konkurującego z blokującym procesem head.
+Proces sterujący współdzieli przydział głównego węzła przez jawne
+`--overlap --exact`, z CPU wyłączonym z puli Ray. Znaczenie `--exact` i
+`--overlap` określa [dokumentacja SLURM](https://slurm.schedmd.com/srun.html).
+Wrapper kończy własne kroki zadania; nie wykonuje globalnego `ray stop`.
 
 Gotowy pełny pilot F1/D200, torus 12×12, `best/plain`, trzy powtórzenia oraz jego ścisły walidator są opisane w [`pilot_run/README.md`](../pilot_run/README.md). Nie składaj go ręcznie z trzech osobnych komend: skrypt zgłoszeniowy zapisuje wspólny manifest i uruchamia finalizer zależny od całej tablicy.
 
