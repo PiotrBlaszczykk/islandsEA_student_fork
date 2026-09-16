@@ -117,6 +117,7 @@ print("platform:", platform.platform())
 print("cpu_count:", os.cpu_count())
 for package in (
     "ray",
+    "click",
     "jmetalpy",
     "numpy",
     "scipy",

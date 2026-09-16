@@ -28,7 +28,10 @@ Skrypt tworzy lub aktualizuje:
 /net/people/plgrid/plgblaszczykk/venvs/islands-ray
 ```
 
-Instaluje wymagania projektu oraz `ray==2.9.3`, `scikit-learn==1.1.3` i `setuptools<81`.
+Instaluje wymagania projektu oraz `ray==2.9.3`, `click==8.2.1`,
+`scikit-learn==1.1.3` i `setuptools<81`. Pin Clicka jest wymagany przez CLI
+Ray 2.9.3; Click 8.3 powoduje błąd `is not a valid Sentinel` jeszcze przed
+startem procesu Ray.
 
 ## 2. Wysłanie smoke joba
 

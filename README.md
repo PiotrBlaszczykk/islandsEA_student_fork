@@ -23,6 +23,7 @@ Recommended local environment:
 - `uv`
 - `Python 3.10`
 - `ray==2.9.3`
+- `click==8.2.1` (CLI Ray 2.9.3 nie działa z Click 8.3)
 - `scikit-learn==1.1.3`
 - `setuptools<81`
 
@@ -31,7 +32,7 @@ Example setup:
 ```bash
 cd islandsEA/islands_desync
 uv venv -c --python 3.10
-uv pip install -r islands_desync/islands_desync/geneticAlgorithm/algorithm/requirements.txt ray==2.9.3 scikit-learn==1.1.3 'setuptools<81'
+uv pip install -r islands_desync/islands_desync/geneticAlgorithm/algorithm/requirements.txt ray==2.9.3 click==8.2.1 scikit-learn==1.1.3 'setuptools<81'
 ```
 
 Notes:

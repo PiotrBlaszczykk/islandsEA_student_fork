@@ -30,21 +30,20 @@ Nie należy interpretować go jako potwierdzenia, że pełny pilot został wykon
 |---|---|
 | SLURM + Python + venv + Ray na jednym węźle | **potwierdzone** przez smoke `21045868` |
 | 40 nazwanych benchmarków i dry-run konfiguracji | **zaimplementowane**; lokalne testy przechodziły |
-| Multi-node launcher Ray dla 150–200 wysp | **zaimplementowany**, ale pełna ścieżka wymaga canary na Aresie |
+| Multi-node launcher Ray dla 144 wysp | **dotarł do startu head node** w canary `21076864`; CLI Ray zablokował dryf Click |
 | Storage wyników i logów pod `$SCRATCH/islandsEA` | **zaimplementowany** |
 | Pełna telemetria `research-v1-full-buffered` | **zaimplementowana**, wymaga walidacji na pełnym canary/pilocie |
-| Pipeline canary → gate → 3 powtórzenia → finalizer | **zaprojektowany i wysłany raz**, lecz zatrzymał się przed compute |
-| Canary 200 wysp | **nie wykonany**; job `21059904` padł po 1 s na błędzie ścieżki |
-| Pełny pilot: torus 10×20, 200 wysp, 3 powtórzenia | **nie został wysłany** |
+| Pipeline canary → gate → 3 powtórzenia → finalizer | **zaimplementowany**; pełne powtórzenia pozostają zablokowane do poprawnego canary |
+| Canary 144 wysp | job `21076864` potwierdził naprawę spool i plan 12×12, ale padł po 7 s przy imporcie CLI Ray |
+| Pełny pilot: torus 12×12, 144 wyspy, 3 powtórzenia | **nie został wysłany** |
 | Kampania 1800 runów | **niegotowa**; potrzebuje pilotów, estymacji i decyzji topologicznych |
 
-Najważniejszy bieżący bloker: skrypty batch w `pilot_run/` wyznaczają katalog
-repo z `${BASH_SOURCE[0]}`. SLURM uruchamia kopię skryptu z
-`/var/spool/slurmd/job.../slurm_script`, więc skrypt szuka repo w
-`/var/spool/slurmd`. Dokładnie z tego powodu canary i gate zakończyły się
-natychmiastowym `FAILED`. Przed ponownym `launch_pilot.sh` trzeba naprawić i
-przetestować przekazywanie absolutnego `ISLANDS_PROJECT_DIR` do **każdego**
-etapu batch.
+Naprawa `/var/spool/slurmd` jest potwierdzona przez canary `21076864`: batch
+odczytał checkout przez absolutne `ISLANDS_PROJECT_DIR`, zweryfikował plan 144
+wysp, przygotował cache Matplotlib na siedmiu węzłach i dotarł do startu head
+node. Bieżący bloker to niezgodny Click w istniejącym venvie. CLI Ray 2.9.3
+kończy import błędem `is not a valid Sentinel`; środowisko trzeba przywrócić do
+pinu `click==8.2.1` i sprawdzić przez `ray --version` przed kolejnym submittem.
 
 ## 2. Źródła prawdy i poziom pewności
 
@@ -60,7 +59,9 @@ etapu batch.
 - `main_codebase/islandsEA_student_fork/pilot_run/` — zamrożona specyfikacja,
   pipeline, walidator, finalizer i downloader;
 - logi `sacct` i stderr jobów `21059904` oraz `21059905` przekazane przez
-  operatora 2026-09-14.
+  operatora 2026-09-14;
+- `sacct`, stdout i stderr canary `21076864` przekazane przez operatora
+  2026-09-16.
 
 Wartości dotyczące partycji, quota, fairshare i kolejki są migawkami. Przed
 każdym kosztownym uruchomieniem należy sprawdzić je ponownie. Konfigurację
@@ -198,6 +199,7 @@ Potwierdzone wersje:
 |---|---:|
 | Python | `3.10.4` |
 | Ray | `2.9.3` |
+| Click | docelowo `8.2.1`; wersja obecna wymaga ponownego odczytu po awarii CLI |
 | jMetalPy | `1.5.5` |
 | NumPy | `1.21.4` |
 | SciPy | `1.7.3` |
@@ -436,12 +438,42 @@ Koszt awarii to około 432 CPU-sekund = `0.12 CPUh` dla canary plus pomijalny
 gate. Nie należy szukać wyników benchmarku ani traktować tego jako naukowego
 powtórzenia.
 
-## 13. Wymagana naprawa błędu `/var/spool/slurmd`
+### Canary 144 po naprawie spool: `21076864`
+
+Canary uruchomiono z commita `e96b53e` i wyłącznie jako pojedynczy job, bez gate
+i pełnych powtórzeń. Preflight na login node potwierdził 144 wyspy, torus 12×12,
+289 CPU Ray i 290 minimalnych CPU SLURM. Rozliczenie:
+
+```text
+21076864 island-pilot-canary FAILED 1:0 00:00:07 AllocCPUS=336 CPUTimeRAW=2352
+```
+
+Job poprawnie użył `$SCRATCH/islandsEA`, rozgrzał cache Matplotlib na wszystkich
+siedmiu węzłach i doszedł do `Starting HEAD`. Następnie samo wejście do CLI Ray
+zakończyło się podczas importu:
+
+```text
+ValueError: <object object at ...> is not a valid Sentinel
+Ray head exited during startup
+```
+
+To znana niezgodność CLI Ray z Click 8.3. Nie uruchomiono benchmarku, nie ma
+`BENCHMARK_RUN_OK` ani artefaktów naukowych. Koszt alokacji wyniósł
+2352 CPU-sekund, czyli około 0.65 CPUh. Przed następnym canary należy przypiąć
+`click==8.2.1`, potwierdzić `ray --version` i pozostawić pełny pilot zablokowany.
+
+## 13. Naprawa błędu `/var/spool/slurmd`
 
 Zasada ogólna:
 
 > W skrypcie przekazanym do `sbatch` nie wolno wyznaczać położenia repo z
 > `${BASH_SOURCE[0]}`. To wskazuje kopię w spool, nie oryginał w checkout.
+
+Naprawę wdrożono w commicie `e96b53e`: wszystkie submittery eksportują
+absolutne `ISLANDS_PROJECT_DIR`, a batch scripts wymagają tej zmiennej. Test
+`pilot_run/test_spool_paths.py` uruchamia kopie wszystkich czterech etapów z
+katalogu o kształcie `/var/spool/slurmd/job...`; canary `21076864` potwierdził
+poprawkę na Aresie.
 
 Submittery działające na login node mogą bezpiecznie wyznaczyć absolutne repo z
 własnego `BASH_SOURCE`, a potem muszą przekazać je do joba:

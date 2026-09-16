@@ -45,12 +45,24 @@ class PilotSpoolPathTests(unittest.TestCase):
             self.venv / "bin" / "python",
             """#!/bin/bash
 printf 'MOCK_PYTHON_CALL=%s\n' "$*" >&2
-if [[ " $* " == *" benchmark-args "* ]]; then
+if [[ " $* " == *"importlib.metadata"* ]]; then
+  printf '%s\n' 'ray=2.9.3 click=8.2.1'
+elif [[ " $* " == *" benchmark-args "* ]]; then
   printf '%s\n' --problem r01_elliptic --dimension 200
 elif [[ " $* " == *"hpc_benchmarks/run_benchmark.py"* && " $* " == *" --dry-run "* ]]; then
   printf '%s\n' '{"islands":144,"dimension":200,"evaluations":128,"required_ray_cpus":289,"required_slurm_cpus":290,"topology":"torus","strategy":"best","acceptance":"plain"}'
 fi
 exit 0
+""",
+        )
+        self._script(
+            self.venv / "bin" / "ray",
+            """#!/bin/bash
+if [[ "${MOCK_RAY_FAIL:-0}" == 1 ]]; then
+  printf '%s\n' 'ValueError: object is not a valid Sentinel' >&2
+  exit 1
+fi
+printf '%s\n' 'ray, version 2.9.3'
 """,
         )
         self._script(self.venv / "bin" / "activate", "# test activation\n")
@@ -195,9 +207,21 @@ export -f git module mkdir sacct sbatch bash
             result.stderr,
         )
         self.assertIn("run_pilot_canary.sh", result.stderr)
+        self.assertIn("RAY_CLI_PREFLIGHT_OK ray, version 2.9.3", result.stdout)
         self.assertNotIn("continue_after_canary.sh", result.stderr)
         self.assertNotIn("run_pilot_array.sh", result.stderr)
         self.assertNotIn("finalize_pilot.sh", result.stderr)
+
+    def test_canary_submitter_blocks_sbatch_when_ray_cli_import_fails(self):
+        result = self._invoke_script(
+            self.project / "pilot_run" / "submit_canary.sh",
+            MOCK_RAY_FAIL="1",
+        )
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("not a valid Sentinel", result.stderr)
+        self.assertIn("Ray CLI preflight failed before submission", result.stderr)
+        self.assertIn("click==8.2.1", result.stderr)
+        self.assertNotIn("MOCK_SBATCH_ARGS=", result.stderr)
 
     def test_every_batch_stage_resolves_checkout_from_project_env_when_copied_to_spool(self):
         results = []
@@ -245,6 +269,18 @@ export -f git module mkdir sacct sbatch bash
                     expected_sbatch_calls,
                     content.count("ISLANDS_PROJECT_DIR=${PROJECT_DIR}"),
                 )
+
+    def test_pilot_submitters_run_ray_cli_preflight(self):
+        for script_name in ("submit_canary.sh", "submit_pilot.sh"):
+            with self.subTest(script=script_name):
+                content = (self.project / "pilot_run" / script_name).read_text(
+                    encoding="utf-8"
+                )
+                self.assertIn(
+                    'source "$PROJECT_DIR/hpc_benchmarks/ray_cli_preflight.sh"',
+                    content,
+                )
+                self.assertIn('islandsea_validate_ray_cli "$VENV_DIR"', content)
 
 
 if __name__ == "__main__":

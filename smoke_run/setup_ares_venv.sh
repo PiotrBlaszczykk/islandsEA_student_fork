@@ -26,7 +26,7 @@ source "${VENV_DIR}/bin/activate"
 
 python -m pip install --upgrade pip wheel "setuptools<81"
 python -m pip install -r "${PROJECT_REQUIREMENTS}"
-python -m pip install "ray==2.9.3" "scikit-learn==1.1.3" "setuptools<81"
+python -m pip install "ray==2.9.3" "click==8.2.1" "scikit-learn==1.1.3" "setuptools<81"
 
 python - <<'PY'
 import importlib.metadata
@@ -34,9 +34,8 @@ import sys
 
 print("Python:", sys.version.replace("\n", " "))
 print("Executable:", sys.executable)
-for package in ("ray", "jmetalpy", "numpy", "scikit-learn", "setuptools"):
+for package in ("ray", "click", "jmetalpy", "numpy", "scikit-learn", "setuptools"):
     print(f"{package}: {importlib.metadata.version(package)}")
 PY
 
 echo "VENV_READY=${VENV_DIR}"
-

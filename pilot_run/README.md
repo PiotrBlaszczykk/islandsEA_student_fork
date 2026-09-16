@@ -115,8 +115,9 @@ Uruchom najpierw canary: te same 144 wysp i pełne
 bash pilot_run/submit_canary.sh
 ```
 
-Ten submitter najpierw uruchamia regresję ścieżki spool oraz dry-run dokładnej
-konfiguracji canary, a następnie przekazuje do joba absolutny
+Ten submitter najpierw uruchamia regresję ścieżki spool, sprawdza import CLI Ray
+przez `ray --version` oraz wykonuje dry-run dokładnej konfiguracji canary.
+Następnie przekazuje do joba absolutny
 `ISLANDS_PROJECT_DIR`. Wysyła wyłącznie jeden job canary; nie tworzy gate,
 tablicy trzech powtórzeń ani finalizera. Do ponowienia samego canary po naprawie
 nie używaj `launch_pilot.sh`, ponieważ ten launcher planuje również gate zdolny

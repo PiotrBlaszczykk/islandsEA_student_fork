@@ -7,6 +7,7 @@ PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
 SPEC="$SCRIPT_DIR/pilot_spec.json"
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
 source "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh"
+source "$PROJECT_DIR/hpc_benchmarks/ray_cli_preflight.sh"
 islandsea_configure_storage
 ARTIFACT_ROOT="$ISLANDS_ARTIFACT_ROOT"
 MAX_PARALLEL="${PILOT_MAX_PARALLEL:-3}"
@@ -60,6 +61,7 @@ if [[ -n "${PILOT_EXPECTED_COMMIT:-}" && "$GIT_COMMIT" != "$PILOT_EXPECTED_COMMI
     exit 2
 fi
 
+islandsea_validate_ray_cli "$VENV_DIR"
 "$VENV_DIR/bin/python" "$SCRIPT_DIR/pilot_tools.py" verify-canary \
     --artifact-root "$ARTIFACT_ROOT" \
     --job-id "$CANARY_JOB_ID"

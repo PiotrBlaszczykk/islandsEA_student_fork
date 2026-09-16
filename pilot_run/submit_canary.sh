@@ -6,6 +6,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
 source "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh"
+source "$PROJECT_DIR/hpc_benchmarks/ray_cli_preflight.sh"
 islandsea_configure_storage
 ARTIFACT_ROOT="$ISLANDS_ARTIFACT_ROOT"
 
@@ -17,6 +18,7 @@ cd "$PROJECT_DIR"
 [[ "$(git branch --show-current)" == "summer_benchmarks_ares" ]] || { echo "Use the Ares CPU checkout for this submitter." >&2; exit 2; }
 export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
 "$VENV_DIR/bin/python" -m unittest pilot_run.test_spool_paths
+islandsea_validate_ray_cli "$VENV_DIR"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
     echo "Refusing a non-reproducible canary: commit or remove all local changes first." >&2
     git status --short >&2

@@ -182,6 +182,7 @@ Validated local setup as of May 5, 2026:
 - package manager / venv tool: `uv`
 - Python: `3.10.20`
 - `ray==2.9.3`
+- `click==8.2.1` (Click 8.3 breaks the Ray 2.9.3 CLI before startup)
 - `scikit-learn==1.1.3`
 - `setuptools<81` (Ray 2.9.x still imports `pkg_resources`)
 
@@ -189,7 +190,7 @@ Validated local environment creation:
 ```bash
 cd islandsEA/islands_desync
 uv venv -c --python 3.10
-uv pip install -r islands_desync/islands_desync/geneticAlgorithm/algorithm/requirements.txt ray==2.9.3 scikit-learn==1.1.3 'setuptools<81'
+uv pip install -r islands_desync/islands_desync/geneticAlgorithm/algorithm/requirements.txt ray==2.9.3 click==8.2.1 scikit-learn==1.1.3 'setuptools<81'
 ```
 
 Validated local launch command:
