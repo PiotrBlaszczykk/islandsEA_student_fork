@@ -13,8 +13,22 @@
 set -euo pipefail
 : "${SLURM_JOB_ID:?Submit through pilot_run/submit_canary.sh}"
 : "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
+: "${ISLANDS_PROJECT_DIR:?Missing absolute repository path}"
 
-PROJECT_DIR="${ISLANDS_PROJECT_DIR:-${SLURM_SUBMIT_DIR:?Missing submission directory}}"
+case "$ISLANDS_PROJECT_DIR" in
+    /*|[A-Za-z]:/*) ;;
+    *) echo "ISLANDS_PROJECT_DIR must be an absolute path: $ISLANDS_PROJECT_DIR" >&2; exit 2 ;;
+esac
+PROJECT_DIR=$(cd -- "$ISLANDS_PROJECT_DIR" && pwd -P) || {
+    echo "Invalid ISLANDS_PROJECT_DIR: $ISLANDS_PROJECT_DIR" >&2
+    exit 2
+}
+[[ -f "$PROJECT_DIR/pilot_run/pilot_spec.json" \
+    && -f "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh" ]] || {
+    echo "ISLANDS_PROJECT_DIR does not point to an IslandsEA checkout: $PROJECT_DIR" >&2
+    exit 2
+}
+export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
 SCRIPT_DIR="$PROJECT_DIR/pilot_run"
 source "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh"
 islandsea_configure_storage
@@ -33,7 +47,6 @@ ACTUAL_COMMIT=$(git rev-parse HEAD)
     git status --short >&2
     exit 2
 }
-export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
 export ISLANDS_RAY_FAILURE_DIR="$ISLANDS_RAY_FAILURE_ROOT/pilot-canary-$SLURM_JOB_ID"
 export ISLANDS_EFFECT_HORIZON_STEPS=25
 islandsea_print_storage

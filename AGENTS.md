@@ -1,15 +1,56 @@
 # AGENTS.md
 
-## Active study update (2026-09-15)
+## Active study and source precedence (2026-09-16)
 
-- Read [STUDY_144.md](STUDY_144.md) first: approved study uses **144 islands** in torus12x12, complete, ER4, WS3 and BA.
-- Exact selected graphs and provenance are identical in both CPU/GPU repos. Supplied **ER4 has 150 nodes**; block its study run until a corrected 144-node graph or explicit transformation approval arrives. Never silently truncate, symmetrize, regenerate or remove loops.
-- Production `run_benchmark.py` defaults to and requires 144. Small smoke runs/ring require `--diagnostic`. D=200 is still a benchmark dimension, not an island count.
-- Ares profile: `submit_ares_144.sh`, 7x48=336 CPUs, 289 Ray CPUs required plus driver. Old 200-island and stale legacy HPC scripts fail closed.
-- Pilot: `pilot_spec.json`, 144 islands, torus12x12, F1 D=200, best/plain, repeats1–3. `launch_pilot.sh --confirm-144-and-562-cpuh`; no methodology confirmation variable required after supervisor approval. Clean commit, canary, scratch, finalizer and no-retry guards remain.
-- Batch benchmarking on Athena includes 144/288/576/864/1152/1728/2304. Full GPU island runner is still pending; shared CPU runner must not be represented as a completed GPU port.
-- Preserve `research-v1-full-buffered` and all existing metric semantics. Current changes do not modify GA/migration/benchmark mathematics.
-- Historical small positional `start.py` examples below are archival; use named launcher with `--diagnostic` for current smoke tests.
+This checkout targets **Ares CPU**, branch `summer_benchmarks_ares`. The Athena GPU checkout is a separate sibling repository.
+
+Read the updated [research scope](../../zakres_badan.md) and the repository's
+[STUDY_144.md](STUDY_144.md) first. The workspace Markdown preserves the PDF's
+tasks/hypotheses and incorporates the later supervisor email. A standalone
+cluster checkout may not contain the workspace file; STUDY_144.md retains
+the operational contract inside each repo.
+
+The email supersedes the PDF's old 150-200 island range and selects the graph
+instances. Do not restore old counts or substitute freshly generated graphs.
+Historical paper settings and ares-info/athena-info debugging snapshots do
+not override current study instructions; preserve their measured job records.
+
+### Fixed experiment and selected instances
+
+| Setting | Current study |
+|---|---|
+| Islands | **144 for every topology/repeat/platform** |
+| Migration interval / migrant group | **5 / 5** |
+| Evaluations | **8000 per island**, 1,152,000 per full run |
+| Population / offspring | **16 / 4** |
+| Dimension | Problem-dependent; e.g. Sphere D=200. Do not change D to 144. |
+| Topologies | torus 12x12, complete, selected ER4, selected WS3, supplied BA |
+| Selection strategies | best, random, maxDistance |
+| Acceptance baseline | plain; extra acceptance experiments are optional |
+| Benchmarks / repeats | 40 / 3, giving 5 x 3 x 40 x 3 = 1800 runs |
+
+- Migration interval currently means evaluation-counter difference, not generations. Preserve that semantic distinction.
+- The suite contains 30 continuous CEC2014 functions and 10 separate binary problems. The binary functions are not part of official CEC2014. Official continuous instances use D=10/30/50/100; D=200 is the labelled IslandsEA extension.
+- Graph originals: workspace `../../grafy/ER4Topology.py`, `WS3Topology.py`, `BA grapf - 144 nodes.txt`. Runtime copies: `islands_desync/islands_desync/islands/topologies/data/{er4,ws3,ba}.json`. These committed copies suffice on the cluster; no runtime download or regeneration.
+- **WS3**: 144 nodes, 1803 undirected edges; source label parameters dim=2, lat=12, nei=3, probab=0.003181, scenario=2.
+- **BA**: 144 nodes, 3855 undirected edges; supplied m0=30, m=30.
+- **ER4 BLOCKER**: supplied 150 nodes (0-149), 728 directed adjacency entries including 6 self-loops; label ERt3.2, probab unknown/null. Its 144-island run must stay blocked until a corrected attachment or an explicit methodological decision arrives. No truncation, symmetrization, loop removal or replacement graph has been approved.
+- Preserve exact adjacency, node IDs, neighbour order, source filename/hash and adjacency hash across repeats and CPU/GPU. Never infer ER probab from density.
+- Main matrix excludes ring and worst selection. Ring and small-island runs require `--diagnostic` and are separate from research data. The historical ring hypothesis does not add a sixth topology to the matrix.
+- Research tasks: compare PEA results, analyze signed-delay patterns for the **10 best and 10 worst islands per trial**, describe contributions and preliminary results. The original deadline is the end of September.
+- Hypotheses concern smaller delay amplitudes and better/non-degraded optimization for selected ER/WS/BA versus complete/torus. They are not measured conclusions of the current campaign.
+
+### Runtime, metrics and readiness
+
+- Preserve results of **all 144 islands**, `param.json`, graph parameters, exact `topology.json`, `topology.png` and complete `research-v1-full-buffered` telemetry. Keep the existing signed-delay, queue, acceptance, survival, fitness and runtime metric definitions.
+- Same CPU/GPU scientific contract means same objective/instance, graph, algorithm settings, seed policy and metric schema. Hardware timing and asynchronous ordering may change delays and final trajectories; do not promise bitwise-identical final GA results across devices.
+- Named `run_benchmark.py` defaults to/requires 144 for study runs, validates graphs before Ray and records graph provenance. Ares submitters also validate before sbatch. The JSON defaults are now 144 islands and interval 5; active runtime overrides remain authoritative.
+- Ares: `submit_ares_144.sh`, branch `summer_benchmarks_ares`, 7 x 48 = 336 allocated CPUs, 335 advertised Ray CPUs, 289 required Ray CPUs plus driver (minimum 290 physical CPUs). Six nodes with 48 CPUs each are insufficient.
+- Pilot: `pilot_run/pilot_spec.json`, F1/r01 D=200, torus 12x12, 144 islands, best/plain, repeats 1-3. Full pipeline ceiling 561.5 CPUh; `launch_pilot.sh --confirm-144-and-562-cpuh`. No CONFIRM_TORUS_200 methodology gate remains. Keep clean/pinned commit, canary verification, SCRATCH, finalizer and no-retry guards.
+- Old `*_ares_200.sh`, `run*-hpc.sh`, `run_delay_experiment.sh`, `run_local_venv_plgrid.sh` and `submit_all_topologies.sh` are retired/fail closed. Do not use them as campaign templates. Job paths use ISLANDS_PROJECT_DIR/SLURM_SUBMIT_DIR, not the SLURM spool copy's BASH_SOURCE.
+- Athena has explicit NumPy/CuPy benchmark backends but **no integrated full GPU island runner yet**. GPU validation batches include 144/288/576/864/1152/1728/2304; theoretical initial population totals 2304, offspring per ideal global wave 576. These totals do not authorize adding a synchronization barrier. Do not submit the Ares CPU profile on Athena.
+- Current local evidence: `../../artifacts/study144/validation.json`, 33 tests per repo (66 total), real CLI dry-runs and exact attachment checks; `../../artifacts/study144/parity.json`, 170 instances / 5946 inputs per comparison, no unexpected source differences. This is CPU evidence, not a 144-island HPC run or validation of the complete 40-function backend on A100.
+- Historical small positional `start.py` commands below are archival. Use the current named launcher with `--diagnostic` for CPU smoke tests. The September16 update changes documentation only; it does not itself submit jobs or certify new GPU results.
 
 ## Scope
 This repository is a research codebase for asynchronous island-model evolutionary computation.  
@@ -28,6 +69,8 @@ Any change that affects migration timing, acceptance, ordering, or logging may a
 
 ## Research Context (Current Experimental Intent)
 
+Paper context: the local `Delays_in_computing_with_Parallel_metaheuristics_on_HPC_infrastructure-1.pdf` and `raport.md`. Current task requirements are in the updated research scope linked above.
+
 The current research context should be treated as follows:
 
 - The system studies **migration delays** in asynchronous island-model evolutionary algorithms on HPC infrastructure.
@@ -37,7 +80,7 @@ The current research context should be treated as follows:
 - The sign of this value matters:
   - negative values correspond to “delayed” migrants,
   - positive values correspond to “accelerated” migrants (a source island was evolutionarily ahead of the destination at send time).
-- The paper context explicitly suggests that destination-side handling of migrants is research-critical: future operators may reject too-delayed migrants or use only partial information from them. Therefore, migrant acceptance is not merely plumbing; it is part of the experiment design. :contentReference[oaicite:2]{index=2} :contentReference[oaicite:3]{index=3}
+- The paper context explicitly suggests that destination-side handling of migrants is research-critical: future operators may reject too-delayed migrants or use only partial information from them. Therefore, migrant acceptance is not merely plumbing; it is part of the experiment design.
 
 Implication for repository work:
 - Changes to immigrant acceptance, migrant buffering, receive ordering, queue draining, or topology scheduling are **experiment-semantic** changes.
@@ -49,16 +92,16 @@ Implication for repository work:
 ## Repository Reality Check (Current Code)
 
 ### Top-level layout
-- `README.md` (minimal, not operational)
+- `README.md`, `STUDY_144.md`, `hpc_benchmarks/README.md`, `pilot_run/README.md` (current study and operational entry points)
 - `islands_desync/` (HPC scripts + Python package root for runtime)
 - `islands_desync/islands_desync/` (actual Python source)
-  - `start.py` (main Ray/HPC orchestration entrypoint)
+  - `start.py` (legacy positional Ray entrypoint; maintained named entrypoint: `hpc_benchmarks/run_benchmark.py`)
   - `geneticAlgorithm/` (GA logic, configs, migrations, utils)
   - `islands/` (island actors, topologies, orchestration)
 
 ### Important historical mismatch
 Historical notes describe both RabbitMQ and Ray flows. Both code paths exist, but they are not equally maintained:
-- **Ray/HPC path appears to be the primary currently used path** (`start.py` + `run_hpc/create_algorithm_hpc.py`), based on current repository structure.
+- **Named Ray/HPC path is maintained**: `hpc_benchmarks/run_benchmark.py` -> `IslandRunner` -> `run_hpc/create_algorithm_hpc.py`. Legacy `start.py` reaches the same builder but does not replace the named launcher's complete provenance contract.
 - **RabbitMQ/local path exists but appears legacy/stale in places** (see warnings below).
 
 ---
@@ -69,7 +112,7 @@ Historical notes describe both RabbitMQ and Ray flows. Both code paths exist, bu
 
 - Operational instructions: `hpc_benchmarks/README.md`.
 - `hpc_benchmarks/run_ares.sh` starts Ray head/workers inside one SLURM allocation and invokes `run_benchmark.py`, which calls the existing `IslandRunner` directly. Legacy `start.py` remains available.
-- `hpc_benchmarks/validate_ares.sh` runs the 17-test benchmark/integration suite on a compute node, without a Ray cluster.
+- `hpc_benchmarks/validate_ares.sh` runs selected-topology tests and pilot/metrics tests, then benchmark/integration validation on a compute node without a Ray cluster. Old reports describing only 17 benchmark tests predate these graph checks; require every stage to pass.
 - `run_hpc/benchmark_configuration.py` reads the existing JSON and optional `ISLANDS_CONFIG`, `ISLANDS_PROBLEM`, `ISLANDS_NUMBER_OF_VARIABLES`, `ISLANDS_NUMBER_OF_EVALUATIONS`, `ISLANDS_POPULATION_SIZE`, `ISLANDS_OFFSPRING_POPULATION_SIZE`. Validate a positive whole number of offspring batches; never silently round the budget.
 - Refined suite: 30 continuous CEC functions (official D=10/30/50/100, explicitly custom IslandsEA D=200) and the same 10 binary functions from help. Fixed data and golden references are committed with the package; no per-worker generation/downloads. Runtime mathematical modules are identical to help at port time.
 - Binary operators are BitFlip(1/bits) and SPX; continuous operators remain MyUniformMutation(1/D, 10) and SwitchCrossover. `active_operators` is authoritative; the old `param.json` text field `operators` remains for compatibility.
@@ -89,8 +132,8 @@ Historical notes describe both RabbitMQ and Ray flows. Both code paths exist, bu
 ## 1) Ray/HPC path (primary, based on current inspection)
 
 ### Entrypoint chain
-1. `islands_desync/run*.sh` (SLURM script)
-2. `python3 -u islands_desync/start.py ...`
+1. `hpc_benchmarks/submit_ares_144.sh` -> `run_ares_144.sh` -> `run_ares.sh`, or the current `pilot_run/` pipeline (Ares CPU)
+2. `python hpc_benchmarks/run_benchmark.py ...` (named benchmark, topology preflight and full provenance)
 3. `islands/core/IslandRunner.py`
 4. `islands/core/Computation.py`
 5. `geneticAlgorithm/run_hpc/create_algorithm_hpc.py`
@@ -115,8 +158,25 @@ If arg 2 is `" "`, current code does **not** call `ray.init()` at all; treat `" 
 Run from outer `islands_desync/` directory.  
 The benchmark launcher sets this working directory automatically. The builder now resolves `algorithm/configurations/algorithm_configuration.json` relative to its source through `run_hpc/benchmark_configuration.py`, or reads `ISLANDS_CONFIG`. Other legacy logging paths still expect the outer package working directory.
 
-### Verified local run workflow
-The active Ray path can be run locally, but the environment needs to match the old dependency stack reasonably closely.
+### Current local diagnostic workflow
+
+From the repository root in an existing project-compatible environment:
+
+```bash
+python hpc_benchmarks/run_benchmark.py --problem r01_elliptic --dimension 200 --topology ws3 --dry-run
+python hpc_benchmarks/run_benchmark.py --problem b03_nk_k4 --dimension 60 --topology complete --diagnostic --islands 2 --evaluations 128 --ray-address local --local-cpus 6
+```
+
+The first checks the 144-island configuration without Ray. The second executes
+a small CPU diagnostic outside the study; never run it on an HPC login node.
+An Athena checkout does not make this CPU runner execute on GPU.
+
+### Historical local run evidence (May 2026; not current launch commands)
+
+The following setup and seven-island paths document an earlier run. Current
+`start.py` rejects that old invocation; use the named diagnostic above.
+Dependency notes remain useful when selecting a compatible environment.
+
 
 Validated local setup as of May 5, 2026:
 - package manager / venv tool: `uv`
@@ -176,14 +236,14 @@ cd islandsEA/islands_desync
 python analyze_migration_delays.py "logs/260505/Sphe200/120000 7rr-co5ilu5"
 ```
 
-### Current topology limits (verified September 12, 2026)
-`IslandRunner.py` already uses `enumerate(..., start=1)` for islands 1..N-1, so the earlier note about shifted topology indices is obsolete. The benchmark port leaves this code unchanged. Torus requires N divisible by 12; ER1..ER4 use fixed 150-node graphs; WS3/WS4 use fixed 144-node graphs. The new benchmark launcher validates the actual adjacency before starting Ray. Do not silently regenerate graphs to fit a requested N.
+### Current topology limits (September 16, 2026)
+`IslandRunner.py` uses `enumerate(..., start=1)` for islands 1..N-1; the old shifted-index warning is obsolete. Study registry: torus/complete/er4/ws3/ba, requested at 144. Torus defaults to 12x12; complete, selected WS3 and selected BA validate at 144. ER4 remains blocked because its supplied graph has 150 nodes. Fixed loaders require exact node counts and valid adjacency hashes; old ER1/ER2/ER3/WS4 are outside the study registry.
 
 ### SLURM script status
 - Old `run*-hpc.sh` launchers are retired fail-closed stubs; previously some passed only 8 args.
 - Historical `.sh.txt` archives still refer to missing `start_bm.py`; do not use them.
 - `run_smoke_ring.sh` is **not present** in this repository snapshot (it may exist only in local/HPC-side working copies).
-- Many scripts contain cluster-specific hardcoded grant/env paths; treat as templates, not ready-to-run defaults.
+- Use documented named submitters and pilot_spec.json. Retired scripts are fail-closed stubs, not runnable templates. Supported Ares benchmark/pilot submitters require branch `summer_benchmarks_ares`.
 
 ---
 
@@ -237,7 +297,7 @@ These are consumed in both Ray/HPC and (legacy) local path.
 
 ### Override behavior
 In Ray/HPC path (`create_algorithm_hpc.py`):
-- `number_of_islands`, `number_of_emigrants`, `migration_interval` are taken from `start.py` args (not from JSON fields of similar names).
+- Island count, migrant group and interval come from `RunAlgorithmParams`, supplied by the named launcher or legacy `start.py`; similarly named JSON fields do not override them. Study defaults are 144/5/5. The named launcher separately sets environment overrides for benchmark/dimension and GA settings.
 
 In local RabbitMQ path (`run_algorithm.py`):
 - island count/migration fields are tied more directly to JSON and CLI assumptions.
@@ -253,7 +313,7 @@ Never assume historical example values are authoritative; inspect live config an
 - Legacy local path: `geneticAlgorithm/run_algorithm.py` (currently `Rastrigin(...)`, alternatives commented)
 - Custom problems: `geneticAlgorithm/utils/myDefProblems.py` (includes `Ackley`, `Schwefel`, `Labs` placeholders/variants)
 
-### Paper-vs-code benchmark mismatch
+### Historical paper settings versus current study
 The paper in the repo root reports experiments with:
 - `Rastrigin`
 - `200` dimensions
@@ -262,7 +322,7 @@ The paper in the repo root reports experiments with:
 - `migration_interval = 5`
 - island counts `50`, `100`, `150`, `200`
 
-The current active Ray/HPC builder defaults to `Sphere(NUMBER_OF_VARIABLES)` in `create_algorithm_hpc.py`, while dimensions and GA sizes come from JSON. Do **not** assume the paper benchmark is the live default configuration.
+These island counts describe the historical paper, not the approved 144 study. The builder delegates to `benchmark_configuration.create_problem`; sphere is the fallback only when JSON/environment do not select a problem. The named launcher requires `--problem` and `--dimension`; the pilot explicitly selects `r01_elliptic`, D=200. Neither Sphere nor the historical Rastrigin describes the entire 40-function study.
 
 ### Critical compatibility rule
 Output paths encode `problem.get_name()[0:4]`.  
@@ -290,7 +350,7 @@ Migration logic is part of the research apparatus, not plumbing. Any semantic ch
 The present research direction makes destination-side acceptance especially important. The paper context indicates:
 - delayed migrants can be non-trivially harmful or at least inefficient,
 - topology changes delay patterns,
-- future work includes dedicated immigration operators that may reject too-delayed migrants or use partial information from them. :contentReference[oaicite:4]{index=4}
+- future work includes dedicated immigration operators that may reject too-delayed migrants or use partial information from them.
 
 Therefore:
 - any new acceptance strategy must define what it does with old / highly delayed / accelerated migrants,
@@ -364,7 +424,7 @@ If you change migration, topology, receive handling, or immigrant acceptance, ev
 - proportion of accelerated migrants (`delay > 0`)
 - proportion of strongly delayed migrants (thresholded, e.g. `delay < -k`)
 
-The paper reports topology-dependent min/max behavior and characteristic delay patterns; use percentiles in addition for stronger comparison. :contentReference[oaicite:5]{index=5}
+The paper reports topology-dependent min/max behavior and characteristic delay patterns; use percentiles in addition for stronger comparison.
 
 ### B. Delivery / acceptance metrics
 - received migrants count
@@ -375,7 +435,7 @@ The paper reports topology-dependent min/max behavior and characteristic delay p
 - rejection rate
 - rejection reasons histogram
 
-These are particularly important for ring-like cases, where islands may stop receiving fresh migrants after neighboring islands finish work. :contentReference[oaicite:6]{index=6}
+These are particularly important for ring-like cases, where islands may stop receiving fresh migrants after neighboring islands finish work.
 
 ### C. Optimization-outcome metrics
 - final best fitness
@@ -384,7 +444,7 @@ These are particularly important for ring-like cases, where islands may stop rec
 - time-to-threshold (if threshold defined)
 - per-island final ranking
 
-The paper compares average and final results across topology/strategy combinations; outcome metrics are mandatory, not optional. :contentReference[oaicite:7]{index=7}
+The paper compares average and final results across topology/strategy combinations; outcome metrics are mandatory, not optional.
 
 ### D. Cooperation / desynchronization metrics
 - island active start/end time
@@ -394,7 +454,7 @@ The paper compares average and final results across topology/strategy combinatio
 - migrants received per unit time / per epoch
 - incoming-queue backlog (if queue exists and is measurable)
 
-The paper explicitly analyzes how long islands cooperate simultaneously and links topology to communication crowding and isolated work. :contentReference[oaicite:8]{index=8}
+The paper explicitly analyzes how long islands cooperate simultaneously and links topology to communication crowding and isolated work.
 
 ### E. Usefulness metrics for new acceptance strategies (recommended)
 If you introduce new destination-side handling, also measure:
@@ -475,20 +535,20 @@ Not every imported operator is active in the current default run path; many are 
 ### Implementations
 - `RingTopology`: current implementation returns `[self, next]` neighbors (non-standard ring; includes self-loop).
 - `TorusTopology`: uses 4-neighbor wrapped grid.
-- `IslandRunner` retains `create(12, island_count // 12)` as the compatibility default. The benchmark launcher may provide explicit rows/columns whose product equals the island count; record that shape as a methodology parameter.
+- `IslandRunner` retains `create(12, island_count // 12)` as the compatibility default; at 144 this is 12x12. The pilot explicitly records 12 rows and 12 columns. Generic CLI support for other valid shapes does not approve them for the study.
 
 ### Known broken/stale topology files
 `ERTopology.py`, `WSTopology.py`, `WS1Topology.py`, `WS2Topology.py` reference undefined `topol` variable (commented dict placeholder).  
-Using `topol=er`, `ws`, `ws1`, or `ws2` likely fails without fixing these files.
+These legacy names are excluded from current named/positional study registries. Do not substitute them for selected ER4/WS3.
 
-### Hardcoded graph topologies
-`ER1/ER2/ER3/ER4` and `WS3/WS4` include large hardcoded adjacency maps.
+### Selected fixed graph data
+`ER4Topology`, `WS3Topology` and `BATopology` wrap `fixed_graph.py` and committed `data/{er4,ws3,ba}.json`. JSON stores exact adjacency, source filename/hash, canonical adjacency hash, parameters and transformation status. Preserve order, loops and direction. ER1/ER2/ER3/WS4 retain legacy inline dictionaries outside the study.
 
 ### Research interpretation of topologies
 Paper context suggests:
 - `complete` creates the largest communication crowding and delay amplitudes, but can still yield the best optimization results due to more diverse migrant inflow,
 - `torus` behaves as an intermediate case,
-- `ring` is the most orderly but risks long isolated work and lack of fresh migrants once neighbors finish. :contentReference[oaicite:9]{index=9}
+- `ring` is the most orderly but risks long isolated work and lack of fresh migrants once neighbors finish.
 
 Therefore:
 - do not evaluate a delay-reduction change solely by smaller delay values,
@@ -501,7 +561,8 @@ Therefore:
 Output path builder:
 - `geneticAlgorithm/utils/filename.py`
 - Format resembles:
-  - `logs/<date>/<prob4><dimension>/<time> <island_count><migrant_code><topology_code>-co<migration_interval>ilu<emigrants>`
+  - `<run-output-root>/<date>/<prob4><dimension>/<time>_<unique-id> <island_count><migrant_code><topology_code>-co<migration_interval>ilu<emigrants>`
+  - Default Ares root: `$SCRATCH/islandsEA/results/runs`; explicit CLI/ISLANDS_RUN_OUTPUT_ROOT overrides take precedence. The `logs/` examples below are historical.
 
 Examples from actual runs:
 - `logs/260407/Sphe30/002459 12rr-co20ilu2`
@@ -509,7 +570,7 @@ Examples from actual runs:
 Where:
 - `<prob4>` = first 4 letters of problem name
 - migrant code = first letter of selection strategy (`r`, `b`, `m`...)
-- topology code = first letter of topology (`r`, `t`, `e`, `w`, `c`...)
+- topology code = first letter (`r`, `t`, `e`, `w`, `c`, `b`...); use full topology name/hash in metadata to identify the graph
 - `coX` = migration interval
 - `iluY` = number of emigrants
 
@@ -524,7 +585,8 @@ Common generated files:
 - `W<id>neighbourRanking.json`
 - `W<id>neighbourRankingPercent.json`
 - `W<id> czas.json`
-- plus top-level `logs/iterations_per_second*.json` from `start.py`
+- named launcher: `iterations_per_second.json` inside the run directory; legacy `start.py`: timestamped summary under the resolved output root
+- named launcher also saves exact `topology.json` with parameters/provenance, `topology.png`, `experiment_manifest.json`, `run_metadata.json` and per-island `metrics/` files
 
 Do not rename/remove/change schema silently. If you must change logging/output semantics, document migration compatibility explicitly.
 
@@ -540,7 +602,7 @@ Avoid breaking old parsers or historical experiment post-processing without expl
 - `genetic_island_algorithm.py` currently reads operator text from `./islands_desync/geneticAlgorithm/run_algorithm.py`,
 - but the active Ray/HPC builder is `run_hpc/create_algorithm_hpc.py`.
 
-If operator configuration matters for reproducibility, inspect the active builder directly instead of relying only on `param.json`.
+Use `active_operators` in param/benchmark provenance and the active builder. The old `operators` text field alone is historical and may be misleading.
 
 ---
 
@@ -671,7 +733,8 @@ Higher-risk additions:
 
 When changing destination-side acceptance or migration timing behavior, prefer at least:
 
-- topologies: `ring`, `torus`, `complete`
+- study topologies: torus12x12, complete, selected WS3/BA, plus selected ER4 once its 144-node mismatch is resolved
+- ring/small-island diagnostics are separate regression tests, not replacements for the study matrix
 - source strategies: `best`, `random`, `maxDistance`
 - same benchmark and GA core parameters as baseline
 - multiple runs per setting (do not rely on single-run anecdotal results)
@@ -697,7 +760,8 @@ Minimum reporting set:
 
 ## Verified Historical Paths (Current Repository)
 - Main evolutionary loop: `islands_desync/islands_desync/geneticAlgorithm/algorithm/genetic_island_algorithm.py`
-- Example HPC script: `islands_desync/run144tr-hpc.sh`
+- Current Ares profile: `hpc_benchmarks/run_ares_144.sh`, submitted via `hpc_benchmarks/submit_ares_144.sh`
+- Historical stub: `islands_desync/run144tr-hpc.sh` (retired; do not submit)
 - Base configuration: `islands_desync/islands_desync/geneticAlgorithm/algorithm/configurations/algorithm_configuration.json`
 - Legacy/local problem selection path: `islands_desync/islands_desync/geneticAlgorithm/run_algorithm.py`
 - Custom problems: `islands_desync/islands_desync/geneticAlgorithm/utils/myDefProblems.py`

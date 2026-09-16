@@ -115,6 +115,13 @@ Uruchom najpierw canary: te same 144 wysp i pełne
 bash pilot_run/submit_canary.sh
 ```
 
+Ten submitter najpierw uruchamia regresję ścieżki spool oraz dry-run dokładnej
+konfiguracji canary, a następnie przekazuje do joba absolutny
+`ISLANDS_PROJECT_DIR`. Wysyła wyłącznie jeden job canary; nie tworzy gate,
+tablicy trzech powtórzeń ani finalizera. Do ponowienia samego canary po naprawie
+nie używaj `launch_pilot.sh`, ponieważ ten launcher planuje również gate zdolny
+automatycznie wysłać pełny pilot po udanej walidacji.
+
 Skrypt wypisze `PILOT_CANARY_JOB_ID`. Po zakończeniu nie wystarczy samo spojrzenie
 na `squeue`; pełny submit sam sprawdzi `sacct`, kod 0, manifesty, topologię, 144
 krzywych i obecność migracji z katalogu canary. Dopiero wtedy:

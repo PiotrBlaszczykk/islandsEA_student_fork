@@ -17,9 +17,23 @@ set -euo pipefail
 [[ "$#" -eq 1 && "$1" =~ ^[0-9]+$ ]] || { echo "Usage: $0 CANARY_JOB_ID" >&2; exit 2; }
 : "${SLURM_JOB_ID:?Submit this gate with pilot_run/launch_pilot.sh}"
 : "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
+: "${ISLANDS_PROJECT_DIR:?Missing absolute repository path}"
 
 CANARY_JOB_ID="$1"
-PROJECT_DIR="${ISLANDS_PROJECT_DIR:-${SLURM_SUBMIT_DIR:?Missing submission directory}}"
+case "$ISLANDS_PROJECT_DIR" in
+    /*|[A-Za-z]:/*) ;;
+    *) echo "ISLANDS_PROJECT_DIR must be an absolute path: $ISLANDS_PROJECT_DIR" >&2; exit 2 ;;
+esac
+PROJECT_DIR=$(cd -- "$ISLANDS_PROJECT_DIR" && pwd -P) || {
+    echo "Invalid ISLANDS_PROJECT_DIR: $ISLANDS_PROJECT_DIR" >&2
+    exit 2
+}
+[[ -f "$PROJECT_DIR/pilot_run/pilot_spec.json" \
+    && -f "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh" ]] || {
+    echo "ISLANDS_PROJECT_DIR does not point to an IslandsEA checkout: $PROJECT_DIR" >&2
+    exit 2
+}
+export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
 SCRIPT_DIR="$PROJECT_DIR/pilot_run"
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
 source "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh"

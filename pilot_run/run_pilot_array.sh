@@ -14,8 +14,22 @@ set -euo pipefail
 : "${SLURM_ARRAY_JOB_ID:?Submit through pilot_run/submit_pilot.sh}"
 : "${SLURM_ARRAY_TASK_ID:?Missing SLURM_ARRAY_TASK_ID}"
 : "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
+: "${ISLANDS_PROJECT_DIR:?Missing absolute repository path}"
 
-PROJECT_DIR="${ISLANDS_PROJECT_DIR:-${SLURM_SUBMIT_DIR:?Missing submission directory}}"
+case "$ISLANDS_PROJECT_DIR" in
+    /*|[A-Za-z]:/*) ;;
+    *) echo "ISLANDS_PROJECT_DIR must be an absolute path: $ISLANDS_PROJECT_DIR" >&2; exit 2 ;;
+esac
+PROJECT_DIR=$(cd -- "$ISLANDS_PROJECT_DIR" && pwd -P) || {
+    echo "Invalid ISLANDS_PROJECT_DIR: $ISLANDS_PROJECT_DIR" >&2
+    exit 2
+}
+[[ -f "$PROJECT_DIR/pilot_run/pilot_spec.json" \
+    && -f "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh" ]] || {
+    echo "ISLANDS_PROJECT_DIR does not point to an IslandsEA checkout: $PROJECT_DIR" >&2
+    exit 2
+}
+export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
 SCRIPT_DIR="$PROJECT_DIR/pilot_run"
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
 source "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh"
@@ -67,7 +81,6 @@ mapfile -t BENCHMARK_ARGS < <(
     exit 2
 }
 
-export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
 export ISLANDS_VENV_DIR="$VENV_DIR"
 export ISLANDS_RAY_FAILURE_DIR="$ISLANDS_RAY_FAILURE_ROOT/pilot-$SLURM_ARRAY_JOB_ID/repeat-$REPEAT"
 export ISLANDS_EFFECT_HORIZON_STEPS=25
