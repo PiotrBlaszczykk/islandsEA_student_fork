@@ -1,15 +1,9 @@
-> **Aktualizacja badania: 144 wyspy (mail 2026-09-15).**
-> Aktualne instrukcje: [STUDY_144.md](../STUDY_144.md). Obowiązują torus12×12,
-> complete, WS3 i BA z załączników. Dostarczony ER4 ma 150 węzłów i jest
-> zablokowany dla badania144 do rozstrzygnięcia. Ares: 7×48=336CPU,
-> wymagane289Ray+driver; pilot≤561.5CPUh, `--confirm-144-and-562-cpuh`.
-> Athena: te same grafy144; pełny runner wysp GPU nadal wymaga integracji.
->
-> **Poniżej zachowano historyczną migawkę debugowania i planów.** Liczby
-> 150/180/200 dotyczące wysp, stare profile `*_ares_200.sh`, kształt10×20,
-> CONFIRM_TORUS_200 i dawne polecenia uruchomienia zostały zastąpione.
-> Nie używać ich jako aktualnej instrukcji. Historyczne joby, rachunki i pomiary
-> zachowano bez przepisywania; D=200 nadal jest poprawnym wymiarem benchmarku.
+> Aktualizacja 2026-09-17: badanie używa 144 wysp we wszystkich topologiach.
+> ER4 został odblokowany zgodnie z odpowiedzią prowadzącej: igraph G(n,p),
+> n=144, p=0.0347, undirected; pętle tylko dla izolowanych węzłów.
+> Zamrożony graf ma 365 krawędzi, składową 144 i zero pętli; seed 20260917.
+> Szczegóły: [generacja ER4](../hpc_benchmarks/ER4_GENERATION.md).
+> Poniższa treść jest historyczną migawką debugowania. Historyczne pomiary i stare załączniki pozostają archiwalne; D=200 jest wymiarem.
 
 # IslandsEA na Aresie — konfiguracja, stan i bezpieczne uruchamianie
 
@@ -30,21 +24,24 @@ Nie należy interpretować go jako potwierdzenia, że pełny pilot został wykon
 |---|---|
 | SLURM + Python + venv + Ray na jednym węźle | **potwierdzone** przez smoke `21045868` |
 | 40 nazwanych benchmarków i dry-run konfiguracji | **zaimplementowane**; lokalne testy przechodziły |
-| Multi-node launcher Ray dla 144 wysp | head Ray potwierdzony w canary `21077082`; poprawiany jest readiness check SLURM |
+| Multi-node launcher Ray dla 144 wysp | head i readiness potwierdzone w `21077531`; poprawiany jest podział CPU/pamięci head-driver |
 | Storage wyników i logów pod `$SCRATCH/islandsEA` | **zaimplementowany** |
 | Pełna telemetria `research-v1-full-buffered` | **zaimplementowana**, wymaga walidacji na pełnym canary/pilocie |
 | Pipeline canary → gate → 3 powtórzenia → finalizer | **zaimplementowany**; pełne powtórzenia pozostają zablokowane do poprawnego canary |
-| Canary 144 wysp | `21076864` wykrył Click 8.5; `21077082` uruchomił zdrowy head Ray, lecz readiness przez zagnieżdżony `srun` nie przeszedł |
+| Canary 144 wysp | `21077531` zaliczył head readiness; driver został odrzucony, bo head step zajął pamięć wszystkich 48 CPU |
 | Pełny pilot: torus 12×12, 144 wyspy, 3 powtórzenia | **nie został wysłany** |
-| Kampania 1800 runów | **niegotowa**; potrzebuje pilotów, estymacji i decyzji topologicznych |
+| Kampania 1800 runów | **niegotowa**; potrzebuje poprawnego pilota i estymacji |
 
 Naprawa `/var/spool/slurmd` jest potwierdzona przez canary `21076864`: batch
 odczytał checkout przez absolutne `ISLANDS_PROJECT_DIR`, zweryfikował plan 144
 wysp, przygotował cache Matplotlib na siedmiu węzłach i dotarł do startu head
 node. Click przywrócono z 8.5.0 do zatwierdzonego 8.2.1. Canary `21077082`
 potwierdził następnie zdrowy GCS i raylet, ale pomocniczy readiness check przez
-osobny krok `srun` nie dotarł do GCS. Bieżąca poprawka wykonuje `ray status`
-bezpośrednio z procesu batch na head node i zachowuje wynik ostatniej próby.
+osobny krok `srun` nie dotarł do GCS. Canary `21077531` zaliczył poprawiony
+readiness, po czym ujawnił błąd podziału zasobów: head step rezerwował wszystkie
+48 CPU i ich pamięć, pozostawiając Ray 47 CPU, ale nie zostawiając SLURM-owi
+pamięci na driver. Bieżąca poprawka rezerwuje dla head 47 CPU, a dla drivera
+pozostały 1 CPU i 2 GB jako rozłączne kroki `--exact`.
 
 ## 2. Źródła prawdy i poziom pewności
 
@@ -294,7 +291,8 @@ Główny wrapper to `hpc_benchmarks/run_ares.sh`:
 6. rozgrzewa osobny cache Matplotlib na każdym węźle;
 7. uruchamia Ray head na pierwszym węźle i worker na każdym kolejnym;
 8. czeka na gotowość head;
-9. uruchamia driver na head przez `srun --overlap`;
+9. uruchamia head step na 47 CPU, a driver jako rozłączny `srun --exact` na
+   pozostałym 1 CPU i 2 GB;
 10. po sukcesie sprząta Ray; po błędzie próbuje spakować per-node logi do
    `$SCRATCH/islandsEA/logs/ray_failures/`.
 
@@ -482,8 +480,37 @@ launcher zakończył zdrowy proces head.
 Nie uruchomiono workerów ani benchmarku; brak `BENCHMARK_RUN_OK` i artefaktów
 naukowych. Koszt wyniósł 21840 CPU-sekund, czyli około 6.07 CPUh. Launcher ma
 wykonywać readiness bezpośrednio z procesu batch na head node, zapisywać pełny
-wynik ostatniego `ray status` oraz używać jawnego `--overlap --exact` dla
-drivera. Przed trzema powtórzeniami nadal wymagany jest nowy poprawny canary.
+wynik ostatniego `ray status`. Przed trzema powtórzeniami nadal wymagany jest
+nowy poprawny canary.
+
+### Canary 144 po naprawie readiness: `21077531`
+
+Canary uruchomiono z commita `da3de56`. Head Ray wystartował na `ac0252`, a
+readiness przeszedł w drugiej próbie:
+
+```text
+RAY_HEAD_READY address=172.22.16.252:37531 attempt=2
+```
+
+Rozliczenie:
+
+```text
+21077531 island-pilot-canary FAILED 1:0 00:02:30 AllocCPUS=336 CPUTimeRAW=50400
+```
+
+Następny krok drivera został natychmiast odrzucony przez SLURM:
+
+```text
+srun: error: Unable to create step for job 21077531: Memory required by task is not available
+```
+
+Przy `--mem-per-cpu=2G` head step żądał 48 CPU i całej przypisanej im pamięci,
+mimo że `ray start --num-cpus=47` pozostawiał logiczny CPU dla drivera. Błąd
+drivera uruchomił cleanup i zabił head; późniejsze `Failed to connect to GCS`
+na workerach były skutkiem tego zakończenia, a nie pierwotną awarią sieci.
+Benchmark nie wystartował i nie powstały artefakty naukowe. Koszt wyniósł 50400
+CPU-sekund, czyli 14 CPUh. Poprawka ustawia head step na 47 CPU oraz driver na
+rozłączny krok `--exact` z pozostałym 1 CPU i 2 GB.
 
 ## 13. Naprawa błędu `/var/spool/slurmd`
 

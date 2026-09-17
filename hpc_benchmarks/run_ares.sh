@@ -17,6 +17,7 @@ VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
 source "$PROJECT_DIR/hpc_benchmarks/ares_storage.sh"
 islandsea_configure_storage
 CPUS="${SLURM_CPUS_PER_TASK:?Specify --cpus-per-task}"
+HEAD_RAY_CPUS=$((CPUS - 1))
 export ISLANDS_ALLOCATED_CPUS_PER_NODE="$CPUS"
 [[ "$CPUS" -ge 2 ]] || { echo 'Need >=2 CPUs per node (one head CPU is reserved for the driver)' >&2; exit 2; }
 [[ -f "$PROJECT_DIR/hpc_benchmarks/run_benchmark.py" ]] || { echo 'Submit from the repository root or set ISLANDS_PROJECT_DIR' >&2; exit 2; }
@@ -104,10 +105,10 @@ srun --exact --nodes="$NODE_COUNT" --ntasks="$NODE_COUNT" --ntasks-per-node=1 --
     'import socket; from islands_desync.geneticAlgorithm.utils.matplotlib_setup import configure_headless_matplotlib; p=configure_headless_matplotlib(); import matplotlib.pyplot as plt; f=plt.figure(); plt.close(f); print(f"MPL_CACHE_READY host={socket.gethostname()} path={p}")'
 
 echo "Starting HEAD at $HEAD ($ADDRESS), job=$SLURM_JOB_ID"
-srun --exact --nodes=1 --ntasks=1 --cpus-per-task="$CPUS" -w "$HEAD" \
+srun --exact --nodes=1 --ntasks=1 --cpus-per-task="$HEAD_RAY_CPUS" -w "$HEAD" \
     bash -c 'mkdir -p "$1/tmp" "$1/xdg-cache"; cd "$2"; shift 2; exec "$@"' _ "$RAY_TMP_DIR" "$RUNTIME_DIR" \
     "$VENV_DIR/bin/ray" start --head --node-ip-address="$HEAD_IP" --port="$PORT" \
-    --num-cpus="$((CPUS - 1))" --temp-dir="$RAY_TMP_DIR" --include-dashboard=false --block &
+    --num-cpus="$HEAD_RAY_CPUS" --temp-dir="$RAY_TMP_DIR" --include-dashboard=false --block &
 PIDS+=("$!")
 HEAD_READY=0
 HEAD_STATUS_LOG="$RAY_TMP_DIR/ray-status.log"
@@ -136,9 +137,9 @@ for node in "${NODES[@]:1}"; do
         --temp-dir="$RAY_TMP_DIR" --block &
     PIDS+=("$!")
 done
-# The Ray processes reserve their node's step; the driver shares the head step
-# allocation explicitly, using the CPU excluded from head Ray resources.
-srun --overlap --exact --nodes=1 --ntasks=1 --cpus-per-task=1 -w "$HEAD" \
+# The head Ray step reserves CPUS-1 CPUs and their proportional memory. The
+# driver gets the remaining CPU and memory as a disjoint exact step.
+srun --exact --nodes=1 --ntasks=1 --cpus-per-task=1 -w "$HEAD" \
     bash -c 'cd "$1"; shift; exec "$@"' _ "$RUNTIME_DIR" \
     "$VENV_DIR/bin/python" -u "$PROJECT_DIR/hpc_benchmarks/run_benchmark.py" \
     "${BENCHMARK_ARGS[@]}" --ray-address "$ADDRESS"

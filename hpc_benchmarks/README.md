@@ -1,8 +1,9 @@
-> Aktualizacja 2026-09-15: obowiązuje **144 wyspy**, torus **12×12**,
-> complete oraz wybrane **ER4 / WS3 / BA**. Źródło aktualnych ustawień i status
-> załączników: [STUDY_144.md](../STUDY_144.md). ER4 dostarczono jako 150 węzłów;
-> jego uruchomienie przy 144 jest zablokowane do rozstrzygnięcia. Historyczne
-> pomiary sprzętu pozostają niezmienione; D=200 oznacza wymiar benchmarku.
+> Aktualizacja 2026-09-17: badanie używa 144 wysp we wszystkich topologiach.
+> ER4 został odblokowany zgodnie z odpowiedzią prowadzącej: igraph G(n,p),
+> n=144, p=0.0347, undirected; pętle tylko dla izolowanych węzłów.
+> Zamrożony graf ma 365 krawędzi, składową 144 i zero pętli; seed 20260917.
+> Szczegóły: [generacja ER4](../hpc_benchmarks/ER4_GENERATION.md).
+> Historyczne pomiary i stare załączniki pozostają archiwalne; D=200 jest wymiarem.
 
 # Benchmarki w main: Ray i Ares
 
@@ -107,14 +108,15 @@ ISLANDS_WALLTIME=01:00:00 bash hpc_benchmarks/submit_ares_144.sh \
 
 Przed startem Ray launcher wykonuje pełny `--dry-run`, sprawdza topologię i porównuje `2*N+1` z rzeczywistą alokacją. Za mały przydział kończy job kodem 2, zamiast pozostawić oczekującego aktora do walltime. Następnie każdy węzeł jednorazowo buduje własny cache Matplotlib w `/tmp/$USER/islandsea-$SLURM_JOB_ID/matplotlib`; workery dzielą gotowy cache tylko w obrębie lokalnego systemu plików węzła. Katalog tymczasowy jest usuwany z każdego węzła podczas kontrolowanego zakończenia.
 
-Pięć topologii badania to torus12×12, complete, ER4, WS3 i BA. WS3/BA wczytują dokładne załączniki. ER4 ma w dostarczonym pliku 150 węzłów, dlatego preflight blokuje go przy wymaganych 144. Szczegóły i źródła grafów: [STUDY_144.md](../STUDY_144.md).
+Pięć topologii badania to torus12×12, complete, ER4, WS3 i BA, po144 wyspy. WS3/BA zachowują dokładne załączniki. ER4 jest nową stałą instancją igraph G(144, 0.0347), zatwierdzoną w follow-upie; szczegóły w [ER4_GENERATION.md](ER4_GENERATION.md).
 
 Każdy węzeł uruchamia jeden proces Ray przez `srun`. Readiness head node jest
 sprawdzany bezpośrednio z procesu batch, który już działa na pierwszym węźle;
 nie tworzy dodatkowego kroku `srun` konkurującego z blokującym procesem head.
-Proces sterujący współdzieli przydział głównego węzła przez jawne
-`--overlap --exact`, z CPU wyłączonym z puli Ray. Znaczenie `--exact` i
-`--overlap` określa [dokumentacja SLURM](https://slurm.schedmd.com/srun.html).
+Head step rezerwuje 47 z 48 CPU oraz odpowiadającą im pamięć, zgodnie z pulą
+zgłoszoną do Ray. Proces sterujący dostaje pozostały 1 CPU i 2 GB jako osobny
+`--exact` step; dzięki temu nie próbuje nałożyć dodatkowej pamięci na krok head.
+Znaczenie `--exact` określa [dokumentacja SLURM](https://slurm.schedmd.com/srun.html).
 Wrapper kończy własne kroki zadania; nie wykonuje globalnego `ray stop`.
 
 Gotowy pełny pilot F1/D200, torus 12×12, `best/plain`, trzy powtórzenia oraz jego ścisły walidator są opisane w [`pilot_run/README.md`](../pilot_run/README.md). Nie składaj go ręcznie z trzech osobnych komend: skrypt zgłoszeniowy zapisuje wspólny manifest i uruchamia finalizer zależny od całej tablicy.
@@ -126,17 +128,21 @@ Gotowy pełny pilot F1/D200, torus 12×12, `best/plain`, trzy powtórzenia oraz 
 - Zachowane `sphere` i `rastrigin` przyjmują dodatni wymiar, także 200. Uruchamianie starego `start.py` bez wyboru problemu zachowuje domyślne `Sphere` i parametry JSON.
 - Selekcja migrantów: `random`, `best`, `worst`, `maxDistance`. Akceptacja: dotychczasowe `plain`, `better`, `newer`, `older`, `oldest`, `stochastic`, `rejectTooOld`, `window`, z istniejącą składnią `dup_` i `:liczba`.
 
-Launcher używa dokładnie istniejących grafów. **Nie wszystkie obsługują dowolną liczbę wysp:**
+Launcher badawczy wymaga144 wysp. Gotowe grafy są stałe dla całej kampanii:
 
-| CLI | Ograniczenie obecnej implementacji |
+| CLI | Instancja badawcza |
 |---|---|
-| `complete` | Dowolna dodatnia liczba wysp |
-| `ring` | Do eksperymentów używaj co najmniej 3 wysp; istniejący graf zawiera również sąsiedztwo własne |
-| `torus` | Domyślnie historyczne `12 × (N/12)`, N≥24 i podzielne przez 12; opcjonalnie jawne `rows × columns = N` |
-| `er1`–`er4` | Gotowe grafy na 150 wysp |
-| `ws3`, `ws4` | Gotowe grafy na 144 wyspy |
+| `complete` | Graf pełny144 bez pętli |
+| `torus` | Torus12×12 |
+| `er4` | igraph G(144, 0.0347), undirected, seed 20260917, 365 krawędzi |
+| `ws3` | Dokładny załącznik144 |
+| `ba` | Dokładny załącznik144,m0=30,m=30 |
+| `ring` | Wyłącznie `--diagnostic`, poza macierzą badania |
 
-Preflight sprawdza rzeczywiste listy sąsiadów i przerywa przy niezgodności, np. domyślny torus150 albo ER180. Jawny prostokątny torus rozwiązuje wyłącznie kwestię rozmiaru tej rodziny; do porównania ER, WS i torusa przy **tej samej** liczbie 150–144 wysp nadal potrzebne będą osobno uzgodnione, zapisane grafy ER/WS. Port benchmarków nie generuje tych grafów ani nie poprawia istniejących pętli własnych. Nawet przy grafie pełnym dotychczasowy `RandomSelect` wybiera jeden cel na migranta; nie jest to rozesłanie każdego migranta do wszystkich sąsiadów.
+Preflight sprawdza listy sąsiadów, liczebność, hashe i kontrakt ER.
+ER1/ER2/ER3/WS4 nie należą do aktualnego rejestru badania. Nie losujemy grafów
+w jobach. `RandomSelect` nadal wybiera jeden cel na migranta; graf pełny nie
+oznacza rozsyłania każdego migranta do wszystkich sąsiadów.
 
 ## Zachowane znaczenie parametrów
 

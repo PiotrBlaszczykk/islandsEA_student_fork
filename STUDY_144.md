@@ -11,18 +11,19 @@ wymiarów (w tym projektowego D=200), operatorów ani definicji metryk.
 | `complete` | 144 węzły, 20592 skierowane wpisy, bez pętli | gotowy |
 | `ws3` | dokładny WS3 z załącznika; 144 węzły, 1803 krawędzie nieskierowane | gotowy |
 | `ba` | dokładny BA z załącznika; m0=30, m=30, 144 węzły, 3855 krawędzi nieskierowanych | gotowy |
-| `er4` | oryginał z załącznika: **150**, nie 144 węzły | blokada w preflight |
+| `er4` | igraph G(144, 0.0347), undirected, seed 20260917, 365 krawędzi, składowa 144, bez pętli | gotowy |
 
-ER4: plik `ER4Topology.py` zawiera węzły 0–149, 728 skierowanych wpisów,
-6 pętli własnych i niesymetryczne listy sąsiadów. To niezgodność załącznika
-z zatwierdzoną liczebnością. **Nie obcięto** grafu, nie usunięto pętli,
-nie symetryzowano go i nie wygenerowano zastępczego ER. Potrzebny jest
-poprawiony graf 144 od prowadzącej albo jawna decyzja o konkretnej transformacji.
-Nie uruchamiać ER4 z 150 wyspami w kampanii porównawczej. `probab` pozostaje
-`null`, ponieważ nie podano go w załączniku (etykieta `ERt3.2`).
+ER4 został zastąpiony zgodnie z odpowiedzią prowadzącej przekazaną 2026-09-17.
+Nowa, zamrożona instancja pochodzi z igraph G(n,p), n=144, p=0.0347,
+directed=False, loops=False. Pierwsze losowanie dla seedu 20260917 ma 365
+krawędzi nieskierowanych, jedną składową 144 i zero izolowanych węzłów/pętli.
+Przyjęty warunek wyboru to najwyżej 3 węzły poza największą składową;
+generator dodaje pętlę tylko do węzła bez sąsiadów. Nie wymusza pełnej spójności.
+Szczegóły, wersje, odtwarzanie i hash: [ER4_GENERATION.md](hpc_benchmarks/ER4_GENERATION.md).
+Stary załącznik 150 zachowano w data/archive/er4_legacy150.json, poza aktywnym grafem.
 
 WS3 zachowuje parametry z etykiety źródła: dim=2, lat=12, nei=3,
-probab=0.003181, scenario=2. Nie odtwarzamy grafów generatorem bibliotek:
+probab=0.003181, scenario=2. WS3 i BA nie odtwarzamy generatorem bibliotek:
 wykorzystujemy dokładne, dostarczone listy sąsiadów, również ich kolejność,
 która może wpływać na wybór celu migracji.
 
@@ -30,7 +31,7 @@ która może wpływać na wybór celu migracji.
 
 W `islands_desync/islands_desync/islands/topologies/data/` są identyczne JSON-y
 `ws3.json`, `ba.json`, `er4.json`: listy sąsiadów, parametry, nazwa pliku źródłowego,
-SHA-256 oryginalnego załącznika i kanonicznej adjacencji. `fixed_graph.py`
+SHA-256 źródła (załącznik WS3/BA lub generator ER4) i kanonicznej adjacencji. `fixed_graph.py`
 sprawdza integralność i dokładną liczebność; nie dokonuje losowania ani obcięcia.
 `study.py` ustala 144 i pięć wybranych nazw. Parametry i proweniencja trafiają
 do `topology.json`, `experiment_manifest.json` i `run_metadata.json`.
@@ -47,7 +48,7 @@ oraz profile `*_ares_200.sh` są wyłączone i wskazują aktualny launcher.
 Stałe badania: 8000 ewaluacji na wyspę (łącznie 1 152 000), populacja 16,
 potomkowie 4, 5 migrantów, interwał 5 według dotychczasowego licznika ewaluacji.
 Wybór migrantów: best/random/maxDistance; podstawowa akceptacja plain.
-Macierz nadal wynosi 5×3×40×3 = 1800 runów, lecz ER4 pozostaje zablokowany.
+Macierz nadal wynosi 5×3×40×3=1800 runów; wszystkie pięć topologii ma już instancje 144. ER4 nie jest zablokowany.
 Wszystkie wyniki wysp, `param.json`, dokładna topologia i obraz oraz pełne
 `research-v1-full-buffered` są zachowane. Semantyka signed delay, kolejkowania,
 filtrów, RNG i zapisu metryk nie została zmieniona.
@@ -92,17 +93,18 @@ inicjalne (144×16), 576 potomków na idealną falę (144×4), 1 152 000 ewaluac
 To opis obciążenia, nie dodatkowa bariera synchronizacji między wyspami.
 Walidator batchy uwzględnia rozmiary 144,288,576,864,1152,1728,2304.
 
-**Pełny GPU runner wysp nadal nie jest zaimplementowany**. Dostępny jest
-batch CPU/CuPy dla 40 funkcji i testy A100, a kod GA/Ray w repo pozostaje CPU.
-Nie przenosić profilu Ares7×48 na pojedynczą A10016CPU: 289 aktorów CPU się
-nie zmieści. Integracja shardów/batchera oraz porównanie kompletnych metryk
-na rzeczywistym GPU pozostają osobnym zadaniem. Zmiana liczby wysp nie
-oznacza potwierdzenia gotowości pełnej kampanii GPU.
+W osobnym repo Atheny zaimplementowano runner shardowy 144 (12 shardów, batcher, router i aktor A100), ale nadal wymaga zaliczonego canary na docelowym stosie. CPU pozostaje dotychczasową ścieżką. Nie przenosić profilu Ares 7×48 na Athenę. Sprawdzać aktualne instrukcje athena_gpu/README.md; odblokowanie ER4 nie certyfikuje pełnej kampanii GPU.
 
 ## Walidacja tej zmiany
 
 Testy sprawdzają dokładne grafy i kolejność sąsiadów, wszystkie identyfikatory,
 sumy kontrolne, mapowanie na uchwyty aktorów, 12×12, odrzucanie niezgodnych
-liczebności i starego ER4, proweniencję oraz plan zasobów pilota.
+liczebności, kontrakt nowego ER4, proweniencję oraz plan zasobów pilota.
 Wyniki lokalnej sesji zapisano w katalogu workspace `artifacts/study144/`.
 Nie uruchomiono zadań SLURM ani kampanii; lokalne testy nie zastępują canary HPC.
+
+Aktualizacja ER4 z 2026-09-17: reguły i odtworzenie opisano w [ER4_GENERATION.md](hpc_benchmarks/ER4_GENERATION.md); wyniki testów tej aktualizacji są w workspace artifacts/er4_144_20260917/.
+
+Walidacja ER4: 42 testy wspólne na każde repo, dodatkowo 27 zaliczonych testów
+Atheny (jeden test real-Ray pominięty), odtworzenie igraph i preflighty CPU/GPU.
+Łącznie 111 testów zaliczonych. Nie wykonano nowego runu na klastrze.

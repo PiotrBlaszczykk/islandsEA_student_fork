@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # The old campaign uses acceptance variants and now-retired launchers.
-echo "Old campaign disabled: follow STUDY_144.md; ER4 needs a corrected 144-node attachment. No jobs submitted." >&2
+echo "Old campaign disabled: follow STUDY_144.md; use the named submitters after validation of the frozen study graphs. No jobs submitted." >&2
 exit 2
 
 SLEEP_SECONDS=60
