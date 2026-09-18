@@ -30,6 +30,7 @@ cleanup() {
 trap cleanup EXIT
 cd "$PROJECT_DIR"
 srun python -m unittest discover -s hpc_benchmarks -p test_study_topologies.py
+srun python -m unittest discover -s hpc_benchmarks -p test_er4_contract.py
 srun python -m unittest pilot_run.test_pilot_tools
 cd "$PROJECT_DIR/islands_desync"
 srun python -m islands_desync.geneticAlgorithm.utils.benchmarks_refined --validate \

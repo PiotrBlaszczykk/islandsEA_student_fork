@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from .Topology import Topology
+from .er4_contract import validate_er4
 
 DATA = Path(__file__).with_name("data")
 
@@ -22,6 +23,8 @@ def load_graph(name):
     if any(not targets or any(type(t) is not int or not 0 <= t < count for t in targets)
            for targets in adjacency.values()):
         raise ValueError(f"Selected graph {name}: invalid migration destinations")
+    if name == "er4":
+        validate_er4(document)
     return document
 
 

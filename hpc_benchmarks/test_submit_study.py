@@ -28,7 +28,7 @@ class SubmissionTests(unittest.TestCase):
         self.script(self.venv / "bin/python", '''#!/usr/bin/env bash
 if [[ "$1" == "-c" ]]; then echo "${MOCK_ISLANDS:-144}"; exit 0; fi
 printf '%s\n' "$@" > "$TEST_ROOT/preflight_args"
-[[ "${MOCK_REJECT:-0}" == "0" ]] || { echo "Selected ER4 has 150 nodes" >&2; exit 2; }
+[[ "${MOCK_REJECT:-0}" == "0" ]] || { echo "Selected graph failed integrity validation" >&2; exit 2; }
 printf '{"islands": %s}\n' "${MOCK_ISLANDS:-144}"
 ''')
         self.env = os.environ.copy()

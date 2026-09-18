@@ -6,6 +6,43 @@ import random
 import numpy as np
 
 
+def rotated_order(values, cursor):
+    """Return one cyclic ordering without mutating the recorded shard order."""
+    values = tuple(values)
+    if not values:
+        return values
+    start = int(cursor) % len(values)
+    return values[start:] + values[:start]
+
+
+def bounded_lead_eligible(
+    island_ids,
+    steps_by_island,
+    pending_islands,
+    *,
+    maximum_completed_step_lead,
+):
+    """Select runnable islands while preventing a physical-shard runaway.
+
+    A lead of two still permits steps 0/1/2 to coexist, so this is bounded
+    asynchronous execution rather than a shard or global generation barrier.
+    """
+    active = tuple(int(value) for value in island_ids)
+    if not active:
+        return set()
+    if maximum_completed_step_lead < 1:
+        raise ValueError("maximum_completed_step_lead must be positive")
+    minimum_step = min(int(steps_by_island[island]) for island in active)
+    pending = set(pending_islands)
+    return {
+        island
+        for island in active
+        if island not in pending
+        and int(steps_by_island[island])
+        < minimum_step + maximum_completed_step_lead
+    }
+
+
 def execute_with_rng_states(python_state, numpy_state, callback):
     """Execute one logical-island phase without leaking module RNG state."""
     outer_python = random.getstate()
@@ -40,6 +77,7 @@ def make_actor_class():
             router,
             package_root,
             operation_timeout_seconds,
+            scheduler_max_step_lead,
         ):
             import os
             import random
@@ -68,6 +106,17 @@ def make_actor_class():
             self.router = router
             self.package_root = str(package_root)
             self.operation_timeout_seconds = float(operation_timeout_seconds)
+            self.scheduler_max_step_lead = int(scheduler_max_step_lead)
+            if self.scheduler_max_step_lead < 1:
+                raise ValueError("scheduler_max_step_lead must be positive")
+            self.shard_position = {
+                island_id: position
+                for position, island_id in enumerate(self.island_ids)
+            }
+            self.submission_cursor = 0
+            self.completion_cursor = 0
+            self.scheduler_sweeps = 0
+            self.maximum_observed_step_lead = 0
             self.hostname = socket.gethostname()
             self.pid = os.getpid()
             self.ray_node_id = str(ray.get_runtime_context().get_node_id())
@@ -159,6 +208,11 @@ def make_actor_class():
             return {
                 "shard_id": self.shard_id,
                 "islands": prepared,
+                "scheduler_order": list(self.island_ids),
+                "scheduler": {
+                    "algorithm": "rotating-round-robin-bounded-lead-v1",
+                    "maximum_completed_step_lead_within_shard": self.scheduler_max_step_lead,
+                },
                 "hostname": self.hostname,
                 "pid": self.pid,
                 "ray_node_id": self.ray_node_id,
@@ -294,11 +348,28 @@ def make_actor_class():
                 raise RuntimeError("shard run called twice")
             pending = {}
             while not all(state["done"] for state in self.states.values()):
-                for island_id in self.island_ids:
+                pending_islands = {value[0] for value in pending.values()}
+                blocked = set()
+                if 0 in self.states and not self._island_zero_can_advance():
+                    blocked.add(0)
+                schedulable = [
+                    island_id
+                    for island_id in self.island_ids
+                    if not self.states[island_id]["done"] and island_id not in blocked
+                ]
+                eligible = bounded_lead_eligible(
+                    schedulable,
+                    {
+                        island_id: self.states[island_id]["algorithm"].step_num
+                        for island_id in schedulable
+                    },
+                    pending_islands,
+                    maximum_completed_step_lead=self.scheduler_max_step_lead,
+                )
+                submitted = 0
+                for island_id in rotated_order(self.island_ids, self.submission_cursor):
                     state = self.states[island_id]
-                    if state["done"] or any(value[0] == island_id for value in pending.values()):
-                        continue
-                    if island_id == 0 and not self._island_zero_can_advance():
+                    if island_id not in eligible:
                         continue
                     algorithm = state["algorithm"]
                     evaluations_before = algorithm.evaluations
@@ -315,6 +386,16 @@ def make_actor_class():
                     )
                     ref = self.batcher.evaluate.remote(request, vectors)
                     pending[ref] = (island_id, request["request_id"], offspring)
+                    submitted += 1
+
+                if submitted:
+                    # Moving the start by one (rather than by the number of
+                    # submissions) prevents a complete sweep from restoring
+                    # the same permanent first/last position on every step.
+                    self.submission_cursor = (
+                        self.submission_cursor + 1
+                    ) % len(self.island_ids)
+                    self.scheduler_sweeps += 1
 
                 if not pending:
                     unfinished = [
@@ -338,6 +419,17 @@ def make_actor_class():
                         timeout=0,
                     )
                     ready.extend(additional)
+                completion_rank = {
+                    island_id: rank
+                    for rank, island_id in enumerate(
+                        rotated_order(self.island_ids, self.completion_cursor)
+                    )
+                }
+                ready.sort(key=lambda ref: completion_rank[pending[ref][0]])
+                if ready:
+                    self.completion_cursor = (
+                        self.completion_cursor + 1
+                    ) % len(self.island_ids)
                 for ref in ready:
                     island_id, request_id, offspring = pending.pop(ref)
                     state = self.states[island_id]
@@ -357,6 +449,16 @@ def make_actor_class():
                             state["algorithm_compute_end_timestamp_unix"]
                             - state["algorithm_start_timestamp_unix"]
                         )
+                active_steps = [
+                    state["algorithm"].step_num
+                    for state in self.states.values()
+                    if not state["done"]
+                ]
+                if active_steps:
+                    self.maximum_observed_step_lead = max(
+                        self.maximum_observed_step_lead,
+                        max(active_steps) - min(active_steps),
+                    )
             for state in self.states.values():
                 state["migration"].acknowledge_finish()
             self.run_finished = True
@@ -366,6 +468,12 @@ def make_actor_class():
                 "request_counts": {
                     str(island_id): state["request_sequence"]
                     for island_id, state in self.states.items()
+                },
+                "scheduler": {
+                    "algorithm": "rotating-round-robin-bounded-lead-v1",
+                    "maximum_completed_step_lead_within_shard": self.scheduler_max_step_lead,
+                    "maximum_observed_step_lead": self.maximum_observed_step_lead,
+                    "sweeps": self.scheduler_sweeps,
                 },
             }
 
@@ -407,6 +515,10 @@ def make_actor_class():
                     "physical_actor_kind": "IslandShard",
                     "shard_id": self.shard_id,
                     "shard_island_ids": list(self.island_ids),
+                    "shard_position": self.shard_position[island_id],
+                    "scheduler_algorithm": "rotating-round-robin-bounded-lead-v1",
+                    "scheduler_maximum_completed_step_lead": self.scheduler_max_step_lead,
+                    "scheduler_maximum_observed_step_lead": self.maximum_observed_step_lead,
                     "constructed_timestamp_unix": self.constructed_timestamp_unix,
                     "algorithm_start_timestamp_unix": state["algorithm_start_timestamp_unix"],
                     "algorithm_compute_end_timestamp_unix": state["algorithm_compute_end_timestamp_unix"],
@@ -455,6 +567,7 @@ def make_actor_class():
                         "ray_node_id": self.ray_node_id,
                         "physical_actor_kind": "IslandShard",
                         "shard_id": self.shard_id,
+                        "shard_position": self.shard_position[island_id],
                         "sent_migrant_count": len(migration_telemetry["sent_events"]),
                         "processed_migrant_count": len(algorithm.processed_migration_events),
                         "prefetched_unprocessed_migrant_count": len(
@@ -477,6 +590,10 @@ def make_actor_class():
                 "hostname": self.hostname,
                 "pid": self.pid,
                 "ray_node_id": self.ray_node_id,
+                "scheduler": {
+                    "algorithm": "rotating-round-robin-bounded-lead-v1",
+                    "maximum_completed_step_lead_within_shard": self.scheduler_max_step_lead,
+                },
             }
 
     return IslandShard

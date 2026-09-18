@@ -43,7 +43,7 @@ class StudyTopologyTests(unittest.TestCase):
         validate_study(2, "ring", diagnostic=True)
 
     def test_all_ready_graphs_have_exactly_144_valid_connected_nodes(self):
-        for name, directed_edges in (("torus", 576), ("complete", 20592), ("ws3", 3606), ("ba", 7710)):
+        for name, directed_edges in (("torus", 576), ("complete", 20592), ("ws3", 3606), ("ba", 7710), ("er4", 730)):
             with self.subTest(name=name):
                 adjacency = graph(name)
                 self.assertEqual(set(range(144)), set(adjacency))
@@ -69,7 +69,7 @@ class StudyTopologyTests(unittest.TestCase):
 
     def test_fixed_graph_order_and_actor_handle_mapping(self):
         handles = [object() for _ in range(144)]
-        for name in ("ws3", "ba"):
+        for name in ("ws3", "ba", "er4"):
             original = load_graph(name)["adjacency"]
             converted = graph(name, callback=lambda i: (i, handles[i]))
             for source, neighbours in original.items():
@@ -77,20 +77,23 @@ class StudyTopologyTests(unittest.TestCase):
                 self.assertTrue(all(handle is handles[i] for i, handle in converted[int(source)]))
 
     def test_fixed_graph_rejects_all_wrong_sizes_without_callback_side_effects(self):
-        for name in ("ws3", "ba"):
+        for name in ("ws3", "ba", "er4"):
             for size in (1, 143, 145, 150, 200):
                 with self.subTest(name=name, size=size), self.assertRaisesRegex(ValueError, "144 nodes"):
                     graph(name, size, callback=lambda _: self.fail("No actor lookup before graph validation"))
 
-    def test_er4_is_kept_exact_and_blocked_for_study(self):
+    def test_er4_matches_authorized_generation_contract(self):
         document = load_graph("er4")
         adjacency = document["adjacency"]
-        self.assertEqual(150, document["nodes"])
-        self.assertEqual(728, sum(map(len, adjacency.values())))
-        self.assertEqual(6, sum(int(i) in targets for i, targets in adjacency.items()))
-        self.assertIsNone(document["parameters"]["probab"])
-        with self.assertRaisesRegex(ValueError, "150 nodes.*144 islands"):
-            graph("er4")
+        self.assertEqual(144, document["nodes"])
+        self.assertEqual(730, sum(map(len, adjacency.values())))
+        self.assertEqual(0, sum(int(i) in targets for i, targets in adjacency.items()))
+        self.assertEqual(0.0347, document["parameters"]["probab"])
+        self.assertIs(document["parameters"]["directed"], False)
+        self.assertEqual(20260917, document["provenance"]["generator"]["selected_seed"])
+        self.assertEqual("469cc283543dcc60d5bf8f07db2eabfb12cab34637f4a6d26bca51d07f85cccc",
+                         document["provenance"]["adjacency_sha256"])
+        self.assertEqual({int(i): targets for i, targets in adjacency.items()}, graph("er4"))
 
     def test_changed_adjacency_fails_checksum(self):
         altered = load_graph("ba")
@@ -100,12 +103,12 @@ class StudyTopologyTests(unittest.TestCase):
                 load_graph("ba")
 
     def test_provenance_is_preserved_in_saved_topology(self):
-        for name in ("ws3", "ba"):
+        for name in ("ws3", "ba", "er4"):
             args = launcher.parser().parse_args(["--problem", "r01_elliptic", "--dimension", "200", "--topology", name])
             payload = launcher.topology_payload(args, graph(name))
             self.assertEqual(graph_parameters(name), payload["parameters"])
             self.assertEqual(payload["parameters"]["provenance"]["adjacency_sha256"], payload["graph_metrics"]["adjacency_sha256"])
-            self.assertEqual("none; original node IDs and neighbour order preserved", payload["parameters"]["provenance"]["transformation"])
+            self.assertEqual(load_graph(name)["provenance"], payload["parameters"]["provenance"])
 
     def test_pilot_cpu_profile_and_budget(self):
         spec = json.loads((ROOT / "pilot_run/pilot_spec.json").read_text())

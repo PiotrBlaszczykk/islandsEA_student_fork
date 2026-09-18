@@ -383,6 +383,22 @@ def make_actor_class():
             phase_rows = Counter()
             for record in self.request_records:
                 phase_rows[record["phase"]] += record["rows"]
+            completed_batches = [
+                record
+                for record in self.batch_records
+                if record.get("status") == "complete"
+            ]
+            batches_by_reason = Counter(
+                record.get("dispatch_reason") for record in completed_batches
+            )
+            completed_count = len(completed_batches)
+            completed_requests = sum(
+                record["request_count"] for record in completed_batches
+            )
+            completed_rows = sum(record["row_count"] for record in completed_batches)
+            small_batches = sum(
+                record["request_count"] <= 3 for record in completed_batches
+            )
             return {
                 "schema_version": 1,
                 "request_count": len(self.request_records),
@@ -394,6 +410,19 @@ def make_actor_class():
                 "rows_by_phase": dict(phase_rows),
                 "maximum_pending_rows": self.maximum_pending_rows,
                 "maximum_pending_requests": self.maximum_pending_requests,
+                "batch_quality": {
+                    "completed_batches_by_reason": dict(batches_by_reason),
+                    "average_requests_per_completed_batch": (
+                        completed_requests / completed_count if completed_count else 0.0
+                    ),
+                    "average_rows_per_completed_batch": (
+                        completed_rows / completed_count if completed_count else 0.0
+                    ),
+                    "batches_with_at_most_three_requests": small_batches,
+                    "fraction_with_at_most_three_requests": (
+                        small_batches / completed_count if completed_count else 0.0
+                    ),
+                },
                 "policy": {
                     "initial_target_rows": self.targets["initial"],
                     "steady_target_rows": self.targets["offspring"],

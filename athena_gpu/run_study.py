@@ -47,7 +47,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--shards", type=int, default=STUDY_SHARDS)
     result.add_argument("--instance-seed", type=int, default=DEFAULT_INSTANCE_SEED)
     result.add_argument("--initial-max-wait-ms", type=float, default=50.0)
-    result.add_argument("--steady-max-wait-ms", type=float, default=2.0)
+    result.add_argument("--steady-max-wait-ms", type=float, default=50.0)
     result.add_argument("--ray-memory-gib", type=int, default=96)
     result.add_argument("--object-store-gib", type=int, default=8)
     result.add_argument("--operation-timeout-seconds", type=float, default=300.0)
@@ -83,8 +83,6 @@ def _git_state() -> tuple[str | None, bool | None]:
 
 
 def _validate_scientific_contract(args) -> dict:
-    if args.topology == "er4":
-        raise ValueError("ER4 remains blocked: the supplied graph has 150 rather than 144 nodes")
     configuration, problem, topology_class, adjacency = common.validate(args)
     from islands_desync.geneticAlgorithm.utils import benchmarks_refined
 
@@ -130,6 +128,7 @@ def _validate_scientific_contract(args) -> dict:
         offspring=args.offspring,
         evaluations=args.evaluations,
         diagnostic=args.diagnostic,
+        shard_mapping_seed=args.seed + (args.repeat - 1) * 1000000,
         initial_max_wait_ms=args.initial_max_wait_ms,
         steady_max_wait_ms=args.steady_max_wait_ms,
     )
@@ -184,7 +183,29 @@ def _slurm_metadata() -> dict:
     }
 
 
-def _scientific_configuration(args, env, configuration, problem, adjacency) -> dict:
+def _effective_algorithm_configuration(args, configuration) -> dict:
+    """Describe values consumed by the Athena builder, not stale JSON defaults."""
+    effective = json.loads(json.dumps(configuration))
+    effective.pop("island_delays", None)
+    effective.update(
+        {
+            "problem": args.problem.strip().lower(),
+            "number_of_variables": args.dimension,
+            "number_of_evaluations": args.evaluations,
+            "population_size": args.population,
+            "offspring_population_size": args.offspring,
+            "number_of_islands": args.islands,
+            "number_of_migrants": args.migrants,
+            "migration_interval": args.interval,
+            "migrant_selection_type": args.strategy,
+            "migrant_acceptance_type": args.acceptance,
+            "topology": args.topology,
+        }
+    )
+    return effective
+
+
+def _scientific_configuration(args, env, effective_configuration, problem, adjacency) -> dict:
     topology_parameters = common.selected_topology_parameters(args)
     benchmark = (
         problem.benchmark_metadata()
@@ -195,7 +216,12 @@ def _scientific_configuration(args, env, configuration, problem, adjacency) -> d
         "study": "diagnostic" if args.diagnostic else "approved-144",
         "execution_backend": "athena-gpu-sharded",
         "benchmark": benchmark,
-        "algorithm_configuration": configuration,
+        "algorithm_configuration": effective_configuration,
+        "algorithm_configuration_authority": {
+            "runtime_parameters": "CLI + RunAlgorithmParams + environment overrides",
+            "source_path": env["ISLANDS_CONFIG"],
+            "ignored_legacy_fields": ["island_delays"],
+        },
         "dimension": args.dimension,
         "islands": args.islands,
         "evaluations_per_island": args.evaluations,
@@ -261,12 +287,15 @@ def _write_athena_contract(directory: Path, *, plan: dict, backend: dict, shards
             "failure_policy": "GPU failures fail the run; no CPU fallback or retry",
             "dispatch_reasons": ["size", "timeout", "flush"],
             "generation_barrier": False,
+            "shard_mapping": plan["shard_mapping"],
+            "scheduler": plan["scheduler"],
+            "full_run_quality_gates": plan["full_run_quality_gates"],
             "files": {
                 "evaluation_requests.jsonl.gz": "one terminal record per logical-island evaluation request",
                 "gpu_batches.jsonl.gz": "one record per physical GPU backend call",
                 "summary.json": "request, response, row and batch reconciliation",
                 "backend.json": "A100/CuPy/Ray identity and total calls/rows",
-                "shards.json": "stable logical-island placement",
+                "shards.json": "seeded logical-island placement and scheduler order",
                 "migration_router.json": "global queue and barrier counters",
             },
         },
@@ -398,8 +427,9 @@ def run(args) -> None:
         for name, installed in dependency_report["installed_expected_distributions"].items()
     }
     benchmark_metadata = problem.benchmark_metadata()
+    effective_configuration = _effective_algorithm_configuration(args, configuration)
     scientific_configuration = _scientific_configuration(
-        args, env, configuration, problem, adjacency
+        args, env, effective_configuration, problem, adjacency
     )
     experiment_key, configuration_sha256 = _fingerprints(scientific_configuration)
     topology_parameters = common.selected_topology_parameters(args)
@@ -413,7 +443,30 @@ def run(args) -> None:
         "experiment_key": experiment_key,
         "configuration_sha256": configuration_sha256,
         "args": vars(args),
-        "configuration": configuration,
+        "configuration": effective_configuration,
+        "configuration_source": {
+            "path": env["ISLANDS_CONFIG"],
+            "canonical_sha256": hashlib.sha256(
+                json.dumps(
+                    configuration,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode("utf-8")
+            ).hexdigest(),
+            "ignored_by_athena_runtime": ["island_delays"],
+            "overridden_by_active_runtime": [
+                "problem",
+                "number_of_variables",
+                "number_of_evaluations",
+                "population_size",
+                "offspring_population_size",
+                "number_of_islands",
+                "number_of_migrants",
+                "migration_interval",
+                "migrant_selection_type",
+            ],
+        },
         "run_directory": str(raw),
         "versions": versions,
         "git_commit": commit,
@@ -568,12 +621,20 @@ def run(args) -> None:
                 router=router,
                 package_root=str(PACKAGE_ROOT),
                 operation_timeout_seconds=args.operation_timeout_seconds,
+                scheduler_max_step_lead=plan["scheduler"][
+                    "maximum_completed_step_lead_within_shard"
+                ],
             )
             for item in plan["shards"]
         ]
         gpu_before = ray.get(gpu.environment.remote(), timeout=args.operation_timeout_seconds)
+        island_zero_shard = next(
+            index
+            for index, item in enumerate(plan["shards"])
+            if 0 in item["island_ids"]
+        )
         island_zero = ray.get(
-            shards[0].prepare_island_zero.remote(),
+            shards[island_zero_shard].prepare_island_zero.remote(),
             timeout=args.actor_startup_timeout,
         )
         if Path(island_zero["run_directory"]).resolve() != raw:

@@ -1,0 +1,3 @@
+# Offline graph preparation only; not a runtime/HPC dependency.
+igraph==0.11.9
+texttable==1.7.0

@@ -5,11 +5,12 @@ Research codebase for asynchronous island-model evolutionary computation, focuse
 ## Current study: 144 islands
 
 Read [STUDY_144.md](STUDY_144.md) for the approved 144-island configuration,
-selected torus12x12/complete/WS3/BA graphs, and the ER4 attachment mismatch
-(150 supplied nodes; its 144-island run is blocked). Ares uses the CPU profile
-`submit_ares_144.sh`; Athena shares these exact graph data but still needs its
-full GPU island runner integrated. The same 40 benchmark definitions and
-research metric semantics are retained.
+selected torus 12x12/complete/WS3/BA graphs and the authorized frozen ER4
+(igraph G(144, 0.0347), undirected, seed 20260917; 365 edges, connected, no loops). Ares uses the CPU profile
+`submit_ares_144.sh`; the separate Athena checkout uses the same graph in its
+sharded GPU runner. Removing the ER4 blocker does not lift the GPU campaign
+hold described in Athena's `athena-info/ATHENA_HOW_TO_RUN.md`. The benchmark
+definitions and metric schema were not changed by this topology update.
 
 ## Named benchmarks on Ares
 

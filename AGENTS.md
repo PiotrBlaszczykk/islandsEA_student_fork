@@ -1,11 +1,13 @@
 # AGENTS.md
 
-## Active study and source precedence (2026-09-16)
+## Active study and source precedence (2026-09-17)
 
 This checkout targets **Athena GPU**, branch `summer_benchmarks_athena`. The
 maintained CPU runner remains unchanged. An Athena-only sharded GPU runner is
-implemented under `athena_gpu/`, but it is not target-certified until its
-same-commit canary passes on Athena.
+implemented under `athena_gpu/`. The latest
+[GPU runbook](athena-info/ATHENA_HOW_TO_RUN.md) records passed A100 integration
+checks, but also a campaign hold after the first technical full run; the ER4
+update does not lift that hold. Any changed commit still requires its own canary.
 
 Read the updated [research scope](../../zakres_badan.md) and the repository's
 [STUDY_144.md](STUDY_144.md) first. The workspace Markdown preserves the PDF's
@@ -14,7 +16,7 @@ cluster checkout may not contain the workspace file; STUDY_144.md retains
 the operational contract inside each repo.
 
 The email supersedes the PDF's old 150-200 island range and selects the graph
-instances. Do not restore old counts or substitute freshly generated graphs.
+instances. A September 17 follow-up explicitly authorizes a new igraph ER G(144, 0.0347), undirected, loops only at isolates; this supersedes the old ER4 blocker. Do not restore old counts, alter WS3/BA or redraw ER per run.
 Historical paper settings and ares-info/athena-info debugging snapshots do
 not override current study instructions; preserve their measured job records.
 
@@ -34,11 +36,11 @@ not override current study instructions; preserve their measured job records.
 
 - Migration interval currently means evaluation-counter difference, not generations. Preserve that semantic distinction.
 - The suite contains 30 continuous CEC2014 functions and 10 separate binary problems. The binary functions are not part of official CEC2014. Official continuous instances use D=10/30/50/100; D=200 is the labelled IslandsEA extension.
-- Graph originals: workspace `../../grafy/ER4Topology.py`, `WS3Topology.py`, `BA grapf - 144 nodes.txt`. Runtime copies: `islands_desync/islands_desync/islands/topologies/data/{er4,ws3,ba}.json`. These committed copies suffice on the cluster; no runtime download or regeneration.
+- Graph sources: WS3/BA remain supplied attachments in ../../grafy/. Active ER4 now comes from hpc_benchmarks/generate_er4.py; original 150-node ER4 is archived as data/archive/er4_legacy150.json. Runtime data/{er4,ws3,ba}.json are committed; no generation/downloads at runtime.
 - **WS3**: 144 nodes, 1803 undirected edges; source label parameters dim=2, lat=12, nei=3, probab=0.003181, scenario=2.
 - **BA**: 144 nodes, 3855 undirected edges; supplied m0=30, m=30.
-- **ER4 BLOCKER**: supplied 150 nodes (0-149), 728 directed adjacency entries including 6 self-loops; label ERt3.2, probab unknown/null. Its 144-island run must stay blocked until a corrected attachment or an explicit methodological decision arrives. No truncation, symmetrization, loop removal or replacement graph has been approved.
-- Preserve exact adjacency, node IDs, neighbour order, source filename/hash and adjacency hash across repeats and CPU/GPU. Never infer ER probab from density.
+- **ER4 READY (September 17 follow-up)**: frozen igraph G(n=144, p=0.0347), directed=False; generate without loops, then add one loop only to each isolated vertex. Accept first draw with <=3 vertices outside largest component; do not force connectedness or tune to GA outcomes. Fixed seed 20260917 passed on attempt 1: 365 undirected edges, component sizes [144], zero isolates/loops. Graph hash 469cc283543dcc60d5bf8f07db2eabfb12cab34637f4a6d26bca51d07f85cccc. See [ER4_GENERATION.md](hpc_benchmarks/ER4_GENERATION.md) for versions, provenance and offline reproduction. Previous prohibitions against replacing the old 150-node ER4 are superseded by this explicit authorization.
+- Preserve exact adjacency, node IDs, neighbour order, source filename/hash and adjacency hash across repeats and CPU/GPU. ER probab=0.0347 comes from the supervisor, not empirical density. The graph remains identical across all repeats and CPU/GPU.
 - Main matrix excludes ring and worst selection. Ring and small-island runs require `--diagnostic` and are separate from research data. The historical ring hypothesis does not add a sixth topology to the matrix.
 - Research tasks: compare PEA results, analyze signed-delay patterns for the **10 best and 10 worst islands per trial**, describe contributions and preliminary results. The original deadline is the end of September.
 - Hypotheses concern smaller delay amplitudes and better/non-degraded optimization for selected ER/WS/BA versus complete/torus. They are not measured conclusions of the current campaign.
@@ -51,10 +53,10 @@ not override current study instructions; preserve their measured job records.
 - Ares: `submit_ares_144.sh`, branch `summer_benchmarks_ares`, 7 x 48 = 336 allocated CPUs, 335 advertised Ray CPUs, 289 required Ray CPUs plus driver (minimum 290 physical CPUs). Six nodes with 48 CPUs each are insufficient.
 - Pilot: `pilot_run/pilot_spec.json`, F1/r01 D=200, torus 12x12, 144 islands, best/plain, repeats 1-3. Full pipeline ceiling 561.5 CPUh; `launch_pilot.sh --confirm-144-and-562-cpuh`. No CONFIRM_TORUS_200 methodology gate remains. Keep clean/pinned commit, canary verification, SCRATCH, finalizer and no-retry guards.
 - Old `*_ares_200.sh`, `run*-hpc.sh`, `run_delay_experiment.sh`, `run_local_venv_plgrid.sh` and `submit_all_topologies.sh` are retired/fail closed. Do not use them as campaign templates. Job paths use ISLANDS_PROJECT_DIR/SLURM_SUBMIT_DIR, not the SLURM spool copy's BASH_SOURCE.
-- Athena has explicit NumPy/CuPy benchmark backends and an **Athena-only, not-yet-target-certified sharded GPU island runner**. It maps 144 logical islands to 12 one-CPU shard actors, one shared batcher, one migration router and one A100 evaluator (15 Ray CPUs plus one driver CPU). GPU validation batches include 144/288/576/864/1152/1728/2304; initial population totals 2304 and at most 576 offspring are independently available at a time. Timeout dispatch preserves asynchronous progress; these targets do not add a generation barrier. Run `athena_gpu/submit_study.sh --canary` first and inspect its artifacts. Never auto-submit the full run, retry, or use the Ares CPU profile on Athena.
-- Local sharded-runner evidence: 26 deterministic Athena tests pass, and the opt-in real-Ray smoke completed four logical islands on two shards with one shared NumPy evaluator (20 requests / 128 rows), including migration and finish/delivery barriers. That smoke used Windows, Ray 2.31 and NumPy 1.26.4; it is scheduler evidence only, not certification of Ray 2.9.3, CuPy or A100. The local `athena_codebase/.venv` checked on September 16 is Python 3.12.10 with only pip and does not match Athena; do not describe it as a target-equivalent environment.
-- Current local evidence: `../../artifacts/study144/validation.json`, 33 tests per repo (66 total), real CLI dry-runs and exact attachment checks; `../../artifacts/study144/parity.json`, 170 instances / 5946 inputs per comparison, no unexpected source differences. This is CPU evidence, not a 144-island HPC run or validation of the complete 40-function backend on A100.
-- Historical small positional `start.py` commands below are archival. Use the current named launcher with `--diagnostic` for CPU smoke tests. The September16 update changes documentation only; it does not itself submit jobs or certify new GPU results.
+- Athena has explicit NumPy/CuPy benchmark backends and an **Athena-only sharded GPU island runner**. It maps 144 logical islands to 12 one-CPU shard actors, one shared batcher, one migration router and one A100 evaluator (15 Ray CPUs plus one driver CPU). GPU validation batches include 144/288/576/864/1152/1728/2304; initial population totals 2304 and at most 576 offspring are independently available at a time. The post-pilot steady operational target is 144 rows with a 50 ms timeout; timeout dispatch remains the bounded progress fallback. Seeded placement and bounded-lead rotation do not add a global generation barrier. Run `athena_gpu/submit_study.sh --canary` first and inspect its artifacts. Never auto-submit the full run, retry, or use the Ares CPU profile on Athena.
+- Local sharded-runner evidence after the September 17 scheduler fix: 32 regular Athena tests pass, and the opt-in real-Ray smoke completed four logical islands on two permuted shards with one shared NumPy evaluator (20 requests / 128 rows), including migration and finish/delivery barriers. The fix uses topology-independent SHA-256 placement, rotating bounded-lead scheduling, a 144-row/50-ms steady batching policy, normalized effective metadata and fail-closed full-run quality checks. That smoke used Windows, Ray 2.31 and NumPy 1.26.4; it is scheduler evidence only, not certification of Ray 2.9.3, CuPy or A100. The local `athena_codebase/.venv` is Python 3.12.10 with only pip; smoke dependencies were supplied from a workspace test directory, so it does not match Athena and must not be described as target-equivalent.
+- Historical 144-island migration evidence: `../../artifacts/study144/validation.json`, 33 tests per repo (66 total), real CLI dry-runs and exact attachment checks; `../../artifacts/study144/parity.json`, 170 instances / 5946 inputs per comparison, no unexpected source differences. This is CPU evidence, not a 144-island HPC run or validation of the complete 40-function backend on A100.
+- Historical small positional `start.py` commands below are archival. Use the current named launcher with `--diagnostic` for CPU smoke tests. The September 17 update changes the frozen ER graph, adds semantic validation and removes the Athena ER-specific block; it does not submit jobs or certify new GPU results.
 
 ## Scope
 This repository is a research codebase for asynchronous island-model evolutionary computation.  
@@ -243,8 +245,8 @@ cd islandsEA/islands_desync
 python analyze_migration_delays.py "logs/260505/Sphe200/120000 7rr-co5ilu5"
 ```
 
-### Current topology limits (September 16, 2026)
-`IslandRunner.py` uses `enumerate(..., start=1)` for islands 1..N-1; the old shifted-index warning is obsolete. Study registry: torus/complete/er4/ws3/ba, requested at 144. Torus defaults to 12x12; complete, selected WS3 and selected BA validate at 144. ER4 remains blocked because its supplied graph has 150 nodes. Fixed loaders require exact node counts and valid adjacency hashes; old ER1/ER2/ER3/WS4 are outside the study registry.
+### Current topology limits (September 17, 2026)
+`IslandRunner.py` uses `enumerate(..., start=1)` for islands 1..N-1; the old shifted-index warning is obsolete. Study registry: torus/complete/er4/ws3/ba, requested at 144. Torus defaults to 12x12; complete, selected WS3 and selected BA validate at 144. ER4 now validates with the authorized frozen 144-node G(n,p) instance; only the archived original has 150 nodes. Fixed loaders require exact node counts and valid adjacency hashes; old ER1/ER2/ER3/WS4 are outside the study registry.
 
 ### SLURM script status
 - Old `run*-hpc.sh` launchers are retired fail-closed stubs; previously some passed only 8 args.
@@ -740,7 +742,7 @@ Higher-risk additions:
 
 When changing destination-side acceptance or migration timing behavior, prefer at least:
 
-- study topologies: torus12x12, complete, selected WS3/BA, plus selected ER4 once its 144-node mismatch is resolved
+- study topologies: torus 12x12, complete, selected WS3/BA, plus the frozen 144-node ER4 authorized on September 17
 - ring/small-island diagnostics are separate regression tests, not replacements for the study matrix
 - source strategies: `best`, `random`, `maxDistance`
 - same benchmark and GA core parameters as baseline
@@ -775,3 +777,24 @@ Minimum reporting set:
 - Migrant source strategy helpers: `islands_desync/islands_desync/geneticAlgorithm/utils/distance.py`
 
 These paths exist, but not all represent equally healthy/maintained runtime paths.
+
+### ER4 follow-up validation (September 17, 2026)
+
+Run the shared topology and ER contract tests in hpc_benchmarks, the existing builder/pilot tests, generator --check in its isolated offline igraph environment, and athena_gpu/tests/test_er4_preflight.py in the Athena checkout. Evidence is recorded in workspace artifacts/er4_144_20260917/. Prior study144 reports describe the previous 150-node blocker and remain historical.
+
+ER4 validation completed locally on September 17: 42 shared tests passed per
+repo; Athena additionally passed 27 tests with one real-Ray test explicitly
+skipped. Both offline generator checks and the CPU/GPU CLI preflights passed.
+The report is `../../artifacts/er4_144_20260917/validation.json` (111 passed,
+one skipped in total). ER4 code/data are identical across repos; WS3/BA are
+unchanged. Existing differences in GPU batching, GA support and controller
+were already present in the branch commits and were not edited here. This
+is ER4 integration evidence, not a new certification of complete CPU/GPU parity.
+
+The newer Athena runbook `athena-info/ATHENA_HOW_TO_RUN.md` (in the Athena
+checkout) records successful A100 backend/canary checks and one technical
+full run. Shard-position, batching and metadata causes have been addressed
+locally, but the campaign remains paused until a new same-commit canary and
+one full pilot pass the target-side quality gates. That deployment status
+supersedes older pre-canary summaries elsewhere in this document. Resolving
+ER4 alone did not resolve those separate issues.

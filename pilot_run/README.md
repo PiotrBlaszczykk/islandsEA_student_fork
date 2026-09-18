@@ -1,8 +1,9 @@
-> Aktualizacja 2026-09-15: obowiązuje **144 wyspy**, torus **12×12**,
-> complete oraz wybrane **ER4 / WS3 / BA**. Źródło aktualnych ustawień i status
-> załączników: [STUDY_144.md](../STUDY_144.md). ER4 dostarczono jako 150 węzłów;
-> jego uruchomienie przy 144 jest zablokowane do rozstrzygnięcia. Historyczne
-> pomiary sprzętu pozostają niezmienione; D=200 oznacza wymiar benchmarku.
+> Aktualizacja 2026-09-17: badanie używa 144 wysp we wszystkich topologiach.
+> ER4 został odblokowany zgodnie z odpowiedzią prowadzącej: igraph G(n,p),
+> n=144, p=0.0347, undirected; pętle tylko dla izolowanych węzłów.
+> Zamrożony graf ma 365 krawędzi, składową 144 i zero pętli; seed 20260917.
+> Szczegóły: [generacja ER4](../hpc_benchmarks/ER4_GENERATION.md).
+> Historyczne pomiary i stare załączniki pozostają archiwalne; D=200 jest wymiarem.
 
 # Pilot Ares: torus 12×12, F1 200D, trzy powtórzenia
 

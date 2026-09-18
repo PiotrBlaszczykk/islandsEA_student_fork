@@ -1,8 +1,9 @@
-> Aktualizacja 2026-09-15: obowiązuje **144 wyspy**, torus **12×12**,
-> complete oraz wybrane **ER4 / WS3 / BA**. Źródło aktualnych ustawień i status
-> załączników: [STUDY_144.md](../STUDY_144.md). ER4 dostarczono jako 150 węzłów;
-> jego uruchomienie przy 144 jest zablokowane do rozstrzygnięcia. Historyczne
-> pomiary sprzętu pozostają niezmienione; D=200 oznacza wymiar benchmarku.
+> Aktualizacja 2026-09-17: badanie używa 144 wysp we wszystkich topologiach.
+> ER4 został odblokowany zgodnie z odpowiedzią prowadzącej: igraph G(n,p),
+> n=144, p=0.0347, undirected; pętle tylko dla izolowanych węzłów.
+> Zamrożony graf ma 365 krawędzi, składową 144 i zero pętli; seed 20260917.
+> Szczegóły: [generacja ER4](../hpc_benchmarks/ER4_GENERATION.md).
+> Historyczne pomiary i stare załączniki pozostają archiwalne; D=200 jest wymiarem.
 
 # Athena: walidacja 40 benchmarków na GPU
 
@@ -17,14 +18,30 @@ Maszynowo sprawdzalny plan, bez importu Ray/CuPy i bez możliwości submitu:
 python athena_gpu/island_integration.py
 ```
 
-## Shardowany runner badania 144 — stan przed pierwszym canary
+## Shardowany runner badania 144
+
+Aktualne wyniki wdrożenia i ograniczenia opisuje
+[ATHENA_HOW_TO_RUN.md](../athena-info/ATHENA_HOW_TO_RUN.md): backend i canary
+przeszły na A100, wykonano jeden techniczny pełny run, ale kampania pozostaje
+wstrzymana do targetowej walidacji lokalnych poprawek shardowania, batchowania
+i metadanych. Odblokowanie ER4 nie znosi tego ograniczenia. Poniższa procedura i pomiary
+lokalne pochodzą z przygotowania runnera przed pierwszym canary.
 
 `run_study.py` zachowuje 144 logiczne wyspy i umieszcza je na 12 aktorach
 shardów. Osobne aktory to wspólny batcher, router migracji oraz evaluator
 `num_gpus=1`; razem dokładnie 15 CPU Ray, 1 A100 i jeden CPU poza Ray dla
 drivera. Każda wyspa ma własny stan Python/NumPy RNG i najwyżej jeden
-niezakończony request ewaluacji. Timeout batchera pozwala szybszym wyspom iść
-dalej, więc docelowe 2304/576 wierszy nie są barierą generacji.
+niezakończony request ewaluacji. Shardy używają zapisanego, deterministycznego
+mapowania SHA-256 zależnego od seedu powtórzenia, zamiast kolejnych zakresów ID.
+Rotacyjny scheduler dopuszcza maksymalnie dwa kroki wyprzedzenia wewnątrz
+sharda, ale nie synchronizuje różnych shardów i nie dodaje globalnej bariery.
+
+Batch inicjalny nadal celuje w 2304 wiersze. Steady target to 144 wiersze,
+timeout 50 ms, przy maksymalnie 576 niezależnie dostępnych wierszach. Metryki
+zapisują rozkład przyczyn dispatchu i rozmiarów batchy. Walidator full odrzuca
+powrót do samych timeoutów/małych batchy oraz silną korelację wyniku lub czasu
+z pozycją w shardzie. Efektywna konfiguracja naukowa jest budowana z aktywnych
+argumentów i nie dziedziczy starego `random` ani 10x10 `island_delays`.
 
 Przed jobem skrypt wymaga czystego, przypiętego commita i zapisuje
 `environment-check.json`. Kontrakt to Python 3.10.4, komplet przypiętych
@@ -64,11 +81,13 @@ Profil full ma limit dwóch godzin / 2 GPUh i nie ma retry. Wyniki trafiają do
 `$SCRATCH/islandsEA/logs/slurm/athena-study-{canary,full}-<JOB_ID>.{out,err}`.
 Nie uruchamiać full po nieudanym canary; najpierw zdiagnozować jego JSON i logi.
 
-Lokalnie przechodzi 26 testów kontraktu. Dodatkowy opt-in smoke wykonał pełny
+Lokalnie po poprawce przechodzi 32 testy kontraktu, a jeden test real-Ray jest
+domyślnie opt-in. Uruchomiony jawnie smoke wykonał pełny
 cykl 4 logicznych wysp na 2 shardach (20 requestów, 128 wierszy), migracje i
 obie bariery na Ray 2.31 z NumPy. To dowód działania schedulera, nie GPU:
 lokalny stos nie jest Ray 2.9.3/CuPy/A100. Sprawdzony
-`athena_codebase/.venv` ma Python 3.12.10 i tylko `pip`, więc nie odpowiada
+`athena_codebase/.venv` ma Python 3.12.10 i tylko `pip`; zależności smoke były
+podpięte z pomocniczego katalogu testowego, więc venv nadal nie odpowiada
 środowisku Atheny; wiążącym następnym testem pozostaje powyższy canary.
 
 Stan 2026-09-14: `benchmarks_refined/batch.py` i `batch_kernels.py` implementują

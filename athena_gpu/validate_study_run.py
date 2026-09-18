@@ -7,6 +7,7 @@ from collections import Counter
 from datetime import datetime, timezone
 import gzip
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -118,6 +119,93 @@ def _check_manifest(manifest: dict, spec: dict, mode: str, expected_commit: str,
     _require("A100" in str(gpu.get("device_name")), "manifest has no A100 proof", errors)
     _require(gpu.get("cupy") == "10.6.0", "manifest has wrong CuPy", errors)
     _require(gpu.get("cuda_runtime") == 11070, "manifest has wrong CUDA runtime", errors)
+    scientific = manifest.get("scientific_configuration", {})
+    migration = scientific.get("migration", {})
+    algorithm = scientific.get("algorithm_configuration", {})
+    _require(
+        migration.get("selection") == spec["migrant_selection"],
+        "scientific migration selection is stale",
+        errors,
+    )
+    _require(
+        algorithm.get("migrant_selection_type") == spec["migrant_selection"],
+        "effective algorithm configuration has a stale migrant selection",
+        errors,
+    )
+    _require(
+        algorithm.get("migrant_acceptance_type") == spec["migrant_acceptance"],
+        "effective algorithm configuration has a stale migrant acceptance",
+        errors,
+    )
+    _require("island_delays" not in algorithm, "legacy island_delays leaked into effective metadata", errors)
+    plan = manifest.get("athena_plan", {})
+    expected_steady_rows = 144 if mode == "full" else 48
+    _require(plan.get("schema_version") == 2, "Athena plan schema is not position-safe v2", errors)
+    _require(
+        plan.get("batching", {}).get("steady_target_rows") == expected_steady_rows,
+        "wrong steady GPU batch target",
+        errors,
+    )
+    _require(
+        plan.get("batching", {}).get("steady_max_wait_ms") == 50.0,
+        "wrong steady GPU batch wait",
+        errors,
+    )
+    _require(
+        plan.get("shard_mapping", {}).get("algorithm") == "sha256-ranked-balanced-v1",
+        "shard mapping is not topology-independent",
+        errors,
+    )
+    _require(
+        plan.get("shard_mapping", {}).get("seed") == spec["base_seed"],
+        "shard mapping seed differs from the repeat seed",
+        errors,
+    )
+    _require(
+        plan.get("scheduler", {}).get("algorithm")
+        == "rotating-round-robin-bounded-lead-v1",
+        "wrong shard scheduler",
+        errors,
+    )
+    _require(
+        plan.get("scheduler", {}).get("generation_barrier") is False,
+        "scheduler introduced a generation barrier",
+        errors,
+    )
+    _require(
+        plan.get("full_run_quality_gates")
+        == {
+            "minimum_size_triggered_batches": 1,
+            "minimum_average_rows_per_batch": 32.0,
+            "maximum_fraction_batches_with_at_most_three_requests": 0.75,
+            "maximum_absolute_position_fitness_pearson": 0.5,
+            "maximum_absolute_position_wall_time_pearson": 0.5,
+            "maximum_same_position_winner_fraction": 0.5,
+        },
+        "full-run quality gates differ from the approved post-pilot contract",
+        errors,
+    )
+    expected_shards = 12 if mode == "full" else 4
+    shard_runs = manifest.get("shard_runs", [])
+    _require(len(shard_runs) == expected_shards, "manifest has incomplete shard runs", errors)
+    configured_lead = plan.get("scheduler", {}).get(
+        "maximum_completed_step_lead_within_shard"
+    )
+    for shard_run in shard_runs:
+        scheduler = shard_run.get("scheduler", {})
+        _require(
+            scheduler.get("algorithm") == "rotating-round-robin-bounded-lead-v1",
+            f"shard {shard_run.get('shard_id')} ran the wrong scheduler",
+            errors,
+        )
+        observed = scheduler.get("maximum_observed_step_lead")
+        _require(
+            isinstance(observed, int)
+            and isinstance(configured_lead, int)
+            and observed <= configured_lead,
+            f"shard {shard_run.get('shard_id')} exceeded its step-lead bound",
+            errors,
+        )
 
 
 def _iter_gzip(path: Path):
@@ -128,6 +216,103 @@ def _iter_gzip(path: Path):
                     yield json.loads(line)
                 except json.JSONDecodeError as error:
                     raise ValueError(f"invalid JSONL at {path}:{line_number}") from error
+
+
+def _pearson(left, right):
+    if len(left) != len(right) or len(left) < 2:
+        return None
+    left_mean = sum(left) / len(left)
+    right_mean = sum(right) / len(right)
+    numerator = sum(
+        (left_value - left_mean) * (right_value - right_mean)
+        for left_value, right_value in zip(left, right)
+    )
+    left_scale = math.sqrt(sum((value - left_mean) ** 2 for value in left))
+    right_scale = math.sqrt(sum((value - right_mean) ** 2 for value in right))
+    if left_scale == 0 or right_scale == 0:
+        return None
+    return numerator / (left_scale * right_scale)
+
+
+def _scheduler_quality(raw: Path, shards: list[dict], mode: str, errors: list[str]) -> dict:
+    result_path = raw / "iterations_per_second.json"
+    if not result_path.is_file():
+        errors.append(f"missing scheduler result data: {result_path}")
+        return {}
+    results = _load(result_path)
+    position_by_island = {}
+    shard_by_island = {}
+    for shard in shards:
+        island_ids = shard.get("islands", [])
+        _require(
+            shard.get("scheduler_order") == island_ids,
+            f"shard {shard.get('shard_id')} scheduler order is not recorded exactly",
+            errors,
+        )
+        _require(
+            shard.get("scheduler", {}).get("algorithm")
+            == "rotating-round-robin-bounded-lead-v1",
+            f"shard {shard.get('shard_id')} reports the wrong scheduler",
+            errors,
+        )
+        for position, island in enumerate(island_ids):
+            position_by_island[island] = position
+            shard_by_island[island] = shard.get("shard_id")
+    positions = []
+    fitness = []
+    wall = []
+    winners = Counter()
+    for island, position in sorted(position_by_island.items()):
+        result = results.get(str(island), {})
+        _require(
+            result.get("shard_position") == position,
+            f"island {island} reports a different shard position",
+            errors,
+        )
+        if isinstance(result.get("final_fitness"), (int, float)):
+            positions.append(position)
+            fitness.append(float(result["final_fitness"]))
+            wall.append(float(result.get("time", 0.0)))
+    for shard_id in sorted(set(shard_by_island.values())):
+        members = [
+            island for island, value in shard_by_island.items() if value == shard_id
+        ]
+        valid = [
+            island
+            for island in members
+            if isinstance(results.get(str(island), {}).get("final_fitness"), (int, float))
+        ]
+        if valid:
+            winner = min(valid, key=lambda island: results[str(island)]["final_fitness"])
+            winners[position_by_island[winner]] += 1
+    fitness_correlation = _pearson(positions, fitness)
+    wall_correlation = _pearson(positions, wall)
+    winner_count = max(winners.values(), default=0)
+    winner_fraction = winner_count / len(shards) if shards else 0.0
+    quality = {
+        "position_vs_final_fitness_pearson": fitness_correlation,
+        "position_vs_wall_time_pearson": wall_correlation,
+        "winning_positions": dict(winners),
+        "maximum_same_position_winner_count": winner_count,
+        "maximum_same_position_winner_fraction": winner_fraction,
+    }
+    if mode == "full":
+        _require(
+            fitness_correlation is not None and abs(fitness_correlation) <= 0.5,
+            "final fitness remains strongly correlated with shard position",
+            errors,
+        )
+        _require(
+            wall_correlation is not None and abs(wall_correlation) <= 0.5,
+            "wall time remains strongly correlated with shard position",
+            errors,
+        )
+        _require(
+            winner_fraction <= 0.5,
+            "more than half of shard winners share one scheduler position",
+            errors,
+        )
+    return quality
 
 
 def _check_athena_metrics(raw: Path, spec: dict, mode: str, errors: list[str]) -> dict:
@@ -185,6 +370,8 @@ def _check_athena_metrics(raw: Path, spec: dict, mode: str, errors: list[str]) -
     batch_rows = 0
     batch_requests = 0
     batch_ids = set()
+    batch_reasons = Counter()
+    small_batches = 0
     max_rows = spec["islands"] * spec["population"]
     for record in _iter_gzip(required["batches"]):
         batch_records += 1
@@ -194,6 +381,7 @@ def _check_athena_metrics(raw: Path, spec: dict, mode: str, errors: list[str]) -
         _require(record.get("status") == "complete", f"GPU batch {batch_id} failed", errors)
         rows = record.get("row_count")
         requests = record.get("request_count")
+        batch_reasons[record.get("dispatch_reason")] += 1
         _require(isinstance(rows, int) and 0 < rows <= max_rows, f"GPU batch {batch_id} has invalid rows", errors)
         _require(isinstance(requests, int) and requests > 0, f"GPU batch {batch_id} has invalid request count", errors)
         profile = record.get("gpu_profile", {})
@@ -204,9 +392,45 @@ def _check_athena_metrics(raw: Path, spec: dict, mode: str, errors: list[str]) -
             batch_rows += rows
         if isinstance(requests, int):
             batch_requests += requests
+            if requests <= 3:
+                small_batches += 1
     _require(batch_records == summary.get("batch_count"), "GPU batch telemetry length mismatch", errors)
     _require(batch_rows == expected_rows, "GPU batches do not reconcile all rows", errors)
     _require(batch_requests == expected_requests, "GPU batches do not reconcile all requests", errors)
+    batch_quality = {
+        "completed_batches_by_reason": dict(batch_reasons),
+        "average_requests_per_completed_batch": (
+            batch_requests / batch_records if batch_records else 0.0
+        ),
+        "average_rows_per_completed_batch": (
+            batch_rows / batch_records if batch_records else 0.0
+        ),
+        "batches_with_at_most_three_requests": small_batches,
+        "fraction_with_at_most_three_requests": (
+            small_batches / batch_records if batch_records else 0.0
+        ),
+    }
+    _require(
+        summary.get("batch_quality") == batch_quality,
+        "batch quality summary differs from GPU batch telemetry",
+        errors,
+    )
+    if mode == "full":
+        _require(
+            batch_reasons["size"] > 0,
+            "no steady batches reached the configured size target",
+            errors,
+        )
+        _require(
+            batch_quality["average_rows_per_completed_batch"] >= 32.0,
+            "average GPU batch remains below 32 rows",
+            errors,
+        )
+        _require(
+            batch_quality["fraction_with_at_most_three_requests"] <= 0.75,
+            "more than 75% of GPU batches still contain at most three requests",
+            errors,
+        )
 
     backend = _load(required["backend"]).get("after", {})
     _require(backend.get("calls") == batch_records, "backend call count differs from batch count", errors)
@@ -216,6 +440,7 @@ def _check_athena_metrics(raw: Path, spec: dict, mode: str, errors: list[str]) -
     _require(len(shards) == expected_shards, "wrong number of physical island shards", errors)
     mapped = sorted(island for shard in shards for island in shard.get("islands", []))
     _require(mapped == list(range(spec["islands"])), "shard placement does not cover islands exactly once", errors)
+    scheduler_quality = _scheduler_quality(raw, shards, mode, errors)
     router = _load(required["router"])
     all_islands = list(range(spec["islands"]))
     _require(router.get("finished_islands") == all_islands, "router finish barrier is incomplete", errors)
@@ -226,6 +451,8 @@ def _check_athena_metrics(raw: Path, spec: dict, mode: str, errors: list[str]) -
         "row_count": batch_rows,
         "backend": backend,
         "router": router,
+        "batch_quality": batch_quality,
+        "scheduler_quality": scheduler_quality,
     }
 
 

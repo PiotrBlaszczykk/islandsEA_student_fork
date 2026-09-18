@@ -1,16 +1,9 @@
-> **Aktualizacja badania: 144 wyspy (mail 2026-09-15).**
-> Aktualne instrukcje: [STUDY_144.md](../STUDY_144.md). Obowiązują torus12×12,
-> complete, WS3 i BA z załączników. Dostarczony ER4 ma 150 węzłów i jest
-> zablokowany dla badania144 do rozstrzygnięcia. Ares: 7×48=336CPU,
-> wymagane289Ray+driver; pilot≤561.5CPUh, `--confirm-144-and-562-cpuh`.
-> Athena: te same grafy144; shardowany runner GPU jest zaimplementowany lokalnie
-> i wymaga pierwszego canary na A100 przed jednym normalnym runem.
->
-> **Poniżej zachowano historyczną migawkę debugowania i planów.** Liczby
-> 150/180/200 dotyczące wysp, stare profile `*_ares_200.sh`, kształt10×20,
-> CONFIRM_TORUS_200 i dawne polecenia uruchomienia zostały zastąpione.
-> Nie używać ich jako aktualnej instrukcji. Historyczne joby, rachunki i pomiary
-> zachowano bez przepisywania; D=200 nadal jest poprawnym wymiarem benchmarku.
+> Aktualizacja 2026-09-17: badanie używa 144 wysp we wszystkich topologiach.
+> ER4 został odblokowany zgodnie z odpowiedzią prowadzącej: igraph G(n,p),
+> n=144, p=0.0347, undirected; pętle tylko dla izolowanych węzłów.
+> Zamrożony graf ma 365 krawędzi, składową 144 i zero pętli; seed 20260917.
+> Szczegóły: [generacja ER4](../hpc_benchmarks/ER4_GENERATION.md).
+> Poniższa treść jest historyczną migawką debugowania. Historyczne pomiary i stare załączniki pozostają archiwalne; D=200 jest wymiarem.
 
 # Handoff: port 40 benchmarków IslandsEA na GPU Atheny
 

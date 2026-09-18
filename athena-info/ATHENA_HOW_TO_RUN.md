@@ -1,6 +1,7 @@
 # Athena GPU: sprawdzony runbook uruchomieniowy i zapis walidacji
 
-Ostatnia aktualizacja: **2026-09-16**.
+Ostatnia aktualizacja: **2026-09-17** (ER4 i lokalna poprawka runnera;
+pomiary GPU poniżej pochodzą z 16 września).
 
 Ten dokument utrwala działającą procedurę dla Atheny, wyniki wykonanych
 walidacji oraz znane ograniczenia. Dotyczy wyłącznie brancha
@@ -14,9 +15,12 @@ Najważniejszy stan na 2026-09-16:
 - canary shardowanego runnera GA przeszedł na A100;
 - jeden normalny run F1/D=200/144 wyspy przeszedł technicznie i zachował
   komplet wymaganych danych;
-- **kampania jest obecnie wstrzymana**: normalny run ujawnił silną zależność
+- **kampania jest obecnie wstrzymana do nowego canary i jednego full**:
+  normalny run ujawnił silną zależność
   wyniku od pozycji wyspy wewnątrz sharda, słabe łączenie requestów w batche
-  oraz jedną niespójność metadanych. Job jest poprawnym dowodem integracji,
+  oraz jedną niespójność metadanych. Przyczyny poprawiono lokalnie, lecz nie
+  zweryfikowano jeszcze nowego commita na A100. Historyczny job jest poprawnym
+  dowodem integracji,
   ale nie powinien być jeszcze używany jako wynik naukowy ani szablon do
   zgłoszenia pozostałych runów;
 - nie ma automatycznego retry, resubmitu ani przejścia canary -> full;
@@ -52,9 +56,13 @@ Liczba 144 nie zmienia wymiaru problemu. Przykładowy pilot używa
 a nie oficjalna instancja CEC2014 D=200.
 
 Aktualna macierz obejmuje torus 12x12, complete, WS3, dostarczony BA oraz ER4.
-**ER4 pozostaje zablokowany**, ponieważ załącznik zawiera 150, a nie 144
-węzły. Nie wolno go obcinać, symetryzować, usuwać pętli ani zastępować nowym
-grafem bez decyzji metodologicznej.
+**ER4 jest odblokowany** po odpowiedzi prowadzącej: nowy, stały graf igraph
+G(n=144, p=0.0347), nieskierowany, seed 20260917. Pierwsze losowanie ma
+365 krawędzi, jedną składową 144 i zero pętli. Generator dopuszcza najwyżej
+3 węzły poza największą składową i dodaje pętle tylko izolowanym węzłom.
+Dokładnie ten sam JSON obowiązuje na Aresie i Athenie; WS3/BA pozostają bez
+zmian. [Odtwarzanie i proweniencja ER4](../hpc_benchmarks/ER4_GENERATION.md).
+Ta zmiana grafu nie usuwa opisanych wyżej powodów wstrzymania kampanii GPU.
 
 ## 2. Sprawdzona architektura Atheny
 
@@ -72,6 +80,19 @@ funkcji celu jest wykonywana na GPU; logika GA, migracje i telemetryka pozostaj�
 na CPU. Nie wprowadzono globalnej bariery generacji. Zachowano dotychczasową
 semantykę signed delay, częściowego opróżniania kolejek i profilu
 `research-v1-full-buffered`.
+
+Od lokalnej poprawki z 17 września fizyczne shardy nie odpowiadają kolejnym
+wierszom torusa. ID wysp są porządkowane stabilnym SHA-256, z seedem równym
+seedowi powtórzenia; ten sam repeat ma identyczne mapowanie we wszystkich
+porównywanych topologiach, benchmarkach i strategiach. Scheduler obraca punkt
+startu każdej rundy obsługi i ogranicza sztuczne wyprzedzenie wewnątrz jednego
+sharda do dwóch ukończonych kroków. Nie synchronizuje shardów i nie dodaje
+globalnej bariery generacji.
+
+Batch steady ma teraz cel 144 wiersze (36 requestów po 4 wiersze) i limit
+oczekiwania 50 ms. Te wartości korzystają ze zwalidowanego rozmiaru A100 i
+zastępują nieosiągany w praktyce cel 576/timeout 2 ms. Maksymalnie niezależnie
+dostępne pozostaje 576 wierszy; nie jest to bariera.
 
 Profil SLURM:
 
@@ -591,9 +612,33 @@ ma wartość `random` i zawiera starą 10x10 macierz `island_delays`. Nie wpłyn
 to na wykonanie, ale może błędnie sklasyfikować run w przyszłym agregatorze.
 Przed kampanią metadane muszą być wewnętrznie jednoznaczne.
 
+### 9.4. Stan lokalnej poprawki z 17 września
+
+Kod lokalny usuwa trzy rozpoznane przyczyny:
+
+- `sha256-ranked-balanced-v1` zastępuje ciągłe grupy ID; mapowanie jest
+  deterministyczne, zależne od repeatu i niezależne od topologii;
+- `rotating-round-robin-bounded-lead-v1` usuwa stałą pierwszą/ostatnią pozycję
+  i ogranicza wyprzedzenie do dwóch kroków, bez synchronizacji między shardami;
+- steady batch target wynosi 144 wiersze, timeout 50 ms, a podsumowanie zapisuje
+  średnie rozmiary oraz liczby dispatchy `size/timeout/flush`;
+- efektywne `scientific_configuration.algorithm_configuration` powstaje z
+  aktywnych argumentów. Zawiera właściwe `best/random/maxDistance` i `plain`,
+  a nie zawiera nieużywanej legacy macierzy `island_delays`;
+- walidator full odrzuca run, jeżeli nie ma ani jednego batcha `size`, średni
+  batch ma mniej niż 32 wiersze, ponad 75% batchy ma najwyżej 3 requesty,
+  bezwzględna korelacja pozycji z fitness/czasem przekracza 0.5 albo ponad
+  połowa shardów ma zwycięzcę na tej samej pozycji.
+
+Lokalnie przechodzą testy kontraktu, pełny dry-run 144 oraz prawdziwy smoke
+Ray/NumPy 4 wyspy/2 shardy dochodzący do pętli GA, migracji i finalizacji.
+Nie jest to certyfikacja Ray 2.9.3, CuPy ani A100. Hold zostaje zdjęty dopiero
+po zaliczonym canary nowego commita i pełnym pilocie, który przejdzie nowe
+bramki jakości.
+
 ### Decyzja operacyjna
 
-Do czasu usunięcia powyższych problemów:
+Do czasu targetowej walidacji powyższej poprawki:
 
 - nie zgłaszać kolejnego full;
 - nie budować arraya ani automatycznego launchera 1800 runów;
@@ -730,7 +775,8 @@ Nie mieszać ich z artefaktami Aresa.
 | Dowód | Stan | Znaczenie |
 |---|---|---|
 | Lokalna walidacja batch backendu | passed | 170 instancji, 22 016 porównań; nie zastępuje A100 |
-| Lokalny real-Ray smoke | passed | 4 wyspy, 2 shardy, 20 requestów, 128 wierszy; scheduler bez GPU |
+| Lokalny real-Ray smoke po poprawce | passed | 4 wyspy, 2 shardy, 20 requestów, 128 wierszy; rotacyjny scheduler i batching bez GPU |
+| Dry-run kontraktu po poprawce | passed | 144 wyspy, 12 permutowanych shardów, target 144/50 ms, brak bariery globalnej |
 | Historyczny F1 readiness `3167902` | passed dla wcześniejszego F1 | nie waliduje całej czterdziestki ani aktualnego runnera |
 | A100 suite `3168014` | passed | 40 benchmarków, NumPy/CuPy, A100 |
 | GA canary `3174524` | passed | pełny mały pipeline shardów/batchera/routera/A100 |

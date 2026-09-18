@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
 
 
 STUDY_ISLANDS = 144
@@ -9,6 +10,9 @@ STUDY_SHARDS = 12
 SLURM_CPUS = 16
 RAY_CPUS = 15
 BACKEND_MAX_ROWS = 8192
+STUDY_STEADY_TARGET_ROWS = 144
+DEFAULT_SHARD_MAPPING_SEED = 20260912
+DEFAULT_SCHEDULER_MAX_STEP_LEAD = 2
 
 
 def _positive_int(name: str, value: int) -> int:
@@ -30,6 +34,44 @@ def balanced_shards(islands: int, shards: int) -> tuple[tuple[int, ...], ...]:
         result.append(tuple(range(first, first + size)))
         first += size
     if tuple(island for group in result for island in group) != tuple(range(islands)):
+        raise AssertionError("shard mapping must cover every island exactly once")
+    return tuple(result)
+
+
+def deterministic_shards(
+    islands: int,
+    shards: int,
+    *,
+    mapping_seed: int,
+) -> tuple[tuple[int, ...], ...]:
+    """Return a stable balanced permutation independent of topology/node order.
+
+    The digest ranking is deliberately specified instead of relying on
+    ``random.shuffle`` so the placement is identical across supported Python
+    versions.  ``mapping_seed`` is the repeat seed, so compared treatments use
+    the same placement while the three study repeats use different placements.
+    """
+    islands = _positive_int("islands", islands)
+    shards = _positive_int("shards", shards)
+    if isinstance(mapping_seed, bool) or not isinstance(mapping_seed, int) or mapping_seed < 0:
+        raise ValueError("mapping_seed must be a nonnegative integer")
+    if shards > islands:
+        raise ValueError("shards cannot exceed logical islands")
+    namespace = f"athena-shard-map-v1:{mapping_seed}:"
+    ranked = sorted(
+        range(islands),
+        key=lambda island: (
+            hashlib.sha256(f"{namespace}{island}".encode("ascii")).digest(),
+            island,
+        ),
+    )
+    sizes = [len(group) for group in balanced_shards(islands, shards)]
+    result = []
+    first = 0
+    for size in sizes:
+        result.append(tuple(ranked[first : first + size]))
+        first += size
+    if sorted(island for group in result for island in group) != list(range(islands)):
         raise AssertionError("shard mapping must cover every island exactly once")
     return tuple(result)
 
@@ -77,7 +119,7 @@ class StudyBatchPolicy:
     steady_target_rows: int
     max_rows: int
     initial_max_wait_ms: float = 50.0
-    steady_max_wait_ms: float = 2.0
+    steady_max_wait_ms: float = 50.0
     max_pending_per_island: int = 1
     backend_max_rows: int = BACKEND_MAX_ROWS
 
@@ -89,11 +131,18 @@ class StudyBatchPolicy:
         offspring: int,
         *,
         initial_max_wait_ms: float = 50.0,
-        steady_max_wait_ms: float = 2.0,
+        steady_max_wait_ms: float = 50.0,
     ) -> "StudyBatchPolicy":
         return cls(
             initial_target_rows=islands * population,
-            steady_target_rows=islands * offspring,
+            # 576 rows is only the theoretical full-island wave.  It was never
+            # reached by the asynchronous runner: a 2 ms timer produced mostly
+            # one-to-three-request batches.  144 is a validated A100 batch size
+            # and remains below the independently available steady-state rows.
+            steady_target_rows=min(
+                islands * offspring,
+                STUDY_STEADY_TARGET_ROWS,
+            ),
             max_rows=islands * population,
             initial_max_wait_ms=initial_max_wait_ms,
             steady_max_wait_ms=steady_max_wait_ms,
@@ -130,8 +179,10 @@ def build_study_plan(
     offspring: int = 4,
     evaluations: int = 8000,
     diagnostic: bool = False,
+    shard_mapping_seed: int = DEFAULT_SHARD_MAPPING_SEED,
+    scheduler_max_step_lead: int = DEFAULT_SCHEDULER_MAX_STEP_LEAD,
     initial_max_wait_ms: float = 50.0,
-    steady_max_wait_ms: float = 2.0,
+    steady_max_wait_ms: float = 50.0,
 ) -> dict:
     for name, value in (
         ("islands", islands),
@@ -139,8 +190,15 @@ def build_study_plan(
         ("population", population),
         ("offspring", offspring),
         ("evaluations", evaluations),
+        ("scheduler_max_step_lead", scheduler_max_step_lead),
     ):
         _positive_int(name, value)
+    if (
+        isinstance(shard_mapping_seed, bool)
+        or not isinstance(shard_mapping_seed, int)
+        or shard_mapping_seed < 0
+    ):
+        raise ValueError("shard_mapping_seed must be a nonnegative integer")
     if not diagnostic and islands != STUDY_ISLANDS:
         raise ValueError("a normal study run requires exactly 144 islands")
     if population < 2 or offspring % 2:
@@ -157,9 +215,13 @@ def build_study_plan(
         steady_max_wait_ms=steady_max_wait_ms,
     )
     batching.validate()
-    mapping = balanced_shards(islands, shards)
+    mapping = deterministic_shards(
+        islands,
+        shards,
+        mapping_seed=shard_mapping_seed,
+    )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "profile": "athena-study-144" if not diagnostic else "athena-study-diagnostic",
         "approved_study_profile": not diagnostic,
         "execution_backend": "athena-gpu-sharded",
@@ -175,6 +237,27 @@ def build_study_plan(
         },
         "resources": {**asdict(resources), "actor_cpus": resources.actor_cpus},
         "batching": asdict(batching),
+        "shard_mapping": {
+            "algorithm": "sha256-ranked-balanced-v1",
+            "seed": shard_mapping_seed,
+            "topology_independent": True,
+            "same_seed_means_same_mapping_across_treatments": True,
+        },
+        "scheduler": {
+            "algorithm": "rotating-round-robin-bounded-lead-v1",
+            "maximum_completed_step_lead_within_shard": scheduler_max_step_lead,
+            "maximum_pending_requests_per_island": 1,
+            "generation_barrier": False,
+            "cross_shard_synchronization": False,
+        },
+        "full_run_quality_gates": {
+            "minimum_size_triggered_batches": 1,
+            "minimum_average_rows_per_batch": 32.0,
+            "maximum_fraction_batches_with_at_most_three_requests": 0.75,
+            "maximum_absolute_position_fitness_pearson": 0.5,
+            "maximum_absolute_position_wall_time_pearson": 0.5,
+            "maximum_same_position_winner_fraction": 0.5,
+        },
         "shards": [
             {"shard_id": shard_id, "island_ids": list(island_ids)}
             for shard_id, island_ids in enumerate(mapping)

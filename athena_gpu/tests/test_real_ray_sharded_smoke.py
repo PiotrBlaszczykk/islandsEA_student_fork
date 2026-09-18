@@ -164,13 +164,26 @@ class RealRayShardedSmokeTests(unittest.TestCase):
                         router=router,
                         package_root=str(PACKAGE_ROOT),
                         operation_timeout_seconds=120,
+                        scheduler_max_step_lead=plan["scheduler"][
+                            "maximum_completed_step_lead_within_shard"
+                        ],
                     )
                     for item in plan["shards"]
                 ]
-                first = ray.get(shards[0].prepare_island_zero.remote(), timeout=120)
+                island_zero_shard = next(
+                    index
+                    for index, item in enumerate(plan["shards"])
+                    if 0 in item["island_ids"]
+                )
+                first = ray.get(
+                    shards[island_zero_shard].prepare_island_zero.remote(),
+                    timeout=120,
+                )
                 ray.get([shard.prepare_remaining.remote() for shard in shards], timeout=120)
                 ray.get([shard.initialize.remote() for shard in shards], timeout=120)
-                ray.get([shard.run.remote() for shard in shards], timeout=120)
+                shard_runs = ray.get(
+                    [shard.run.remote() for shard in shards], timeout=120
+                )
                 summary = ray.get(batcher.flush.remote(), timeout=120)
                 ray.get([shard.acknowledge_deliveries.remote() for shard in shards], timeout=120)
                 results = ray.get([shard.finalize.remote() for shard in shards], timeout=120)
@@ -186,6 +199,18 @@ class RealRayShardedSmokeTests(unittest.TestCase):
                 self.assertEqual(20, summary["request_count"])
                 self.assertEqual(128, summary["row_count"])
                 self.assertEqual(0, summary["error_count"])
+                self.assertGreater(
+                    summary["batch_quality"]["completed_batches_by_reason"].get(
+                        "size", 0
+                    ),
+                    0,
+                )
+                self.assertTrue(
+                    all(
+                        item["scheduler"]["maximum_observed_step_lead"] <= 2
+                        for item in shard_runs
+                    )
+                )
                 self.assertEqual([0, 1, 2, 3], router_summary["finished_islands"])
                 self.assertEqual([0, 1, 2, 3], router_summary["delivery_complete_islands"])
                 run_directory = Path(first["run_directory"])
