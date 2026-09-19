@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# One-command Ares launcher. It performs a local preflight, submits the canary
-# and schedules a lightweight validation gate. The gate submits the expensive
-# three-repeat pilot only after the canary is complete and fully valid.
+# One-command Ares launcher. It performs a local preflight and submits the
+# canary, validation gate, array and finalizer from the login node. Expensive
+# jobs stay dependency-blocked until the canary is complete and fully valid.
 set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -129,6 +129,20 @@ GATE_JOB_ID="${GATE_SUBMISSION%%;*}"
     exit 1
 }
 
+# Ares rejects sbatch from compute-node jobs. Submit the array and finalizer
+# here on the login node, but keep them blocked behind the strict canary gate.
+export PILOT_CANARY_JOB_ID="$CANARY_JOB_ID"
+export PILOT_GATE_JOB_ID="$GATE_JOB_ID"
+export PILOT_EXPECTED_COMMIT="$COMMIT"
+FULL_OUTPUT=$(bash "$SCRIPT_DIR/submit_pilot.sh")
+printf '%s\n' "$FULL_OUTPUT"
+ARRAY_JOB_ID=$(awk -F= '/^PILOT_ARRAY_JOB_ID=/{print $2}' <<<"$FULL_OUTPUT")
+FINALIZER_JOB_ID=$(awk -F= '/^PILOT_FINALIZER_JOB_ID=/{print $2}' <<<"$FULL_OUTPUT")
+[[ "$ARRAY_JOB_ID" =~ ^[0-9]+$ && "$FINALIZER_JOB_ID" =~ ^[0-9]+$ ]] || {
+    echo "Could not extract the dependent array/finalizer job ids." >&2
+    exit 1
+}
+
 CANARY_DIR="$ISLANDS_ARTIFACT_ROOT/pilot_canaries/$CANARY_JOB_ID"
 mkdir -p "$CANARY_DIR"
 "$VENV_DIR/bin/python" -c '
@@ -138,27 +152,31 @@ path = pathlib.Path(sys.argv[1])
 payload = {
     "schema_version": 1,
     "created_utc": datetime.now(timezone.utc).isoformat(),
-    "status": "canary_and_gate_submitted",
+    "status": "pipeline_submitted_waiting_for_canary",
     "branch": sys.argv[2],
     "git_commit": sys.argv[3],
     "canary_job_id": sys.argv[4],
     "gate_job_id": sys.argv[5],
-    "max_parallel_repeats": int(sys.argv[6]),
-    "artifact_root": sys.argv[7],
-    "slurm_log_dir": sys.argv[8],
+    "array_job_id": sys.argv[6],
+    "finalizer_job_id": sys.argv[7],
+    "max_parallel_repeats": int(sys.argv[8]),
+    "artifact_root": sys.argv[9],
+    "slurm_log_dir": sys.argv[10],
     "automatic_full_submit": True,
     "automatic_retry": False,
 }
 path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 ' "$CANARY_DIR/pipeline_submission.json" "$BRANCH" "$COMMIT" \
-  "$CANARY_JOB_ID" "$GATE_JOB_ID" "$MAX_PARALLEL" \
+  "$CANARY_JOB_ID" "$GATE_JOB_ID" "$ARRAY_JOB_ID" "$FINALIZER_JOB_ID" "$MAX_PARALLEL" \
   "$ISLANDS_ARTIFACT_ROOT" "$ISLANDS_SLURM_LOG_DIR"
 
 echo "=== PILOT PIPELINE SUBMITTED ==="
 echo "PILOT_CANARY_JOB_ID=$CANARY_JOB_ID"
 echo "PILOT_GATE_JOB_ID=$GATE_JOB_ID"
+echo "PILOT_ARRAY_JOB_ID=$ARRAY_JOB_ID"
+echo "PILOT_FINALIZER_JOB_ID=$FINALIZER_JOB_ID"
 echo "PIPELINE_METADATA=$CANARY_DIR/pipeline_submission.json"
 echo "GATE_LOG=$ISLANDS_SLURM_LOG_DIR/pilot-gate-$GATE_JOB_ID.out"
-echo "The gate will submit the full 3-repeat pilot only after strict canary validation."
-echo "Monitor: squeue -j $CANARY_JOB_ID,$GATE_JOB_ID"
-echo "Accounting: sacct -j $CANARY_JOB_ID,$GATE_JOB_ID --format=JobID,JobName,State,ExitCode,Elapsed,AllocCPUS,CPUTimeRAW,MaxRSS"
+echo "The array and finalizer are queued but cannot start until the strict canary gate succeeds."
+echo "Monitor: squeue -j $CANARY_JOB_ID,$GATE_JOB_ID,$ARRAY_JOB_ID,$FINALIZER_JOB_ID"
+echo "Accounting: sacct -j $CANARY_JOB_ID,$GATE_JOB_ID,$ARRAY_JOB_ID,$FINALIZER_JOB_ID --format=JobID,JobName,State,ExitCode,Elapsed,AllocCPUS,CPUTimeRAW,MaxRSS"

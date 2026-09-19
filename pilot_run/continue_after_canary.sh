@@ -10,9 +10,9 @@
 #SBATCH --output=/tmp/island-pilot-gate-%j.out
 #SBATCH --error=/tmp/island-pilot-gate-%j.err
 
-# This job runs afterany so it can record and report an invalid canary. The
-# strict verifier inside submit_pilot.sh prevents the full allocation unless
-# the canary completed with exit 0 and its complete data contract is valid.
+# This job runs afterany so it can record and report an invalid canary. Full
+# jobs are pre-submitted from the login node with an afterok dependency on this
+# gate; Ares does not permit calling sbatch from a compute-node batch job.
 set -euo pipefail
 [[ "$#" -eq 1 && "$1" =~ ^[0-9]+$ ]] || { echo "Usage: $0 CANARY_JOB_ID" >&2; exit 2; }
 : "${SLURM_JOB_ID:?Submit this gate with pilot_run/launch_pilot.sh}"
@@ -73,28 +73,19 @@ done
 
 echo "Validating canary $CANARY_JOB_ID for pinned commit $PILOT_EXPECTED_COMMIT"
 echo "canary_state=$CANARY_STATE"
-export PILOT_CANARY_JOB_ID="$CANARY_JOB_ID"
-export PILOT_EXPECTED_COMMIT
 CANARY_DIR="$ISLANDS_ARTIFACT_ROOT/pilot_canaries/$CANARY_JOB_ID"
-FULL_SUBMISSION_LOG="$CANARY_DIR/full_submission.txt"
-bash "$SCRIPT_DIR/submit_pilot.sh" | tee "$FULL_SUBMISSION_LOG"
-ARRAY_JOB_ID=$(awk -F= '/^PILOT_ARRAY_JOB_ID=/{print $2}' "$FULL_SUBMISSION_LOG")
-FINALIZER_JOB_ID=$(awk -F= '/^PILOT_FINALIZER_JOB_ID=/{print $2}' "$FULL_SUBMISSION_LOG")
-[[ "$ARRAY_JOB_ID" =~ ^[0-9]+$ && "$FINALIZER_JOB_ID" =~ ^[0-9]+$ ]] || {
-    echo "PILOT_GATE_FAILED: full submission returned invalid job identifiers." >&2
-    exit 1
-}
+"$VENV_DIR/bin/python" "$SCRIPT_DIR/pilot_tools.py" verify-canary \
+    --artifact-root "$ISLANDS_ARTIFACT_ROOT" \
+    --job-id "$CANARY_JOB_ID"
 "$VENV_DIR/bin/python" -c '
 import json, pathlib, sys
 from datetime import datetime, timezone
 path = pathlib.Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
 payload.update({
-    "status": "full_pilot_submitted",
+    "status": "canary_validated_full_run_released",
     "gate_completed_utc": datetime.now(timezone.utc).isoformat(),
-    "array_job_id": sys.argv[2],
-    "finalizer_job_id": sys.argv[3],
 })
 path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-' "$CANARY_DIR/pipeline_submission.json" "$ARRAY_JOB_ID" "$FINALIZER_JOB_ID"
+' "$CANARY_DIR/pipeline_submission.json"
 echo "PILOT_GATE_OK"

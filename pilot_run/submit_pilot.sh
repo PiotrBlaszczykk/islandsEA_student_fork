@@ -12,6 +12,7 @@ islandsea_configure_storage
 ARTIFACT_ROOT="$ISLANDS_ARTIFACT_ROOT"
 MAX_PARALLEL="${PILOT_MAX_PARALLEL:-3}"
 CANARY_JOB_ID="${PILOT_CANARY_JOB_ID:-}"
+GATE_JOB_ID="${PILOT_GATE_JOB_ID:-}"
 ARRAY_JOB_ID=""
 FINALIZER_JOB_ID=""
 
@@ -42,6 +43,10 @@ trap rollback_submission EXIT
     echo "Submission blocked: set PILOT_CANARY_JOB_ID to the completed canary job id." >&2
     exit 2
 }
+[[ -z "$GATE_JOB_ID" || "$GATE_JOB_ID" =~ ^[0-9]+$ ]] || {
+    echo "Submission blocked: PILOT_GATE_JOB_ID must be numeric when set." >&2
+    exit 2
+}
 [[ -f "$SPEC" && -x "$VENV_DIR/bin/python" ]] || {
     echo "Missing pilot spec or project venv: $VENV_DIR" >&2
     exit 2
@@ -62,20 +67,36 @@ if [[ -n "${PILOT_EXPECTED_COMMIT:-}" && "$GIT_COMMIT" != "$PILOT_EXPECTED_COMMI
 fi
 
 islandsea_validate_ray_cli "$VENV_DIR"
-"$VENV_DIR/bin/python" "$SCRIPT_DIR/pilot_tools.py" verify-canary \
-    --artifact-root "$ARTIFACT_ROOT" \
-    --job-id "$CANARY_JOB_ID"
+ARRAY_DEPENDENCY_OPTIONS=()
+FINALIZER_DEPENDENCY=""
+if [[ -n "$GATE_JOB_ID" ]]; then
+    # launch_pilot.sh runs on the login node and pre-submits the expensive jobs.
+    # The array is released only when the lightweight gate validates the canary.
+    ARRAY_DEPENDENCY_OPTIONS+=(--dependency="afterok:${GATE_JOB_ID}" --kill-on-invalid-dep=yes)
+    FINALIZER_DEPENDENCY="afterok:${GATE_JOB_ID},afterany:ARRAY_JOB_ID"
+else
+    "$VENV_DIR/bin/python" "$SCRIPT_DIR/pilot_tools.py" verify-canary \
+        --artifact-root "$ARTIFACT_ROOT" \
+        --job-id "$CANARY_JOB_ID"
+fi
 
 mkdir -p "$ARTIFACT_ROOT"
 ARRAY_SUBMISSION=$(sbatch --parsable \
+    "${ARRAY_DEPENDENCY_OPTIONS[@]}" \
     --array="1-3%${MAX_PARALLEL}" \
     --output="$ISLANDS_SLURM_LOG_DIR/pilot-%A_%a.out" \
     --error="$ISLANDS_SLURM_LOG_DIR/pilot-%A_%a.err" \
     --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR},PILOT_EXPECTED_COMMIT=${GIT_COMMIT}" \
     "$SCRIPT_DIR/run_pilot_array.sh")
 ARRAY_JOB_ID="${ARRAY_SUBMISSION%%;*}"
+if [[ -n "$FINALIZER_DEPENDENCY" ]]; then
+    FINALIZER_DEPENDENCY="${FINALIZER_DEPENDENCY/ARRAY_JOB_ID/$ARRAY_JOB_ID}"
+else
+    FINALIZER_DEPENDENCY="afterany:${ARRAY_JOB_ID}"
+fi
 FINALIZER_SUBMISSION=$(sbatch --parsable \
-    --dependency="afterany:${ARRAY_JOB_ID}" \
+    --dependency="$FINALIZER_DEPENDENCY" \
+    ${GATE_JOB_ID:+--kill-on-invalid-dep=yes} \
     --output="$ISLANDS_SLURM_LOG_DIR/pilot-finalize-%j.out" \
     --error="$ISLANDS_SLURM_LOG_DIR/pilot-finalize-%j.err" \
     --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR},PILOT_EXPECTED_COMMIT=${GIT_COMMIT}" \
@@ -92,6 +113,7 @@ trap - EXIT
 
 echo "PILOT_ARRAY_JOB_ID=$ARRAY_JOB_ID"
 echo "PILOT_FINALIZER_JOB_ID=$FINALIZER_JOB_ID"
+[[ -z "$GATE_JOB_ID" ]] || echo "PILOT_GATE_JOB_ID=$GATE_JOB_ID"
 echo "PILOT_ARTIFACT_DIR=$ARTIFACT_ROOT/$ARRAY_JOB_ID"
 echo "PILOT_SLURM_LOG_DIR=$ISLANDS_SLURM_LOG_DIR"
 echo "Monitor: squeue -j $ARRAY_JOB_ID,$FINALIZER_JOB_ID"

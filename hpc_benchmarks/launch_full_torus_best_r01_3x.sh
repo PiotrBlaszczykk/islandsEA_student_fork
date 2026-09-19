@@ -23,9 +23,9 @@ Submits one fixed study configuration on Ares:
   repetitions: 1, 2, 3 (distinct deterministic seed bases)
 
 The command first submits a 128-evaluation canary for the current clean commit.
-Only a strictly valid canary lets the gate submit the three full repetitions
-and their finalizer. The rounded allocation ceiling is 562 CPUh; there are no
-automatic retries.
+The three full repetitions and finalizer are submitted from the login node but
+remain dependency-blocked until the gate strictly validates the canary. The
+rounded allocation ceiling is 562 CPUh; there are no automatic retries.
 EOF
     exit 2
 fi

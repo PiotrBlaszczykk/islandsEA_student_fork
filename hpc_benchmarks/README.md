@@ -7,8 +7,8 @@
 > **Gotowy wariant Ares 3x:** `r01_elliptic`, D=200, torus 12x12, 144 wyspy,
 > `best/plain`, 8000 ewaluacji na wyspę uruchamia
 > `bash hpc_benchmarks/launch_full_torus_best_r01_3x.sh --confirm-144-and-562-cpuh`.
-> Launcher wykonuje canary dla bieżącego commita i dopiero po jego ścisłej
-> walidacji automatycznie wysyła trzy pełne powtórzenia oraz finalizer.
+> Launcher wysyła wszystkie joby z login node'a; trzy pełne powtórzenia i
+> finalizer pozostają zależnościami zablokowane do ścisłej walidacji canary.
 
 > Aktualizacja 2026-09-17: badanie używa 144 wysp we wszystkich topologiach.
 > ER4 został odblokowany zgodnie z odpowiedzią prowadzącej: igraph G(n,p),

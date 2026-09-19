@@ -295,6 +295,39 @@ export -f git module mkdir sacct sbatch bash
         self.assertIn("--confirm-144-and-562-cpuh", content)
         self.assertNotIn("sbatch ", content)
 
+    def test_gate_validates_without_nested_sbatch_and_login_launcher_prequeues_full_jobs(self):
+        gate = (self.project / "pilot_run" / "continue_after_canary.sh").read_text(
+            encoding="utf-8"
+        )
+        launcher = (self.project / "pilot_run" / "launch_pilot.sh").read_text(
+            encoding="utf-8"
+        )
+        submitter = (self.project / "pilot_run" / "submit_pilot.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotRegex(gate, r"(?m)^\s*sbatch\b")
+        self.assertNotIn("submit_pilot.sh", gate)
+        self.assertIn('export PILOT_GATE_JOB_ID="$GATE_JOB_ID"', launcher)
+        self.assertIn('FULL_OUTPUT=$(bash "$SCRIPT_DIR/submit_pilot.sh")', launcher)
+        self.assertIn('--dependency="afterok:${GATE_JOB_ID}"', submitter)
+        self.assertIn("--kill-on-invalid-dep=yes", submitter)
+
+    def test_login_submitter_queues_array_and_finalizer_behind_gate(self):
+        result = self._invoke_script(
+            self.project / "pilot_run" / "submit_pilot.sh",
+            PILOT_CANARY_JOB_ID="123",
+            PILOT_GATE_JOB_ID="888",
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("--dependency=afterok:888 --kill-on-invalid-dep=yes", result.stderr)
+        self.assertIn(
+            "--dependency=afterok:888,afterany:12345 --kill-on-invalid-dep=yes",
+            result.stderr,
+        )
+        self.assertNotIn(" verify-canary ", result.stderr)
+        self.assertIn("PILOT_ARRAY_JOB_ID=12345", result.stdout)
+        self.assertIn("PILOT_FINALIZER_JOB_ID=12345", result.stdout)
+
     def test_ray_launcher_reserves_head_resources_for_driver(self):
         content = (self.project / "hpc_benchmarks" / "run_ares.sh").read_text(
             encoding="utf-8"

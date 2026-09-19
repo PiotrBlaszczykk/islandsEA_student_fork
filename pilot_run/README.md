@@ -60,10 +60,12 @@ automatycznych retry.
 ## Jednokomendowe uruchomienie całego pipeline'u
 
 Po `git pull --ff-only` jeden launcher wykonuje testy, dry-run, sprawdza czysty
-commit i storage pod `$SCRATCH`, wysyła canary, a następnie mały job-bramkę.
-Bramka działa przez zależność SLURM `afterany`, więc nie wymaga otwartej sesji
-SSH. Sprawdza wynik canary i **tylko po pełnej walidacji** automatycznie wysyła
-trzy właściwe powtórzenia oraz finalizer:
+commit i storage pod `$SCRATCH`, a następnie z login node'a wysyła canary,
+mały job-bramkę, zależny array oraz finalizer. Bramka działa przez zależność
+SLURM `afterany`, więc nie wymaga otwartej sesji SSH. Array ma `afterok` na
+bramkę i pozostaje zablokowany; **dopiero pełna walidacja canary** zwalnia trzy
+właściwe powtórzenia. Gate nie wywołuje `sbatch`, ponieważ Ares zabrania
+zagnieżdżonego submitu z compute node'a:
 
 ```bash
 bash hpc_benchmarks/launch_full_torus_best_r01_3x.sh --confirm-144-and-562-cpuh

@@ -543,6 +543,21 @@ accounting, ponieważ Ares zwrócił rzeczywiste job IDs elementów tablicy
 aby mapował elementy przez `SLURM_JOB_ID` zapisane w `repeat-N/attempt.json`;
 nie wpływa to na ważność wyników naukowych.
 
+### Canary `21086372` i zakaz zagnieżdżonego `sbatch`
+
+Canary `21086372` dla commita
+`2fbf747f97e8253330916cb309b6422613a83099` zakończył się jako
+`COMPLETED 0:0`; ścisła walidacja zapisała `valid=true` i pustą listę błędów.
+Gate `21086373` poprawnie zweryfikował canary, ale zakończył się `FAILED 1:0`,
+ponieważ Ares odrzucił próbę `sbatch` z compute node'a komunikatem
+`Batch job submission failed: Access/permission denied`. Pełny array nie został
+wtedy wysłany, a canary pozostał ważny.
+
+Pipeline został zmieniony tak, aby `launch_pilot.sh` wysyłał wszystkie joby z
+login node'a. Array i finalizer są wcześniej ustawione jako zależne od
+`afterok` gate oraz `--kill-on-invalid-dep=yes`; gate wyłącznie waliduje canary.
+Nie przywracać wywołania `submit_pilot.sh` ani `sbatch` wewnątrz gate.
+
 ## 13. Naprawa błędu `/var/spool/slurmd`
 
 Zasada ogólna:
