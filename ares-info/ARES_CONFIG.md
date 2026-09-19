@@ -7,16 +7,16 @@
 
 # IslandsEA na Aresie — konfiguracja, stan i bezpieczne uruchamianie
 
-Ostatnia aktualizacja: **2026-09-14**  
+Ostatnia aktualizacja: **2026-09-19**
 Klaster: **Ares / Cyfronet / PLGrid**  
 Użytkownik: `plgblaszczykk`  
-Branch roboczy dla Aresa: `summer_benchmarks`  
-Zweryfikowany lokalny commit: `ca5cd17b28c62676bb86575ffea2e12e7aa592b2` (`Add unattended gated pilot launcher`)
+Branch roboczy dla Aresa: `summer_benchmarks_ares`
+Zweryfikowany commit pilota: `c281fd56eb02466fbe0344ebd216c01e811edac4`
 
 Ten dokument jest technicznym handoffem dla kolejnych sesji pracujących nad
 uruchomieniami IslandsEA na Aresie. Opisuje środowisko, model zasobów, storage,
 konfigurację naukową, pipeline pilota, format danych, koszty i znane awarie.
-Nie należy interpretować go jako potwierdzenia, że pełny pilot został wykonany.
+Pełny pilot Ares `21083930` został wykonany i zweryfikowany 2026-09-17.
 
 ## 1. Stan w jednym miejscu
 
@@ -24,13 +24,13 @@ Nie należy interpretować go jako potwierdzenia, że pełny pilot został wykon
 |---|---|
 | SLURM + Python + venv + Ray na jednym węźle | **potwierdzone** przez smoke `21045868` |
 | 40 nazwanych benchmarków i dry-run konfiguracji | **zaimplementowane**; lokalne testy przechodziły |
-| Multi-node launcher Ray dla 144 wysp | head i readiness potwierdzone w `21077531`; poprawiany jest podział CPU/pamięci head-driver |
+| Multi-node launcher Ray dla 144 wysp | **potwierdzony** przez canary `21083080` i trzy powtórzenia `21083930` |
 | Storage wyników i logów pod `$SCRATCH/islandsEA` | **zaimplementowany** |
-| Pełna telemetria `research-v1-full-buffered` | **zaimplementowana**, wymaga walidacji na pełnym canary/pilocie |
-| Pipeline canary → gate → 3 powtórzenia → finalizer | **zaimplementowany**; pełne powtórzenia pozostają zablokowane do poprawnego canary |
-| Canary 144 wysp | `21077531` zaliczył head readiness; driver został odrzucony, bo head step zajął pamięć wszystkich 48 CPU |
-| Pełny pilot: torus 12×12, 144 wyspy, 3 powtórzenia | **nie został wysłany** |
-| Kampania 1800 runów | **niegotowa**; potrzebuje poprawnego pilota i estymacji |
+| Pełna telemetria `research-v1-full-buffered` | **potwierdzona** dla 144 wysp i trzech powtórzeń |
+| Pipeline canary → 3 powtórzenia → finalizer | **potwierdzony**; finalizer `21083931` zakończył się `PILOT_VALIDATION_OK` |
+| Canary 144 wysp | `21083080`, `COMPLETED 0:0`, pełna walidacja kontraktu |
+| Pełny pilot: torus 12×12, 144 wyspy, 3 powtórzenia | `21083930`, trzy razy `COMPLETED 0:0`, `valid_repeats=3` |
+| Kampania 1800 runów | **nieuruchomiona**; pilot CPU daje działający wzorzec i pomiar kosztu, ale macierz wymaga osobnego przeglądu przed wysłaniem |
 
 Naprawa `/var/spool/slurmd` jest potwierdzona przez canary `21076864`: batch
 odczytał checkout przez absolutne `ISLANDS_PROJECT_DIR`, zweryfikował plan 144
@@ -40,8 +40,9 @@ potwierdził następnie zdrowy GCS i raylet, ale pomocniczy readiness check prze
 osobny krok `srun` nie dotarł do GCS. Canary `21077531` zaliczył poprawiony
 readiness, po czym ujawnił błąd podziału zasobów: head step rezerwował wszystkie
 48 CPU i ich pamięć, pozostawiając Ray 47 CPU, ale nie zostawiając SLURM-owi
-pamięci na driver. Bieżąca poprawka rezerwuje dla head 47 CPU, a dla drivera
-pozostały 1 CPU i 2 GB jako rozłączne kroki `--exact`.
+pamięci na driver. Poprawka rezerwująca dla head 47 CPU, a dla drivera
+pozostały 1 CPU i 2 GB jako rozłączne kroki `--exact`, została potwierdzona
+przez canary `21083080` oraz pełny pilot `21083930`.
 
 ## 2. Źródła prawdy i poziom pewności
 
@@ -512,6 +513,36 @@ Benchmark nie wystartował i nie powstały artefakty naukowe. Koszt wyniósł 50
 CPU-sekund, czyli 14 CPUh. Poprawka ustawia head step na 47 CPU oraz driver na
 rozłączny krok `--exact` z pozostałym 1 CPU i 2 GB.
 
+### Poprawny canary i pełny pilot: `21083080`, `21083930`, `21083931`
+
+Canary `21083080` uruchomiono z czystego commita
+`c281fd56eb02466fbe0344ebd216c01e811edac4`. Zakończył się po 37 sekundach jako
+`COMPLETED 0:0`, wypisał `RAY_HEAD_READY` i `BENCHMARK_RUN_OK`, a
+`pilot_tools.py verify-canary` utworzył poprawny `canary_validation.json`.
+
+Z tego samego commita wysłano pełny pilot `21083930`: jeden wariant
+`r01_elliptic`, D=200, torus 12x12, `best/plain`, 144 wyspy, 8000 ewaluacji na
+wyspę, powtórzenia 1-3. Wszystkie trzy elementy tablicy zakończyły się jako
+`COMPLETED 0:0` po odpowiednio 85, 89 i 84 sekundach. Finalizer `21083931`
+zakończył się jako `COMPLETED 0:0` i wypisał `PILOT_VALIDATION_OK`.
+
+Pobrany katalog `artifacts/pilot_runs/21083930` ma trzy poprawne archiwa SHA-256.
+Każde archiwum zawiera 2170 plików oraz komplet sześciu plików metryk dla każdej
+ze 144 wysp. `pilot_summary.json` ma `valid=true`, `valid_repeats=3`, jeden
+wspólny `experiment_key` i trzy unikalne `run_id`. Każde powtórzenie zachowuje
+718560 rekordów `send`, 718560 rekordów terminalnych `process`, zero brakujących
+lub zduplikowanych eventów, 287568 snapshotów fitness i 144 końcowe rozwiązania
+ze sprawdzonym SHA-256. Topologia ma ten sam hash we wszystkich powtórzeniach:
+`ee7f804ab3897a895a7de8d10eac48e78c1d417fa7374884234f7817b238f739`.
+
+Rzeczywisty koszt alokacji trzech powtórzeń wyniósł 24.08 CPUh; finalizer dodał
+około 0.155 CPUh. Oryginalny `pilot_summary.json` błędnie pokazał brak danych
+accounting, ponieważ Ares zwrócił rzeczywiste job IDs elementów tablicy
+`21083932`, `21083933`, `21083930`, a parser oczekiwał nazw
+`21083930_1..3`. Surowy `sacct.txt` jest kompletny. Parser został poprawiony,
+aby mapował elementy przez `SLURM_JOB_ID` zapisane w `repeat-N/attempt.json`;
+nie wpływa to na ważność wyników naukowych.
+
 ## 13. Naprawa błędu `/var/spool/slurmd`
 
 Zasada ogólna:
@@ -877,11 +908,12 @@ bash hpc_benchmarks/submit_ares.sh \
 Po sukcesie testów ścieżki i po ponownym przeglądzie kosztu:
 
 ```bash
-bash pilot_run/launch_pilot.sh --confirm-torus200-and-722-cpuh
+bash hpc_benchmarks/launch_full_torus_best_r01_3x.sh --confirm-144-and-562-cpuh
 ```
 
-Launcher ma wypisać nowe ID canary i gate. Starych `21059904/21059905` nie
-można użyć jako dowodu zaliczonego canary.
+To aktywny entrypoint dla zatwierdzonego wariantu 144 wysp; deleguje do
+`pilot_run/launch_pilot.sh`. Launcher wypisuje nowe ID canary i gate. Historyczne
+`21059904/21059905` pozostają wyłącznie zapisem wcześniejszej, odrzuconej próby.
 
 ## 23. Monitorowanie i diagnostyka
 

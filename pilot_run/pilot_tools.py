@@ -791,13 +791,36 @@ def parse_sacct(pilot_dir: Path, array_job_id: str, spec: dict) -> dict:
 
     repeats = {}
     for repeat in spec["repeats"]:
-        base_id = f"{array_job_id}_{repeat}"
-        allocation_row = next(
-            (row for row in rows if row["job_id_raw"] == base_id), None
-        )
-        step_rows = [
-            row for row in rows if row["job_id_raw"].startswith(base_id + ".")
-        ]
+        candidate_base_ids = []
+        attempt_path = pilot_dir / f"repeat-{repeat}" / "attempt.json"
+        if attempt_path.is_file():
+            try:
+                attempt = load_json(attempt_path)
+                recorded_job_id = attempt.get("slurm", {}).get("SLURM_JOB_ID")
+                if recorded_job_id is not None and str(recorded_job_id).strip():
+                    candidate_base_ids.append(str(recorded_job_id).strip())
+            except (OSError, AttributeError, TypeError, ValueError):
+                pass
+        candidate_base_ids.append(f"{array_job_id}_{repeat}")
+        candidate_base_ids = list(dict.fromkeys(candidate_base_ids))
+
+        base_id = candidate_base_ids[0]
+        allocation_row = None
+        step_rows = []
+        for candidate in candidate_base_ids:
+            candidate_allocation = next(
+                (row for row in rows if row["job_id_raw"] == candidate), None
+            )
+            candidate_steps = [
+                row
+                for row in rows
+                if row["job_id_raw"].startswith(candidate + ".")
+            ]
+            if candidate_allocation is not None or candidate_steps:
+                base_id = candidate
+                allocation_row = candidate_allocation
+                step_rows = candidate_steps
+                break
         source = allocation_row or (step_rows[0] if step_rows else None)
         if source is None:
             repeats[str(repeat)] = {"available": False}
@@ -1206,6 +1229,21 @@ def validate_repeat(
     result["archive"] = archive
     result["valid"] = not errors
     dump_json(evidence_dir / "validation.json", result)
+    # Packaging happens after all validation/analysis writes, never in the GA loop.
+    sys.path.insert(0, str(PROJECT_DIR / "hpc_benchmarks"))
+    from run_bundle import export_run
+    metadata = load_json(raw / "run_metadata.json")
+    job_id = metadata["resources"]["slurm"]["SLURM_JOB_ID"]
+    export_root = os.environ.get("ISLANDS_EXPORT_ROOT")
+    if not export_root:
+        export_root = str(Path(os.environ.get("ISLANDS_STORAGE_ROOT", str(expected_run_output_root().parents[1]))) / "exports")
+    result["portable_bundle"] = export_run(
+        pointer=pointer_path, job_dir=repeat_dir, job_id=job_id, platform="ares",
+        output_root=export_root, log_dir=metadata.get("storage", {}).get("slurm_log_directory"),
+        ray_logs=(result.get("attempt", {}).get("storage", {}).get("ISLANDS_RAY_FAILURE_DIR")
+                  or os.environ.get("ISLANDS_RAY_FAILURE_DIR")), replace=True,
+        allow_incomplete=bool(errors), exit_code=result.get("attempt", {}).get("exit_code"),
+    )
     return result
 
 

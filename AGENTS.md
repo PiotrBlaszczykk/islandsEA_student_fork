@@ -1,5 +1,49 @@
 # AGENTS.md
 
+## Portable run artifacts (2026-09-19; supersedes scattered download layouts)
+
+Read [RUN_ARTIFACTS.md](hpc_benchmarks/RUN_ARTIFACTS.md). The user approved the
+existing metric set and requested only a common artifact layout, matching
+workspace `artifacts/run_wyniki_przyklad/{run_123456,run_3174577}`.
+
+- Primary deliverable: `$SCRATCH/islandsEA/exports/run_<SLURM_JOB_ID>.tar.gz`
+  and `.tar.gz.sha256`; extracted root is `run_<SLURM_JOB_ID>/` with exactly
+  `logs/`, `metrics/`, `results/`, `identifier.txt`, `metdadata.json`.
+  The `metdadata.json` spelling deliberately matches the user's template.
+- Every original raw file except the relocated metrics tree is in `results/`.
+  The original `metrics/` becomes a sibling of `results/`; preserve all islands,
+  the six files per island, `data_contract.json`, legacy outputs and GPU extras.
+  SLURM `.out/.err` and available failure logs belong in `logs/`.
+- `metdadata.json` is a byte copy of `results/run_metadata.json`. Original HPC
+  paths inside scientific JSON remain provenance, not usable laptop paths.
+  `results/bundle_manifest.json` is the portable path/inventory/checksum map.
+  It separates data completeness, scientific status, job exit and validation.
+  Missing validation is `not_run`, never an invented `passed`.
+- Shared standard-library exporter: `hpc_benchmarks/run_bundle.py`, with
+  `run_bundle.sh` wrapper hooks. Keep these files identical in both repos.
+  Packaging only runs after computation/metric export, outside measured GA;
+  do not move compression, hashing or filesystem work into the evolution loop.
+  Original raw/audit paths remain compatible with existing validators.
+- Ares run wrapper packages ordinary/canary jobs; array wrapper first closes
+  attempt.json, then packages; pilot finalizer refreshes after verification.
+  Each array element uses its actual SLURM_JOB_ID, not the shared parent ID.
+  Athena study wrapper packages after its validation/cleanup. No new jobs,
+  dependencies, retries or submissions are introduced by export.
+- The automatic archive contains a final-wrapper log snapshot. For SLURM's
+  subsequent epilogue messages, refresh after job termination with `export
+  --replace`. Hard-killed jobs may require manual `--allow-incomplete` export.
+  Failed/partial data must stay clearly marked and never pass as a full result.
+- `hpc_benchmarks/download_run.ps1 -Platform ares|athena -JobId ... [-Extract]`
+  is the new per-run downloader. It verifies SHA-256 and never overwrites an
+  existing download. Old pilot archives/downloader remain for compatibility.
+  Never alter the user's reference run directories or historical measurement bytes.
+- Core CPU/GPU writers for research metrics, runtime serialization, fitness
+  snapshots and survival are identical. All 21 CPU runtime fields are present
+  on GPU. GPU shard/batch diagnostic fields and `metrics/athena/` are genuine
+  platform extras; do not remove them or fabricate equivalent CPU GPU readings.
+  Audit and local evidence: `../../artifacts/run_layout_20260919/`.
+
+
 ## Active study and source precedence (2026-09-17)
 
 This checkout targets **Ares CPU**, branch `summer_benchmarks_ares`. The Athena GPU checkout is a separate sibling repository.
@@ -46,7 +90,7 @@ not override current study instructions; preserve their measured job records.
 - Same CPU/GPU scientific contract means same objective/instance, graph, algorithm settings, seed policy and metric schema. Hardware timing and asynchronous ordering may change delays and final trajectories; do not promise bitwise-identical final GA results across devices.
 - Named `run_benchmark.py` defaults to/requires 144 for study runs, validates graphs before Ray and records graph provenance. Ares submitters also validate before sbatch. The JSON defaults are now 144 islands and interval 5; active runtime overrides remain authoritative.
 - Ares: `submit_ares_144.sh`, branch `summer_benchmarks_ares`, 7 x 48 = 336 allocated CPUs, 335 advertised Ray CPUs, 289 required Ray CPUs plus driver (minimum 290 physical CPUs). Six nodes with 48 CPUs each are insufficient.
-- Pilot: `pilot_run/pilot_spec.json`, F1/r01 D=200, torus 12x12, 144 islands, best/plain, repeats 1-3. Full pipeline ceiling 561.5 CPUh; `launch_pilot.sh --confirm-144-and-562-cpuh`. No CONFIRM_TORUS_200 methodology gate remains. Keep clean/pinned commit, canary verification, SCRATCH, finalizer and no-retry guards.
+- Pilot: `pilot_run/pilot_spec.json`, F1/r01 D=200, torus 12x12, 144 islands, best/plain, repeats 1-3. Full pipeline ceiling 561.5 CPUh. The production entrypoint for this one fixed matrix variant is `bash hpc_benchmarks/launch_full_torus_best_r01_3x.sh --confirm-144-and-562-cpuh`; it delegates to `pilot_run/launch_pilot.sh` so there is only one implementation. No CONFIRM_TORUS_200 methodology gate remains. Keep clean/pinned commit, canary verification, SCRATCH, finalizer and no-retry guards.
 - Old `*_ares_200.sh`, `run*-hpc.sh`, `run_delay_experiment.sh`, `run_local_venv_plgrid.sh` and `submit_all_topologies.sh` are retired/fail closed. Do not use them as campaign templates. Job paths use ISLANDS_PROJECT_DIR/SLURM_SUBMIT_DIR, not the SLURM spool copy's BASH_SOURCE.
 - The sibling Athena checkout now has a sharded144-island GPU runner (12 shards, batcher, router, A100 evaluator;15 Ray CPUs plus driver), still requiring target canary certification. Do not submit the Ares CPU profile there. Current graph data and metric definitions remain shared.
 - Historical 144-island migration evidence: `../../artifacts/study144/validation.json`, 33 tests per repo (66 total), real CLI dry-runs and exact attachment checks; `../../artifacts/study144/parity.json`, 170 instances / 5946 inputs per comparison, no unexpected source differences. This is CPU evidence, not a 144-island HPC run or validation of the complete 40-function backend on A100.
@@ -557,7 +601,7 @@ Therefore:
 
 ---
 
-## Output and Logging Contract (Do Not Break)
+## Internal raw output and logging (portable export described above)
 
 Output path builder:
 - `geneticAlgorithm/utils/filename.py`

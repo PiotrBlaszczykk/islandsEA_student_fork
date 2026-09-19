@@ -358,6 +358,37 @@ class PilotContractTests(unittest.TestCase):
             self.assertEqual(512 * 1024**2, parsed["aggregate"]["maximum_rss_bytes_across_steps"])
             self.assertAlmostEqual(540 / 3360, parsed["repeats"]["1"]["cpu_efficiency"])
 
+    def test_parsable_sacct_uses_recorded_array_element_job_ids(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pilot = Path(temporary)
+            job_ids = {1: "21083932", 2: "21083933", 3: "21083930"}
+            rows = []
+            for repeat, job_id in job_ids.items():
+                attempt_dir = pilot / f"repeat-{repeat}"
+                attempt_dir.mkdir(parents=True)
+                (attempt_dir / "attempt.json").write_text(
+                    json.dumps({"slurm": {"SLURM_JOB_ID": job_id}}),
+                    encoding="utf-8",
+                )
+                rows.append(
+                    f"{job_id}|job|plgrid|COMPLETED|0:0|10|336|3360|00:09:00||||672G|0|"
+                )
+                rows.append(
+                    f"{job_id}.batch|batch||COMPLETED|0:0|10|48|480|00:01:00|512M||||0|"
+                )
+            (pilot / "sacct.txt").write_text("\n".join(rows), encoding="utf-8")
+
+            parsed = pilot_tools.parse_sacct(
+                pilot, "21083930", {"repeats": [1, 2, 3]}
+            )
+
+            self.assertAlmostEqual(
+                2.8, parsed["aggregate"]["allocated_cpu_hours"]
+            )
+            for repeat, job_id in job_ids.items():
+                self.assertTrue(parsed["repeats"][str(repeat)]["available"])
+                self.assertEqual(job_id, parsed["repeats"][str(repeat)]["job_id"])
+
     def test_rich_delay_statistics(self):
         matplotlib = types.ModuleType("matplotlib")
         matplotlib.__path__ = []

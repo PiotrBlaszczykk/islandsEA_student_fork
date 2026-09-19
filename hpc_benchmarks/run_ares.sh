@@ -33,6 +33,12 @@ export TMPDIR="$RAY_TMP_DIR/tmp"
 export XDG_CACHE_HOME="$RAY_TMP_DIR/xdg-cache"
 export MPLCONFIGDIR="$RAY_TMP_DIR/matplotlib"
 islandsea_print_storage
+source "$PROJECT_DIR/hpc_benchmarks/run_bundle.sh"
+islandsea_bundle_prepare ares "${BENCHMARK_ARGS[@]}"
+export ISLANDS_RAY_FAILURE_DIR="${ISLANDS_RAY_FAILURE_DIR:-$ISLANDS_RAY_FAILURE_ROOT/$SLURM_JOB_ID}"
+# Record a pointer even for ordinary jobs; pilot-supplied pointers keep their path.
+BENCHMARK_ARGS+=(--result-pointer "$ISLANDS_BUNDLE_POINTER")
+trap islandsea_bundle_early_exit EXIT
 mapfile -t NODES < <(scontrol show hostnames "$SLURM_JOB_NODELIST")
 NODE_COUNT="${#NODES[@]}"
 [[ "$NODE_COUNT" -eq "${SLURM_JOB_NUM_NODES:?Missing SLURM_JOB_NUM_NODES}" ]] || {
@@ -89,6 +95,11 @@ cleanup() {
             --ntasks-per-node=1 --cpus-per-task=1 \
             bash -c 'expected="/tmp/${USER}/islandsea-${SLURM_JOB_ID}"; [[ "$1" == "$expected" ]] || exit 2; rm -rf -- "$1"' \
             _ "$RAY_TMP_DIR" >/dev/null 2>&1 || echo "Warning: could not remove $RAY_TMP_DIR from every node" >&2
+    fi
+    if [[ "${ISLANDS_BUNDLE_DEFER:-0}" != 1 ]]; then
+        islandsea_bundle_finish "$status"
+        local bundle_status=$?
+        if (( status == 0 && bundle_status != 0 )); then status=$bundle_status; fi
     fi
     exit "$status"
 }

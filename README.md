@@ -1,3 +1,9 @@
+> **Artefakty runa od 2026-09-19:** wspólny format CPU/GPU to
+> `run_<job_id>/{logs,metrics,results}`, `identifier.txt`, `metdadata.json`
+> oraz `run_<job_id>.tar.gz` + SHA-256 w `$SCRATCH/islandsEA/exports`.
+> [Układ, eksport i pobieranie](<hpc_benchmarks/RUN_ARTIFACTS.md>). Dawne raw/audit i archiwa pilota
+> są zachowane dla zgodności; nowy downloader to `hpc_benchmarks/download_run.ps1`.
+
 # islandsEA
 
 Research codebase for asynchronous island-model evolutionary computation, focused on migration-delay behavior and topology effects.

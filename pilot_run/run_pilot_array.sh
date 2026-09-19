@@ -69,9 +69,15 @@ finish_attempt() {
         "$VENV_DIR/bin/python" "$SCRIPT_DIR/pilot_tools.py" record-attempt \
             --path "$ATTEMPT" --status failed --repeat "$REPEAT" --exit-code "$status"
     fi
+    islandsea_bundle_finish "$status"
+    local bundle_status=$?
+    if (( status == 0 && bundle_status != 0 )); then status=$bundle_status; fi
     exit "$status"
 }
 trap finish_attempt EXIT
+source "$PROJECT_DIR/hpc_benchmarks/run_bundle.sh"
+islandsea_bundle_prepare ares --result-pointer "$RESULT_POINTER"
+export ISLANDS_BUNDLE_DEFER=1
 
 mapfile -t BENCHMARK_ARGS < <(
     "$VENV_DIR/bin/python" "$SCRIPT_DIR/pilot_tools.py" benchmark-args --repeat "$REPEAT"

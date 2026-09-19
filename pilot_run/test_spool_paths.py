@@ -282,6 +282,19 @@ export -f git module mkdir sacct sbatch bash
                 )
                 self.assertIn('islandsea_validate_ray_cli "$VENV_DIR"', content)
 
+    def test_full_run_entrypoint_delegates_to_validated_fixed_pipeline(self):
+        content = (
+            self.project
+            / "hpc_benchmarks"
+            / "launch_full_torus_best_r01_3x.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            'exec bash "$PROJECT_DIR/pilot_run/launch_pilot.sh" "$CONFIRMATION"',
+            content,
+        )
+        self.assertIn("--confirm-144-and-562-cpuh", content)
+        self.assertNotIn("sbatch ", content)
+
     def test_ray_launcher_reserves_head_resources_for_driver(self):
         content = (self.project / "hpc_benchmarks" / "run_ares.sh").read_text(
             encoding="utf-8"

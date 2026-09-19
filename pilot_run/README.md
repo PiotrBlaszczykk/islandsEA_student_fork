@@ -1,3 +1,9 @@
+> **Artefakty runa od 2026-09-19:** wspólny format CPU/GPU to
+> `run_<job_id>/{logs,metrics,results}`, `identifier.txt`, `metdadata.json`
+> oraz `run_<job_id>.tar.gz` + SHA-256 w `$SCRATCH/islandsEA/exports`.
+> [Układ, eksport i pobieranie](<../hpc_benchmarks/RUN_ARTIFACTS.md>). Dawne raw/audit i archiwa pilota
+> są zachowane dla zgodności; nowy downloader to `hpc_benchmarks/download_run.ps1`.
+
 > Aktualizacja 2026-09-17: badanie używa 144 wysp we wszystkich topologiach.
 > ER4 został odblokowany zgodnie z odpowiedzią prowadzącej: igraph G(n,p),
 > n=144, p=0.0347, undirected; pętle tylko dla izolowanych węzłów.
@@ -60,8 +66,13 @@ SSH. Sprawdza wynik canary i **tylko po pełnej walidacji** automatycznie wysył
 trzy właściwe powtórzenia oraz finalizer:
 
 ```bash
-bash pilot_run/launch_pilot.sh --confirm-144-and-562-cpuh
+bash hpc_benchmarks/launch_full_torus_best_r01_3x.sh --confirm-144-and-562-cpuh
 ```
+
+To jawnie nazwany produkcyjny entrypoint dla jednego wariantu macierzy. Deleguje
+do `pilot_run/launch_pilot.sh`, aby nie powielać zamrożonej specyfikacji,
+walidacji, zależności SLURM ani limitów zasobów. Bezpośrednie wywołanie
+`pilot_run/launch_pilot.sh` z tym samym argumentem pozostaje równoważne.
 
 Argument jest celowo długi: potwierdza koszt pipeline’u ≤561.5 CPUh (zaokrąglony limit 562). Canary oraz właściwe joby są przypięte do commita obecnego przy
 uruchomieniu. Zmiana checkoutu lub brudne drzewo przed startem któregokolwiek
