@@ -19,6 +19,22 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 
 
+def portable_results(run_dir: Path):
+    run_dir = Path(run_dir)
+    if (run_dir / "metdadata.json").is_file() and (run_dir / "results").is_dir():
+        return run_dir / "results"
+    return run_dir
+
+
+def portable_metrics(run_dir: Path):
+    run_dir = portable_results(run_dir)
+    if (run_dir / "metrics").is_dir():
+        return run_dir / "metrics"
+    if run_dir.name == "results" and (run_dir.parent / "metdadata.json").is_file():
+        return run_dir.parent / "metrics"
+    return run_dir / "metrics"
+
+
 def load_json(path: Path):
     return json.loads(path.read_text())
 
@@ -221,12 +237,12 @@ def iter_jsonl_gzip(path: Path):
 
 
 def research_metrics_available(run_dir: Path):
-    return (run_dir / "metrics" / "data_contract.json").is_file()
+    return (portable_metrics(run_dir) / "data_contract.json").is_file()
 
 
 def load_research_events(run_dir: Path, fitness_curves, effect_horizon_steps):
     events = []
-    for path in sorted((run_dir / "metrics").glob("island_*/migration_events.jsonl.gz")):
+    for path in sorted(portable_metrics(run_dir).glob("island_*/migration_events.jsonl.gz")):
         for record in iter_jsonl_gzip(path):
             if record.get("record_type") != "process" or not record.get("processed"):
                 continue
@@ -329,7 +345,7 @@ def load_immigrant_events(run_dir: Path, fitness_curves, effect_horizon_steps):
 
 
 def load_research_overview(run_dir: Path):
-    metrics_root = run_dir / "metrics"
+    metrics_root = portable_metrics(run_dir)
     if not research_metrics_available(run_dir):
         return None
 
@@ -529,7 +545,7 @@ def load_research_fitness_histories(run_dir: Path):
     histories = {}
     if not research_metrics_available(run_dir):
         return histories
-    for path in sorted((run_dir / "metrics").glob("island_*/fitness_history.jsonl.gz")):
+    for path in sorted(portable_metrics(run_dir).glob("island_*/fitness_history.jsonl.gz")):
         island = int(path.parent.name.split("_")[1])
         histories[island] = list(iter_jsonl_gzip(path))
     return histories
@@ -1578,7 +1594,7 @@ def main():
     )
     args = parser.parse_args()
 
-    run_dir = Path(args.run_dir).resolve()
+    run_dir = portable_results(Path(args.run_dir).resolve())
     output_dir = Path(args.output_dir).resolve() if args.output_dir else run_dir / "analysis_migration"
     output_dir.mkdir(parents=True, exist_ok=True)
 

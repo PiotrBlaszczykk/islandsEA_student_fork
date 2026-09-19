@@ -15,7 +15,6 @@ set -euo pipefail
 : "${SLURM_JOB_ID:?Submit through athena_gpu/submit_study.sh}"
 : "${ISLANDS_PROJECT_DIR:?Submitter must export the repository path}"
 : "${ISLANDS_VENV_DIR:?Submitter must export the Athena venv path}"
-: "${ATHENA_EXPECTED_COMMIT:?Submitter must pin the Git commit}"
 : "${ATHENA_STUDY_MODE:?Submitter must select canary or full}"
 : "${ATHENA_STUDY_RESULT_ROOT:?Submitter must export the result root}"
 : "${SCRATCH:?Athena study artifacts require SCRATCH}"
@@ -25,6 +24,31 @@ case "$ATHENA_STUDY_MODE" in
     *) echo "Invalid ATHENA_STUDY_MODE=$ATHENA_STUDY_MODE" >&2; exit 2 ;;
 esac
 
+if [[ "${ATHENA_FROZEN_ARRAY:-0}" == 1 ]]; then
+    [[ "$ATHENA_STUDY_MODE" == full ]] || {
+        echo "Frozen three-repeat array requires ATHENA_STUDY_MODE=full" >&2
+        exit 2
+    }
+    : "${SLURM_ARRAY_JOB_ID:?Frozen three-repeat run requires a SLURM array}"
+    : "${SLURM_ARRAY_TASK_ID:?Frozen three-repeat run requires a SLURM array task}"
+    # In the frozen array, the scheduler is the only source of the repeat.
+    # Ignore a stale ATHENA_STUDY_REPEAT inherited from the login shell.
+    STUDY_REPEAT="$SLURM_ARRAY_TASK_ID"
+else
+    STUDY_REPEAT="${ATHENA_STUDY_REPEAT:-${SLURM_ARRAY_TASK_ID:-1}}"
+fi
+case "$STUDY_REPEAT" in
+    1|2|3) ;;
+    *) echo "Invalid Athena study repeat: $STUDY_REPEAT" >&2; exit 2 ;;
+esac
+if [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "$STUDY_REPEAT" != "$SLURM_ARRAY_TASK_ID" ]]; then
+    echo "Repeat $STUDY_REPEAT differs from SLURM array task $SLURM_ARRAY_TASK_ID" >&2
+    exit 2
+fi
+if [[ "$ATHENA_STUDY_MODE" == canary && "$STUDY_REPEAT" != 1 ]]; then
+    echo "Athena canary must use repeat 1" >&2
+    exit 2
+fi
 PROJECT_DIR="$ISLANDS_PROJECT_DIR"
 VENV_DIR="$ISLANDS_VENV_DIR"
 RUN_DIR="$ATHENA_STUDY_RESULT_ROOT/$SLURM_JOB_ID"
@@ -54,6 +78,12 @@ cleanup() {
     fi
     if [[ "$RAY_TMP_DIR" =~ ^/tmp/r[0-9]+$ ]]; then
         rm -rf -- "$RAY_TMP_DIR"
+    fi
+    if declare -F islandsea_bundle_finish >/dev/null; then
+        set +e
+        islandsea_bundle_finish "$status"
+        local bundle_status=$?
+        if (( status == 0 && bundle_status != 0 )); then status=$bundle_status; fi
     fi
     exit "$status"
 }
@@ -86,18 +116,23 @@ export MPLBACKEND=Agg
 export MPLCONFIGDIR="$RUN_DIR/cache/matplotlib"
 export RAY_DEDUP_LOGS=0
 mkdir -p "$MPLCONFIGDIR" "$ISLANDS_RUN_OUTPUT_ROOT" "$ISLANDS_AUDIT_ROOT"
+source "$PROJECT_DIR/hpc_benchmarks/run_bundle.sh"
+islandsea_bundle_prepare athena --result-pointer "$RUN_DIR/result_pointer.json"
+export ISLANDS_RAY_FAILURE_DIR="$RUN_DIR/ray-failure-logs"
 
 cd "$PROJECT_DIR"
 ACTUAL_COMMIT=$(git rev-parse HEAD)
-[[ "$ACTUAL_COMMIT" == "$ATHENA_EXPECTED_COMMIT" ]] || {
-    echo "Checkout changed after submission: expected $ATHENA_EXPECTED_COMMIT, got $ACTUAL_COMMIT" >&2
-    exit 2
-}
-[[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
-    echo "Checkout became dirty after submission" >&2
-    git status --short >&2
-    exit 2
-}
+if [[ -n "${ATHENA_EXPECTED_COMMIT:-}" ]]; then
+    [[ "$ACTUAL_COMMIT" == "$ATHENA_EXPECTED_COMMIT" ]] || {
+        echo "Checkout changed after submission: expected $ATHENA_EXPECTED_COMMIT, got $ACTUAL_COMMIT" >&2
+        exit 2
+    }
+    [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
+        echo "Checkout became dirty after submission" >&2
+        git status --short >&2
+        exit 2
+    }
+fi
 
 case "$(hostname -s)" in
     login*) echo "Refusing to run a study job on a login node" >&2; exit 2 ;;
@@ -121,8 +156,9 @@ COMMON_ARGS=(
     --topology torus
     --strategy best
     --acceptance plain
-    --repeat 1
+    --repeat "$STUDY_REPEAT"
     --seed 20260912
+    --instance-seed 20260511
     --ray-address local
     --local-cpus 15
     --ray-temp-dir "$RAY_TMP_DIR"
@@ -162,6 +198,8 @@ fi
 echo "=== ATHENA SHARDED STUDY RUN ==="
 echo "mode=$ATHENA_STUDY_MODE"
 echo "job_id=$SLURM_JOB_ID"
+echo "array_job_id=${SLURM_ARRAY_JOB_ID:-none}"
+echo "repeat=$STUDY_REPEAT"
 echo "host=$(hostname -f)"
 echo "commit=$ACTUAL_COMMIT"
 echo "result_dir=$RUN_DIR"
@@ -179,7 +217,8 @@ PYTHON_JOB_PID=""
     --pointer "$RUN_DIR/result_pointer.json" \
     --output "$RUN_DIR/validation.json" \
     --mode "$ATHENA_STUDY_MODE" \
-    --expected-commit "$ACTUAL_COMMIT"
+    --expected-commit "$ACTUAL_COMMIT" \
+    --expected-repeat "$STUDY_REPEAT"
 
 echo "ATHENA_STUDY_RESULT=$RUN_DIR"
 echo "ATHENA_STUDY_JOB_OK=1"

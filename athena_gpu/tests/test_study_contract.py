@@ -1,15 +1,52 @@
 """Pure tests for the approved Athena 144-island execution contract."""
+import os
 import unittest
+from pathlib import PurePosixPath
 from types import SimpleNamespace
+from unittest.mock import patch
 
+from athena_gpu import run_study
 from athena_gpu.study_contract import (
     balanced_shards,
     build_study_plan,
     deterministic_shards,
 )
+from athena_gpu.validate_study_run import _spec as validation_spec
 
 
 class StudyContractTests(unittest.TestCase):
+    def test_unpinned_frozen_execution_records_dirty_state_without_blocking(self):
+        environment = {
+            "SLURM_JOB_ID": "123",
+            "SLURM_CPUS_PER_TASK": "16",
+            "CUDA_VISIBLE_DEVICES": "0",
+        }
+        args = SimpleNamespace(ray_temp_dir="/tmp/r123")
+        with (
+            patch.dict(os.environ, environment, clear=True),
+            patch.object(run_study.socket, "gethostname", return_value="t0001"),
+            patch.object(run_study, "Path", PurePosixPath),
+            patch.object(
+                run_study,
+                "environment_report",
+                return_value={"status": "passed", "errors": []},
+            ),
+            patch.object(run_study, "_git_state", return_value=("abc123", True)),
+        ):
+            self.assertEqual(("abc123", True), run_study._require_compute_allocation(args))
+
+    def test_full_validation_contract_uses_repeat_specific_seed(self):
+        first = validation_spec("full", 1)
+        second = validation_spec("full", 2)
+        third = validation_spec("full", 3)
+        self.assertEqual([1, 2, 3], [first["repeat"], second["repeat"], third["repeat"]])
+        self.assertEqual(
+            [20260912, 21260912, 22260912],
+            [first["repeat_seed"], second["repeat_seed"], third["repeat_seed"]],
+        )
+        with self.assertRaisesRegex(ValueError, "repeat 1"):
+            validation_spec("canary", 2)
+
     def test_full_profile_is_one_normal_study_run(self):
         plan = build_study_plan()
         self.assertEqual("athena-study-144", plan["profile"])

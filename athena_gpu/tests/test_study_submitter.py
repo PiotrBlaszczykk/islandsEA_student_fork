@@ -63,6 +63,9 @@ echo 7654321
             "ATHENA_STUDY_CANARY_ROOT",
             "ATHENA_STUDY_RUN_ROOT",
             "ATHENA_STUDY_CANARY_JOB_ID",
+            "ATHENA_FROZEN_RUN_ROOT",
+            "ATHENA_FROZEN_ARRAY",
+            "ATHENA_STUDY_REPEAT",
         ):
             self.env.pop(key, None)
         self.env.update(
@@ -77,11 +80,11 @@ echo 7654321
         path.write_bytes(text.encode("utf-8"))
         path.chmod(0o755)
 
-    def submit(self, arguments, extra_env=None):
+    def submit(self, arguments, extra_env=None, script="submit_study.sh"):
         env = dict(self.env)
         if extra_env:
             env.update(extra_env)
-        env["SUBMITTER"] = bash_path(self.scripts / "submit_study.sh")
+        env["SUBMITTER"] = bash_path(self.scripts / script)
         env["ARGS"] = arguments
         return subprocess.run(
             [
@@ -136,14 +139,78 @@ echo 7654321
         self.assertNotEqual(0, result.returncode)
         self.assertFalse(self.capture.exists())
 
-    def test_job_wrapper_has_valid_bash_syntax(self):
-        result = subprocess.run(
-            [self.bash, "-n", str(self.scripts / "run_study_job.sh")],
-            text=True,
-            capture_output=True,
-            timeout=30,
+    def test_frozen_three_repeat_array_submits_directly(self):
+        result = self.submit(
+            "",
+            {
+                "ATHENA_EXPECTED_COMMIT": "stale-commit-from-login-shell",
+                "ATHENA_STUDY_CANARY_JOB_ID": "999",
+            },
+            script="submit_frozen_torus3.sh",
         )
         self.assertEqual(0, result.returncode, result.stderr)
+        arguments = self.capture.read_text(encoding="utf-8").splitlines()
+        for value in (
+            "--array=1-3%3",
+            "--nodes=1",
+            "--cpus-per-task=16",
+            "--gres=gpu:1",
+            "--time=02:00:00",
+            "--account=plgintobl-gpu-a100",
+        ):
+            self.assertIn(value, arguments)
+        exported = "\n".join(arguments)
+        self.assertIn("ATHENA_STUDY_MODE=full", exported)
+        self.assertIn("ATHENA_FROZEN_ARRAY=1", exported)
+        self.assertNotIn("ATHENA_STUDY_CANARY_JOB_ID", exported)
+        self.assertNotIn("ATHENA_EXPECTED_COMMIT", exported)
+        self.assertIn("ATHENA_FROZEN_REPEATS=1,2,3", result.stdout)
+        self.assertIn("MAX_TOTAL_GPU_HOURS=6.0", result.stdout)
+        self.assertIn("No automatic retry", result.stdout)
+
+    def test_frozen_three_repeat_array_does_not_gate_on_dirty_checkout(self):
+        result = self.submit(
+            "",
+            {"MOCK_DIRTY": "1"},
+            script="submit_frozen_torus3.sh",
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertTrue(self.capture.exists())
+
+    def test_job_wrapper_has_valid_bash_syntax(self):
+        for script in ("run_study_job.sh", "submit_frozen_torus3.sh"):
+            with self.subTest(script=script):
+                result = subprocess.run(
+                    [self.bash, "-n", str(self.scripts / script)],
+                    text=True,
+                    capture_output=True,
+                    timeout=30,
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_job_wrapper_forwards_repeat_to_runner_and_validator(self):
+        script = (self.scripts / "run_study_job.sh").read_text(encoding="utf-8")
+        self.assertIn('--repeat "$STUDY_REPEAT"', script)
+        self.assertIn('--expected-repeat "$STUDY_REPEAT"', script)
+        self.assertIn('STUDY_REPEAT="$SLURM_ARRAY_TASK_ID"', script)
+        for argument in (
+            "--problem r01_elliptic",
+            "--dimension 200",
+            "--islands 144",
+            "--evaluations 8000",
+            "--population 16",
+            "--offspring 4",
+            "--migrants 5",
+            "--interval 5",
+            "--torus-rows 12",
+            "--torus-columns 12",
+            "--topology torus",
+            "--strategy best",
+            "--acceptance plain",
+            "--seed 20260912",
+            "--instance-seed 20260511",
+        ):
+            self.assertIn(argument, script)
 
 
 if __name__ == "__main__":

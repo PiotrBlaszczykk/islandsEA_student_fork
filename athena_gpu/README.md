@@ -1,3 +1,8 @@
+> **Nowy eksport pojedynczego joba (2026-09-19):** wrapper zapisuje
+> `run_<job_id>.tar.gz` i SHA-256 w `$SCRATCH/islandsEA/exports`, według
+> [wspólnego układu](../hpc_benchmarks/RUN_ARTIFACTS.md). Instrukcje starych
+> zbiorczych paczek poniżej są historią; nowe runy pobieraj przez `download_run.ps1`.
+
 > Aktualizacja 2026-09-17: badanie używa 144 wysp we wszystkich topologiach.
 > ER4 został odblokowany zgodnie z odpowiedzią prowadzącej: igraph G(n,p),
 > n=144, p=0.0347, undirected; pętle tylko dla izolowanych węzłów.
@@ -21,11 +26,11 @@ python athena_gpu/island_integration.py
 ## Shardowany runner badania 144
 
 Aktualne wyniki wdrożenia i ograniczenia opisuje
-[ATHENA_HOW_TO_RUN.md](../athena-info/ATHENA_HOW_TO_RUN.md): backend i canary
-przeszły na A100, wykonano jeden techniczny pełny run, ale kampania pozostaje
-wstrzymana do targetowej walidacji lokalnych poprawek shardowania, batchowania
-i metadanych. Odblokowanie ER4 nie znosi tego ograniczenia. Poniższa procedura i pomiary
-lokalne pochodzą z przygotowania runnera przed pierwszym canary.
+[ATHENA_HOW_TO_RUN.md](../athena-info/ATHENA_HOW_TO_RUN.md). Poprawiony canary
+`3181809` i pełny pilot `3185051` przeszły na A100, wraz z bramkami
+shardowania, batchowania, migracji i metadanych. Canary pozostaje opcjonalnym
+narzędziem diagnostycznym; zamrożony launcher trzech powtórzeń uruchamia full
+bez canary i bez bramki Git.
 
 `run_study.py` zachowuje 144 logiczne wyspy i umieszcza je na 12 aktorach
 shardów. Osobne aktory to wspólny batcher, router migracji oraz evaluator
@@ -80,6 +85,23 @@ Profil full ma limit dwóch godzin / 2 GPUh i nie ma retry. Wyniki trafiają do
 `$SCRATCH/islandsEA/results/athena_study_{canaries,runs}/<JOB_ID>/`, a logi do
 `$SCRATCH/islandsEA/logs/slurm/athena-study-{canary,full}-<JOB_ID>.{out,err}`.
 Nie uruchamiać full po nieudanym canary; najpierw zdiagnozować jego JSON i logi.
+
+Zamrożone, porównywalne z Ares uruchomienie trzech powtórzeń ma osobny,
+nierozszerzalny submitter. Zgłasza on bezpośrednio dokładnie jeden array
+`1-3%3`; nie wymaga canary, ID canary, czystego drzewa ani zgodności z
+upstreamem:
+
+```bash
+bash athena_gpu/submit_frozen_torus3.sh
+```
+
+Każdy element używa jednej A100, 16 CPU, maksymalnie 2 GPUh i ma własny
+`SLURM_JOB_ID`, walidację oraz `exports/run_<job_id>.tar.gz`. Array wykonuje
+`repeat=1,2,3`; seed bazowy pozostaje 20260912, a repeat-base wynosi kolejno
+20260912, 21260912 i 22260912. Nie ma retry, automatycznego resubmitu ani
+jobów następczych. Maksymalny łączny koszt to 6 GPUh.
+Aktualny commit i stan Git pozostają w metadanych wyłącznie jako proweniencja;
+nie są bramką uruchomienia tego arraya.
 
 Lokalnie po poprawce przechodzi 32 testy kontraktu, a jeden test real-Ray jest
 domyślnie opt-in. Uruchomiony jawnie smoke wykonał pełny

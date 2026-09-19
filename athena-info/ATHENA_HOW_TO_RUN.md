@@ -1,28 +1,32 @@
+> **Nowy eksport pojedynczego joba (2026-09-19):** wrapper zapisuje
+> `run_<job_id>.tar.gz` i SHA-256 w `$SCRATCH/islandsEA/exports`, według
+> [wspólnego układu](../hpc_benchmarks/RUN_ARTIFACTS.md). Instrukcje starych
+> zbiorczych paczek poniżej są historią; nowe runy pobieraj przez `download_run.ps1`.
+
 # Athena GPU: sprawdzony runbook uruchomieniowy i zapis walidacji
 
-Ostatnia aktualizacja: **2026-09-17** (ER4 i lokalna poprawka runnera;
-pomiary GPU poniżej pochodzą z 16 września).
+Ostatnia aktualizacja: **2026-09-19** (targetowa walidacja poprawionego
+runnera na A100: canary `3181809` i full `3185051`).
 
 Ten dokument utrwala działającą procedurę dla Atheny, wyniki wykonanych
 walidacji oraz znane ograniczenia. Dotyczy wyłącznie brancha
 `summer_benchmarks_athena` i kodu z `athena_gpu/`. Nie jest instrukcją dla
 Aresa i nie wolno przenosić tutaj profilu CPU Aresa.
 
-Najważniejszy stan na 2026-09-16:
+Najważniejszy stan na 2026-09-19:
 
 - backend wszystkich 40 benchmarków przeszedł pełną walidację NumPy/CuPy na
   A100;
-- canary shardowanego runnera GA przeszedł na A100;
-- jeden normalny run F1/D=200/144 wyspy przeszedł technicznie i zachował
-  komplet wymaganych danych;
-- **kampania jest obecnie wstrzymana do nowego canary i jednego full**:
-  normalny run ujawnił silną zależność
-  wyniku od pozycji wyspy wewnątrz sharda, słabe łączenie requestów w batche
-  oraz jedną niespójność metadanych. Przyczyny poprawiono lokalnie, lecz nie
-  zweryfikowano jeszcze nowego commita na A100. Historyczny job jest poprawnym
-  dowodem integracji,
-  ale nie powinien być jeszcze używany jako wynik naukowy ani szablon do
-  zgłoszenia pozostałych runów;
+- poprawiony canary `3181809` i pełny run `3185051` przeszły na A100 na
+  czystym commicie `0547d5917459be100ff8860875b2a906ab8b0f08`;
+- pełny run F1/D=200/144 wyspy zachował komplet wymaganych danych i przeszedł
+  nowe bramki batchingu, schedulera, migracji oraz proweniencji;
+- historyczny job `3174577` pozostaje wyłącznie dowodem integracji: miał silną
+  zależność wyniku od pozycji wyspy w shardzie, małe batche i niespójne
+  metadane. Tych problemów nie stwierdzono w `3185051`;
+- targetowa walidacja runnera jest zakończona. Nie oznacza to automatycznej
+  zgody na zgłoszenie kampanii 1800 runów: plan kampanii i sposób jej
+  porcjowania nadal wymagają osobnej decyzji użytkownika;
 - nie ma automatycznego retry, resubmitu ani przejścia canary -> full;
 - commit, push i pull wykonuje użytkownik. Żaden agent ani skrypt nie powinien
   samodzielnie zgłaszać jobów.
@@ -342,6 +346,38 @@ seed bazowy 20260912
 Nie jest to launcher całej macierzy 1800. Każdy kolejny wariant wymaga osobnej,
 kontrolowanej decyzji i po usunięciu opisanych niżej problemów.
 
+### 6.1. Zamrożony run porównawczy z trzema powtórzeniami
+
+Do porównania z równoległym pilotem Aresa służy wyłącznie:
+
+```bash
+bash athena_gpu/submit_frozen_torus3.sh
+```
+
+Submitter nie wymaga canary, ID canary, konkretnego commita, czystego drzewa
+ani zgodności z upstreamem. Sprawdza tylko zgodność naukowej części
+`pilot_run/pilot_spec.json` z zamrożonym kontraktem, po czym zgłasza jeden
+SLURM array `1-3%3`, bez zależności, retry i finalizera. Aktualny commit oraz
+stan dirty są zachowywane wyłącznie jako proweniencja. Każdy element ma jedną
+A100, 16 CPU, limit 2 godzin i wykonuje jeden repeat:
+
+| Repeat | Base seed runnera | Seed wyspy `i` |
+|---:|---:|---:|
+| 1 | 20260912 | `20260912 + i` |
+| 2 | 21260912 | `21260912 + i` |
+| 3 | 22260912 | `22260912 + i` |
+
+Wszystkie trzy używają tej samej instancji benchmarku i `instance-seed`
+20260511. Numer repeatu wpływa na RNG wysp oraz deterministyczne mapowanie
+wysp na shardy, nie zmienia torusa ani instancji funkcji celu. Każdy element
+zapisuje osobne `validation.json` i przenośną paczkę
+`$SCRATCH/islandsEA/exports/run_<element_SLURM_JOB_ID>.tar.gz`.
+
+Maksymalny koszt całego arraya wynosi 6 GPUh. Zgłoszenie jest ręczne.
+Historyczny `3185051` pozostaje poprawnym pojedynczym repeatem 1, ale zamrożony
+komplet porównawczy uruchamia wszystkie trzy repeaty w jednym formacie
+artefaktów.
+
 Kontrola zakończonego full:
 
 ```bash
@@ -454,6 +490,66 @@ Run zachował wyniki wszystkich 144 wysp i pełną telemetrykę. Jest dowodem, �
 cały pipeline działa technicznie, ale ze względu na artefakt shardowania nie
 jest jeszcze bezpiecznym wynikiem naukowym.
 
+### Targetowa ponowna walidacja: joby 3181809 i 3185051
+
+Poprawiony runner sprawdzono na czystym commicie:
+
+```text
+0547d5917459be100ff8860875b2a906ab8b0f08
+```
+
+Canary `3181809` zakończył się `COMPLETED|0:0` w 42 s, wypisał wszystkie
+markery sukcesu i zapisał `status=passed`, `valid=true`, `errors=[]`.
+Na A100 wykonał 1536 wierszy w 30 wywołaniach backendu. Średni batch miał
+51.2 wiersza i 11.6 requestu; 28 z 30 batchy uruchomił próg rozmiaru, a tylko
+3.33% batchy zawierało najwyżej trzy requesty. Migracje miały 840 rekordów
+send i 840 odpowiadających rekordów terminalnych, bez braków i duplikatów.
+
+Pełny pilot `3185051` jest normalnym runem kontraktu 144 wysp:
+
+| Pole | Wynik |
+|---|---|
+| Job | `3185051` |
+| Commit | `0547d5917459be100ff8860875b2a906ab8b0f08` |
+| Węzeł | `t0003` |
+| SLURM | `COMPLETED`, `0:0` |
+| Czas | 00:13:59 (839 s) |
+| TotalCPU | 01:23:26 |
+| MaxRSS | 12 261 828 KiB, około 11.7 GiB |
+| GPU | NVIDIA A100-SXM4-40GB |
+| Raw run | `results/runs/260919/r01_200/134902_dafd553493 144bt-co5ilu5` |
+
+Walidacja pełnego pilota zapisała:
+
+```text
+status=passed
+valid=true
+errors=[]
+row_count=1152000
+backend_calls=13056
+średnio requestów/batch=22.026
+średnio wierszy/batch=88.235
+batche size/timeout=739/12317
+odsetek batchy z <=3 requestami=0.245%
+korelacja pozycja-final fitness=+0.0142
+korelacja pozycja-wall time=+0.0122
+maksymalny udział tej samej pozycji wśród zwycięzców shardów=0.25
+```
+
+Wszystkie pełne bramki zostały spełnione: co najmniej jeden batch `size`,
+średnio co najmniej 32 wiersze/batch, najwyżej 75% małych batchy, obie
+bezwzględne korelacje najwyżej 0.5 i najwyżej połowa zwycięzców shardów na tej
+samej pozycji. Progi są zapisane w manifeście pod kluczem
+`athena_plan.full_run_quality_gates`; odczyt `athena_plan.quality_gates`
+zwróci `None`, ponieważ taki klucz nie istnieje.
+
+Efektywne metadane są jednoznaczne: `best/plain`, brak `island_delays`, torus
+12x12, repeat 1, seed 20260912, F1/D=200 oraz backend
+`athena-gpu-sharded`. Migracje zachowały 718 560 send i 718 560 terminalnych
+process records, bez braków i duplikatów. `queued_at_end=2175` jest jawnie
+zapisywane jako `queued_not_dequeued_at_end_of_run`, zgodnie z opisaną niżej
+semantyką końca runu; nie jest utratą rekordu.
+
 ## 7. Układ wyników i obowiązkowe dane
 
 Całość trafia pod scratch:
@@ -553,7 +649,7 @@ offspring ma rozmiar 4, w tym runie obserwowany odstęp między kolejnymi
 migracjami wyniósł konsekwentnie 8 ewaluacji. To istniejąca semantyka, nie
 należy jej po cichu przeliczać na pokolenia.
 
-## 9. Aktualne blokery przed kampanią
+## 9. Historyczne blokery i wynik ich weryfikacji
 
 ### 9.1. Silny artefakt pozycji w shardzie
 
@@ -612,7 +708,7 @@ ma wartość `random` i zawiera starą 10x10 macierz `island_delays`. Nie wpłyn
 to na wykonanie, ale może błędnie sklasyfikować run w przyszłym agregatorze.
 Przed kampanią metadane muszą być wewnętrznie jednoznaczne.
 
-### 9.4. Stan lokalnej poprawki z 17 września
+### 9.4. Poprawka z 17 września zweryfikowana 19 września
 
 Kod lokalny usuwa trzy rozpoznane przyczyny:
 
@@ -630,22 +726,26 @@ Kod lokalny usuwa trzy rozpoznane przyczyny:
   bezwzględna korelacja pozycji z fitness/czasem przekracza 0.5 albo ponad
   połowa shardów ma zwycięzcę na tej samej pozycji.
 
-Lokalnie przechodzą testy kontraktu, pełny dry-run 144 oraz prawdziwy smoke
-Ray/NumPy 4 wyspy/2 shardy dochodzący do pętli GA, migracji i finalizacji.
-Nie jest to certyfikacja Ray 2.9.3, CuPy ani A100. Hold zostaje zdjęty dopiero
-po zaliczonym canary nowego commita i pełnym pilocie, który przejdzie nowe
-bramki jakości.
+Oprócz testów lokalnych, dry-runu 144 i smoke Ray/NumPy poprawka przeszła
+targetową weryfikację Ray 2.9.3, CuPy 10.6.0 i A100 w canary `3181809` oraz
+pełnym pilocie `3185051`. Pełny pilot przeszedł wszystkie wymienione wyżej
+bramki jakości. Hold związany z artefaktem pozycji, batchingiem i niespójnymi
+metadanymi jest zdjęty dla commita `0547d5917459be100ff8860875b2a906ab8b0f08`.
 
 ### Decyzja operacyjna
 
-Do czasu targetowej walidacji powyższej poprawki:
+Po targetowej walidacji:
 
-- nie zgłaszać kolejnego full;
-- nie budować arraya ani automatycznego launchera 1800 runów;
 - nie traktować `3174577` jako wyniku do wnioskowania o hipotezach;
-- można zachować go jako dowód integracji i materiał diagnostyczny.
+- `3185051` spełnia kontrakt normalnego runu i może zostać zachowany jako
+  pierwszy wynik konfiguracji F1/D=200/torus/best/plain/repeat 1;
+- nie zgłaszać automatycznie kolejnych runów ani arraya; porcjowanie kampanii,
+  limity i procedura wznowień wymagają osobnego zatwierdzenia użytkownika;
+- najpierw ręcznie spakować, pobrać i zweryfikować dowody `3181809` oraz
+  `3185051` według sekcji 11. Te joby wykonano przed wdrożeniem nowego
+  automatycznego eksportu `run_<job_id>.tar.gz`.
 
-## 10. Kolejność ponownej walidacji po poprawce
+## 10. Zakończona ponowna walidacja po poprawce
 
 Po lokalnej poprawce schedulera/metadanych/batchingu:
 
@@ -660,9 +760,75 @@ Po lokalnej poprawce schedulera/metadanych/batchingu:
    w shardzie oraz rozkład rozmiarów batchy;
 8. dopiero po usunięciu konfuzji schedulera projektować kampanię.
 
-Nie wolno automatycznie zgłosić punktu 6 po punkcie 4.
+Kroki 1-7 wykonano i zakończono sukcesem w jobach `3181809` oraz `3185051`.
+Krok 8 oznacza osobny etap projektowania kampanii, a nie automatyczne
+zgłoszenie następnych jobów.
 
 ## 11. Eksport dowodów z Atheny
+
+### Canary 3181809 i pełny pilot 3185051
+
+Oba joby wykonano na commicie `0547d59`, który nie zawierał jeszcze nowego
+automatycznego eksportera pojedynczego runu. Należy więc jednorazowo utworzyć
+na Athenie wspólne archiwum dowodowe:
+
+```bash
+ROOT="$SCRATCH/islandsEA"
+EXPORT="$ROOT/exports"
+ARCHIVE="$EXPORT/athena-study-evidence-3181809-3185051.tar.gz"
+
+mkdir -p "$EXPORT"
+
+ITEMS=(
+  "results/athena_study_canaries/3181809"
+  "results/athena_study_runs/3185051"
+  "results/runs/260918/r01_200/181034_5a05bfa7ca 12bt-co5ilu5"
+  "results/runs/260919/r01_200/134902_dafd553493 144bt-co5ilu5"
+  "results/audit/260918_181034_5a05bfa7ca"
+  "results/audit/260919_134902_dafd553493"
+  "logs/slurm/athena-study-canary-3181809.out"
+  "logs/slurm/athena-study-canary-3181809.err"
+  "logs/slurm/athena-study-full-3185051.out"
+  "logs/slurm/athena-study-full-3185051.err"
+)
+
+for item in "${ITEMS[@]}"; do
+  test -e "$ROOT/$item" || {
+    echo "BRAK: $ROOT/$item" >&2
+    exit 1
+  }
+done
+
+tar -C "$ROOT" -czf "$ARCHIVE" -- "${ITEMS[@]}"
+sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+ls -lh "$ARCHIVE" "$ARCHIVE.sha256"
+cat "$ARCHIVE.sha256"
+```
+
+Archiwum i plik SHA-256 należy pobrać na laptop do
+`artifacts/athena/study_3185051`, zweryfikować przed rozpakowaniem i zachować
+obok poprzednich dowodów. Procedura PowerShell niżej jest taka sama; trzeba
+podmienić `$Destination` oraz `$Name`.
+
+Eksport wykonano i sprawdzono lokalnie. Archiwum ma 207 715 773 bajty, a jego
+SHA-256 wynosi:
+
+```text
+8979010d2d0edcae0e1b6e9fde77f3b14e2dcae9a8c43b5d6c4047741f6a9bfd
+```
+
+Hash z Atheny i hash lokalny są identyczne. Rozpakowana kopia znajduje się w:
+
+```text
+C:\Users\piotr\UMISI\IslandsEA_summer\artifacts\athena\study_3185051
+```
+
+Kontrola lokalna potwierdziła 12/12 katalogów metryk wysp dla canary,
+144/144 dla full, zero brakujących wymaganych plików głównych, per-island i
+`metrics/athena`, wszystkie markery sukcesu oraz brak komunikatów błędu poza
+zwykłym ładowaniem modułów i startem Ray.
+
+### Historyczne joby 3168014, 3174524 i 3174577
 
 Historyczne joby `3168014`, `3174524` i `3174577` zostały zebrane do:
 
@@ -781,6 +947,8 @@ Nie mieszać ich z artefaktami Aresa.
 | A100 suite `3168014` | passed | 40 benchmarków, NumPy/CuPy, A100 |
 | GA canary `3174524` | passed | pełny mały pipeline shardów/batchera/routera/A100 |
 | GA full `3174577` | technicznie passed | komplet danych; wykryty artefakt shardów, nie wynik naukowy |
+| GA canary `3181809` | passed | poprawiony scheduler, batching i metadane na A100; commit `0547d59` |
+| GA full `3185051` | passed | 144 wyspy; wszystkie bramki jakości i integralności zaliczone; normalny wynik F1/torus/best/repeat 1 |
 
 ## 13. Typowe problemy
 
@@ -809,7 +977,9 @@ W zmiennej PowerShell nie wpisywać backslasha przed `@`.
 
 ### Submitter odmawia z powodu Git
 
-Sprawdzić branch, czystość i zgodność z upstream:
+Ta sekcja dotyczy starszego `submit_study.sh`. Zamrożony
+`submit_frozen_torus3.sh` nie ma bramki branch/clean/upstream/commit.
+W starszym submitterze sprawdzić branch, czystość i zgodność z upstream:
 
 ```bash
 git status --short --branch

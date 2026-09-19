@@ -1206,6 +1206,21 @@ def validate_repeat(
     result["archive"] = archive
     result["valid"] = not errors
     dump_json(evidence_dir / "validation.json", result)
+    # Packaging happens after all validation/analysis writes, never in the GA loop.
+    sys.path.insert(0, str(PROJECT_DIR / "hpc_benchmarks"))
+    from run_bundle import export_run
+    metadata = load_json(raw / "run_metadata.json")
+    job_id = metadata["resources"]["slurm"]["SLURM_JOB_ID"]
+    export_root = os.environ.get("ISLANDS_EXPORT_ROOT")
+    if not export_root:
+        export_root = str(Path(os.environ.get("ISLANDS_STORAGE_ROOT", str(expected_run_output_root().parents[1]))) / "exports")
+    result["portable_bundle"] = export_run(
+        pointer=pointer_path, job_dir=repeat_dir, job_id=job_id, platform="ares",
+        output_root=export_root, log_dir=metadata.get("storage", {}).get("slurm_log_directory"),
+        ray_logs=(result.get("attempt", {}).get("storage", {}).get("ISLANDS_RAY_FAILURE_DIR")
+                  or os.environ.get("ISLANDS_RAY_FAILURE_DIR")), replace=True,
+        allow_incomplete=bool(errors), exit_code=result.get("attempt", {}).get("exit_code"),
+    )
     return result
 
 

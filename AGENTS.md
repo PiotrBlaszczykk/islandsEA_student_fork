@@ -1,13 +1,60 @@
 # AGENTS.md
 
+## Portable run artifacts (2026-09-19; supersedes scattered download layouts)
+
+Read [RUN_ARTIFACTS.md](hpc_benchmarks/RUN_ARTIFACTS.md). The user approved the
+existing metric set and requested only a common artifact layout, matching
+workspace `artifacts/run_wyniki_przyklad/{run_123456,run_3174577}`.
+
+- Primary deliverable: `$SCRATCH/islandsEA/exports/run_<SLURM_JOB_ID>.tar.gz`
+  and `.tar.gz.sha256`; extracted root is `run_<SLURM_JOB_ID>/` with exactly
+  `logs/`, `metrics/`, `results/`, `identifier.txt`, `metdadata.json`.
+  The `metdadata.json` spelling deliberately matches the user's template.
+- Every original raw file except the relocated metrics tree is in `results/`.
+  The original `metrics/` becomes a sibling of `results/`; preserve all islands,
+  the six files per island, `data_contract.json`, legacy outputs and GPU extras.
+  SLURM `.out/.err` and available failure logs belong in `logs/`.
+- `metdadata.json` is a byte copy of `results/run_metadata.json`. Original HPC
+  paths inside scientific JSON remain provenance, not usable laptop paths.
+  `results/bundle_manifest.json` is the portable path/inventory/checksum map.
+  It separates data completeness, scientific status, job exit and validation.
+  Missing validation is `not_run`, never an invented `passed`.
+- Shared standard-library exporter: `hpc_benchmarks/run_bundle.py`, with
+  `run_bundle.sh` wrapper hooks. Keep these files identical in both repos.
+  Packaging only runs after computation/metric export, outside measured GA;
+  do not move compression, hashing or filesystem work into the evolution loop.
+  Original raw/audit paths remain compatible with existing validators.
+- Ares run wrapper packages ordinary/canary jobs; array wrapper first closes
+  attempt.json, then packages; pilot finalizer refreshes after verification.
+  Each array element uses its actual SLURM_JOB_ID, not the shared parent ID.
+  Athena study wrapper packages after its validation/cleanup. No new jobs,
+  dependencies, retries or submissions are introduced by export.
+- The automatic archive contains a final-wrapper log snapshot. For SLURM's
+  subsequent epilogue messages, refresh after job termination with `export
+  --replace`. Hard-killed jobs may require manual `--allow-incomplete` export.
+  Failed/partial data must stay clearly marked and never pass as a full result.
+- `hpc_benchmarks/download_run.ps1 -Platform ares|athena -JobId ... [-Extract]`
+  is the new per-run downloader. It verifies SHA-256 and never overwrites an
+  existing download. Old pilot archives/downloader remain for compatibility.
+  Never alter the user's reference run directories or historical measurement bytes.
+- Core CPU/GPU writers for research metrics, runtime serialization, fitness
+  snapshots and survival are identical. All 21 CPU runtime fields are present
+  on GPU. GPU shard/batch diagnostic fields and `metrics/athena/` are genuine
+  platform extras; do not remove them or fabricate equivalent CPU GPU readings.
+  Audit and local evidence: `../../artifacts/run_layout_20260919/`.
+
+
 ## Active study and source precedence (2026-09-17)
 
 This checkout targets **Athena GPU**, branch `summer_benchmarks_athena`. The
 maintained CPU runner remains unchanged. An Athena-only sharded GPU runner is
 implemented under `athena_gpu/`. The latest
 [GPU runbook](athena-info/ATHENA_HOW_TO_RUN.md) records passed A100 integration
-checks, but also a campaign hold after the first technical full run; the ER4
-update does not lift that hold. Any changed commit still requires its own canary.
+checks, target canary `3181809` and target full pilot `3185051`. Those jobs
+lifted the historical shard-position/batching/metadata hold. For the frozen
+three-repeat comparison, the user explicitly waived another canary and any
+same-commit-canary gate on 2026-09-19. The launcher records the current Git
+state for provenance but submits the three full repeats directly.
 
 Read the updated [research scope](../../zakres_badan.md) and the repository's
 [STUDY_144.md](STUDY_144.md) first. The workspace Markdown preserves the PDF's
@@ -53,7 +100,7 @@ not override current study instructions; preserve their measured job records.
 - Ares: `submit_ares_144.sh`, branch `summer_benchmarks_ares`, 7 x 48 = 336 allocated CPUs, 335 advertised Ray CPUs, 289 required Ray CPUs plus driver (minimum 290 physical CPUs). Six nodes with 48 CPUs each are insufficient.
 - Pilot: `pilot_run/pilot_spec.json`, F1/r01 D=200, torus 12x12, 144 islands, best/plain, repeats 1-3. Full pipeline ceiling 561.5 CPUh; `launch_pilot.sh --confirm-144-and-562-cpuh`. No CONFIRM_TORUS_200 methodology gate remains. Keep clean/pinned commit, canary verification, SCRATCH, finalizer and no-retry guards.
 - Old `*_ares_200.sh`, `run*-hpc.sh`, `run_delay_experiment.sh`, `run_local_venv_plgrid.sh` and `submit_all_topologies.sh` are retired/fail closed. Do not use them as campaign templates. Job paths use ISLANDS_PROJECT_DIR/SLURM_SUBMIT_DIR, not the SLURM spool copy's BASH_SOURCE.
-- Athena has explicit NumPy/CuPy benchmark backends and an **Athena-only sharded GPU island runner**. It maps 144 logical islands to 12 one-CPU shard actors, one shared batcher, one migration router and one A100 evaluator (15 Ray CPUs plus one driver CPU). GPU validation batches include 144/288/576/864/1152/1728/2304; initial population totals 2304 and at most 576 offspring are independently available at a time. The post-pilot steady operational target is 144 rows with a 50 ms timeout; timeout dispatch remains the bounded progress fallback. Seeded placement and bounded-lead rotation do not add a global generation barrier. Run `athena_gpu/submit_study.sh --canary` first and inspect its artifacts. Never auto-submit the full run, retry, or use the Ares CPU profile on Athena.
+- Athena has explicit NumPy/CuPy benchmark backends and an **Athena-only sharded GPU island runner**. It maps 144 logical islands to 12 one-CPU shard actors, one shared batcher, one migration router and one A100 evaluator (15 Ray CPUs plus one driver CPU). GPU validation batches include 144/288/576/864/1152/1728/2304; initial population totals 2304 and at most 576 offspring are independently available at a time. The post-pilot steady operational target is 144 rows with a 50 ms timeout; timeout dispatch remains the bounded progress fallback. Seeded placement and bounded-lead rotation do not add a global generation barrier. `athena_gpu/submit_study.sh --canary` remains an optional diagnostic; the frozen three-repeat launcher submits directly by explicit user decision. Never auto-retry or use the Ares CPU profile on Athena.
 - Local sharded-runner evidence after the September 17 scheduler fix: 32 regular Athena tests pass, and the opt-in real-Ray smoke completed four logical islands on two permuted shards with one shared NumPy evaluator (20 requests / 128 rows), including migration and finish/delivery barriers. The fix uses topology-independent SHA-256 placement, rotating bounded-lead scheduling, a 144-row/50-ms steady batching policy, normalized effective metadata and fail-closed full-run quality checks. That smoke used Windows, Ray 2.31 and NumPy 1.26.4; it is scheduler evidence only, not certification of Ray 2.9.3, CuPy or A100. The local `athena_codebase/.venv` is Python 3.12.10 with only pip; smoke dependencies were supplied from a workspace test directory, so it does not match Athena and must not be described as target-equivalent.
 - Historical 144-island migration evidence: `../../artifacts/study144/validation.json`, 33 tests per repo (66 total), real CLI dry-runs and exact attachment checks; `../../artifacts/study144/parity.json`, 170 instances / 5946 inputs per comparison, no unexpected source differences. This is CPU evidence, not a 144-island HPC run or validation of the complete 40-function backend on A100.
 - Historical small positional `start.py` commands below are archival. Use the current named launcher with `--diagnostic` for CPU smoke tests. The September 17 update changes the frozen ER graph, adds semantic validation and removes the Athena ER-specific block; it does not submit jobs or certify new GPU results.
@@ -125,10 +172,10 @@ Historical notes describe both RabbitMQ and Ray flows. Both code paths exist, bu
 - BinarySolution stores a nested bit vector. `utils/decision_variables.py` flattens it for distance, diversity and population logging; logged problem size is number of bits. `maxDistance` sums squared bit differences (Hamming), keeping existing selection and tie order. Continuous distance arithmetic is preserved.
 - `--seed` and `--repeat` give seed `seed + (repeat-1)*1000000 + island_id`; these seeds do not change benchmark instances or guarantee deterministic asynchronous ordering. Old launches without `ISLANDS_SEED` preserve their RNG policy.
 - Existing actor reservations require `2*N+1` logical Ray CPUs; the SLURM wrapper reserves one additional head CPU for the driver. BLAS/OMP threads are restricted to 1. Code, instance, configuration, Python and dependency versions are checked on every node before the timed run.
-- Canary, gate, full array and finalizer are pinned to the same clean Git commit. Changing or dirtying the shared checkout while they are queued makes the affected stage fail closed.
+- Canary, gate, full array and finalizer are normally pinned to the same clean Git commit. The Athena frozen three-repeat launcher is an explicit exception: it has no canary, clean-tree, upstream or expected-commit gate. Git state is recorded only as provenance.
 - On branch `summer_benchmarks_athena`, use `athena_diagnostics/collect_athena_info.sh` before designing any Athena launcher. It writes the small combined login/GPU-node report to `~/artifacts/athena_duagnostics.txt` and, by default, submits only a one-A100 diagnostic probe (16 CPU, 128000 MB, 10-minute cap) to `plgrid-gpu-a100` on the explicitly selected `plgintobl-gpu-a100` grant. Override `ATHENA_ACCOUNT` only when the user explicitly selects another grant; `--login-only` performs no allocation.
 - Do not submit the existing Ares benchmark profile on Athena. The current Ray/jMetalPy/NumPy path is CPU-bound, whereas Athena is restricted to GPU-enabled work; first use the diagnostic report to select a CUDA-capable evaluation path and an island-to-GPU mapping. Keep Athena-specific launch changes isolated on `summer_benchmarks_athena`.
-- **Athena batch backend (September 14, 2026):** `benchmarks_refined/batch.py` + `batch_kernels.py` implement all 30 CEC and 10 binary functions with explicit `NumpyBatchBackend` / `CupyBatchBackend`; read `benchmarks_refined/BATCH.md` and `athena_gpu/README.md`. Canonical scalar code/data and GA adapters are unchanged. Local CPU evidence in `athena_gpu/validation_cpu.json`: 170 instances, 22016 comparisons, 1667 invalid-input checks; Python 3.12.14 / NumPy 2.3.5, **not the Athena stack**. Full A100 validation job `3168014` for commit `d9795315f28d06945ab9af46e9cc54e9c8bb8a39` completed `0:0`: `validation.json` reports `passed`, 40 benchmarks, 170 instances, 22016 checked rows and unchanged global RNG, and all three `ATHENA_40_*` success markers were emitted. Backend implementation and data are unchanged through the locally reviewed base commit `dbe27de`; later validation-size changes do not invalidate that numerical result. `athena_gpu/submit_validation.sh` prepares one 1-A100/16-CPU/15-minute validation job (maximum 0.25 GPUh), with 15 Ray CPUs + 1 driver CPU, 96/8 GiB Ray caps, pinned clean commit, scratch outputs/caches and no retries. The numerical result authorized integration work; it does not certify the new island scheduler. `submit_study.sh --canary` is the mandatory next target check. A full `--full --confirm-one-of-1800-max-2-gpuh` submission is allowed only manually, after a passed same-commit canary. Do not restore host-wide `ray stop --force` in these jobs.
+- **Athena batch backend (September 14, 2026):** `benchmarks_refined/batch.py` + `batch_kernels.py` implement all 30 CEC and 10 binary functions with explicit `NumpyBatchBackend` / `CupyBatchBackend`; read `benchmarks_refined/BATCH.md` and `athena_gpu/README.md`. Canonical scalar code/data and GA adapters are unchanged. Local CPU evidence in `athena_gpu/validation_cpu.json`: 170 instances, 22016 comparisons, 1667 invalid-input checks; Python 3.12.14 / NumPy 2.3.5, **not the Athena stack**. Full A100 validation job `3168014` for commit `d9795315f28d06945ab9af46e9cc54e9c8bb8a39` completed `0:0`: `validation.json` reports `passed`, 40 benchmarks, 170 instances, 22016 checked rows and unchanged global RNG, and all three `ATHENA_40_*` success markers were emitted. Backend implementation and data are unchanged through the locally reviewed base commit `dbe27de`; later validation-size changes do not invalidate that numerical result. `athena_gpu/submit_validation.sh` prepares one 1-A100/16-CPU/15-minute validation job (maximum 0.25 GPUh), with 15 Ray CPUs + 1 driver CPU, 96/8 GiB Ray caps, pinned clean commit, scratch outputs/caches and no retries. The numerical result authorized integration work. `submit_study.sh --canary` remains available as a diagnostic check, but the separate frozen three-repeat launcher intentionally requires no canary. Do not restore host-wide `ray stop --force` in these jobs.
 - **Ares storage contract (September 13, 2026):** source `hpc_benchmarks/ares_storage.sh` and call `islandsea_configure_storage` in submitters and jobs. With `$SCRATCH` available, generated data lives under `$SCRATCH/islandsEA/`: raw runs in `results/runs`, compact audit in `results/audit`, pilot archives/summaries in `results/pilot_runs`, SLURM logs in `logs/slurm`, failure-only Ray logs in `logs/ray_failures`, and reserved roots in `checkpoints` and `tmp`. Repo/config and the existing venv remain in HOME. The fallback is `$HOME/islandsEA` with a warning. Do not reintroduce output under the repo, `~/artifacts`, or relative `logs/` in an Ares launcher. Submit via `pilot_run/submit_*.sh`, `hpc_benchmarks/submit_*.sh`, or `smoke_run/submit_smoke.sh`, because `#SBATCH` does not expand shell variables; `/tmp` in job headers is only a safe non-HOME fallback.
 - Every named benchmark run writes `run_metadata.json` as well as `experiment_manifest.json`. `run_metadata.json` is the aggregation contract: it records a unique `run_id`, stable SHA-256 `experiment_key`, all benchmark/GA/migration/topology settings, repeat and seed policy, topology hash, resources/SLURM IDs, Git/code/dependency provenance and resolved storage/output paths. The pilot validator must reject missing or inconsistent metadata.
 - The pilot requires metrics profile `research-v1-full-buffered`. Each island writes `metrics/island_NNN/{migration_events,queue_fetches,fitness_history}.jsonl.gz`, `final_solution.json`, `runtime.json` and `summary.json`; the root `metrics/data_contract.json` defines the schema. Migration records share `(run_id,event_id)` across send/process and retain enqueue/dequeue timestamps, queue depth/residence, pre-filter decision, replacement survival and a 25-step survival observation. Fitness includes the initial population and every step on evaluation/time axes. Telemetry stays in actor memory during optimization and is compressed only after the finish barrier; never replace it with per-migrant synchronous I/O.
@@ -565,7 +612,7 @@ Therefore:
 
 ---
 
-## Output and Logging Contract (Do Not Break)
+## Internal raw output and logging (portable export described above)
 
 Output path builder:
 - `geneticAlgorithm/utils/filename.py`
@@ -791,10 +838,8 @@ unchanged. Existing differences in GPU batching, GA support and controller
 were already present in the branch commits and were not edited here. This
 is ER4 integration evidence, not a new certification of complete CPU/GPU parity.
 
-The newer Athena runbook `athena-info/ATHENA_HOW_TO_RUN.md` (in the Athena
-checkout) records successful A100 backend/canary checks and one technical
-full run. Shard-position, batching and metadata causes have been addressed
-locally, but the campaign remains paused until a new same-commit canary and
-one full pilot pass the target-side quality gates. That deployment status
-supersedes older pre-canary summaries elsewhere in this document. Resolving
-ER4 alone did not resolve those separate issues.
+The newer Athena runbook `athena-info/ATHENA_HOW_TO_RUN.md` records the passed
+A100 backend, canary `3181809` and full pilot `3185051`; the latter passed all
+target-side batching, scheduler, migration and metadata gates. By the user's
+explicit decision, the dedicated frozen three-repeat comparison launcher now
+submits directly without a new canary or a canary-to-commit binding.

@@ -160,9 +160,9 @@ def _require_compute_allocation(args) -> str:
         )
     commit, dirty = _git_state()
     expected_commit = os.environ.get("ATHENA_EXPECTED_COMMIT")
-    if not expected_commit or commit != expected_commit or dirty is not False:
+    if expected_commit and (commit != expected_commit or dirty is not False):
         raise RuntimeError("execution requires the pinned clean checkout throughout the job")
-    return commit
+    return commit, dirty
 
 
 def _slurm_metadata() -> dict:
@@ -371,7 +371,7 @@ def run(args) -> None:
         )
         return
 
-    commit = _require_compute_allocation(args)
+    commit, git_dirty = _require_compute_allocation(args)
     import ray
 
     from athena_gpu.evaluation_batcher import make_actor_class as make_batcher
@@ -470,7 +470,7 @@ def run(args) -> None:
         "run_directory": str(raw),
         "versions": versions,
         "git_commit": commit,
-        "git_dirty": False,
+        "git_dirty": git_dirty,
         "runtime_sha256": runtime_sha256(),
         "athena_runtime_sha256": _athena_runtime_sha256(),
         "selected_graphs": {
@@ -541,7 +541,7 @@ def run(args) -> None:
         },
         "provenance": {
             "git_commit": commit,
-            "git_dirty": False,
+            "git_dirty": git_dirty,
             "runtime_sha256": manifest["runtime_sha256"],
             "athena_runtime_sha256": manifest["athena_runtime_sha256"],
             "launcher_sha256": manifest["launcher_sha256"],

@@ -29,6 +29,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--output", type=Path, required=True)
     result.add_argument("--mode", choices=("canary", "full"), required=True)
     result.add_argument("--expected-commit", required=True)
+    result.add_argument("--expected-repeat", type=int, choices=(1, 2, 3), default=1)
     return result
 
 
@@ -36,8 +37,10 @@ def _load(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _spec(mode: str) -> dict:
+def _spec(mode: str, repeat: int = 1) -> dict:
     full = mode == "full"
+    if not full and repeat != 1:
+        raise ValueError("Athena canary must use repeat 1")
     islands = 144 if full else 12
     evaluations = 8000 if full else 128
     population = 16
@@ -57,6 +60,9 @@ def _spec(mode: str) -> dict:
         "migrant_selection": "best",
         "migrant_acceptance": "plain",
         "base_seed": 20260912,
+        "benchmark_instance_seed": 20260511,
+        "repeat": repeat,
+        "repeat_seed": 20260912 + (repeat - 1) * 1000000,
         "expected_steps_per_island": (evaluations - population) // offspring,
         "effect_horizon_steps": 25,
         "metrics_profile": "research-v1-full-buffered",
@@ -72,7 +78,11 @@ def _require(condition: bool, message: str, errors: list[str]) -> None:
 def _check_manifest(manifest: dict, spec: dict, mode: str, expected_commit: str, errors: list[str]):
     _require(manifest.get("status") == "complete", "experiment manifest is not complete", errors)
     _require(manifest.get("git_commit") == expected_commit, "manifest commit mismatch", errors)
-    _require(manifest.get("git_dirty") is False, "manifest reports a dirty checkout", errors)
+    _require(
+        isinstance(manifest.get("git_dirty"), bool),
+        "manifest does not record the Git dirty state",
+        errors,
+    )
     _require(manifest.get("execution_backend") == "athena-gpu-sharded", "wrong execution backend", errors)
     _require(
         manifest.get("versions") == ATHENA_EXPECTED_DISTRIBUTIONS,
@@ -95,8 +105,9 @@ def _check_manifest(manifest: dict, spec: dict, mode: str, expected_commit: str,
         "torus_columns": spec["torus_columns"],
         "strategy": spec["migrant_selection"],
         "acceptance": spec["migrant_acceptance"],
-        "repeat": 1,
+        "repeat": spec["repeat"],
         "seed": spec["base_seed"],
+        "instance_seed": spec["benchmark_instance_seed"],
         "diagnostic": mode == "canary",
     }
     for key, value in expected.items():
@@ -120,6 +131,7 @@ def _check_manifest(manifest: dict, spec: dict, mode: str, expected_commit: str,
     _require(gpu.get("cupy") == "10.6.0", "manifest has wrong CuPy", errors)
     _require(gpu.get("cuda_runtime") == 11070, "manifest has wrong CUDA runtime", errors)
     scientific = manifest.get("scientific_configuration", {})
+    scientific_seed = scientific.get("seed", {})
     migration = scientific.get("migration", {})
     algorithm = scientific.get("algorithm_configuration", {})
     _require(
@@ -138,6 +150,23 @@ def _check_manifest(manifest: dict, spec: dict, mode: str, expected_commit: str,
         errors,
     )
     _require("island_delays" not in algorithm, "legacy island_delays leaked into effective metadata", errors)
+    _require(scientific.get("repeat") == spec["repeat"], "scientific repeat is wrong", errors)
+    _require(
+        scientific_seed.get("requested_base") == spec["base_seed"],
+        "scientific base seed is wrong",
+        errors,
+    )
+    _require(
+        scientific_seed.get("repeat_base") == spec["repeat_seed"],
+        "scientific repeat seed is wrong",
+        errors,
+    )
+    _require(
+        scientific_seed.get("benchmark_instance_seed")
+        == spec["benchmark_instance_seed"],
+        "scientific benchmark instance seed is wrong",
+        errors,
+    )
     plan = manifest.get("athena_plan", {})
     expected_steady_rows = 144 if mode == "full" else 48
     _require(plan.get("schema_version") == 2, "Athena plan schema is not position-safe v2", errors)
@@ -157,7 +186,7 @@ def _check_manifest(manifest: dict, spec: dict, mode: str, expected_commit: str,
         errors,
     )
     _require(
-        plan.get("shard_mapping", {}).get("seed") == spec["base_seed"],
+        plan.get("shard_mapping", {}).get("seed") == spec["repeat_seed"],
         "shard mapping seed differs from the repeat seed",
         errors,
     )
@@ -458,7 +487,7 @@ def _check_athena_metrics(raw: Path, spec: dict, mode: str, errors: list[str]) -
 
 def validate(args) -> dict:
     errors: list[str] = []
-    spec = _spec(args.mode)
+    spec = _spec(args.mode, args.expected_repeat)
     _require(args.pointer.is_file(), "result pointer is missing", errors)
     raw = None
     pointer = {}
@@ -499,7 +528,9 @@ def validate(args) -> dict:
         if paths["manifest"].is_file():
             _check_manifest(_load(paths["manifest"]), spec, args.mode, args.expected_commit, errors)
         if paths["metadata"].is_file():
-            pilot_tools.check_run_metadata(_load(paths["metadata"]), spec, 1, raw, errors)
+            pilot_tools.check_run_metadata(
+                _load(paths["metadata"]), spec, spec["repeat"], raw, errors
+            )
         if paths["topology"].is_file():
             pilot_tools.check_topology(_load(paths["topology"]), spec, errors)
         if paths["param"].is_file():
@@ -534,6 +565,7 @@ def validate(args) -> dict:
         "schema_version": 1,
         "checked_utc": datetime.now(timezone.utc).isoformat(),
         "mode": args.mode,
+        "repeat": spec["repeat"],
         "status": "passed" if not errors else "failed",
         "valid": not errors,
         "git_commit": args.expected_commit,

@@ -1,3 +1,9 @@
+> **Artefakty runa od 2026-09-19:** wspólny format CPU/GPU to
+> `run_<job_id>/{logs,metrics,results}`, `identifier.txt`, `metdadata.json`
+> oraz `run_<job_id>.tar.gz` + SHA-256 w `$SCRATCH/islandsEA/exports`.
+> [Układ, eksport i pobieranie](<../hpc_benchmarks/RUN_ARTIFACTS.md>). Dawne raw/audit i archiwa pilota
+> są zachowane dla zgodności; nowy downloader to `hpc_benchmarks/download_run.ps1`.
+
 > Aktualizacja 2026-09-17: badanie używa 144 wysp we wszystkich topologiach.
 > ER4 został odblokowany zgodnie z odpowiedzią prowadzącej: igraph G(n,p),
 > n=144, p=0.0347, undirected; pętle tylko dla izolowanych węzłów.
