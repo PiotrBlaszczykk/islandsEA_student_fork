@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 def portable_results(run_dir: Path):
     run_dir = Path(run_dir)
-    if (run_dir / "metdadata.json").is_file() and (run_dir / "results").is_dir():
+    if (run_dir / "metadata.json").is_file() and (run_dir / "results").is_dir():
         return run_dir / "results"
     return run_dir
 
@@ -30,7 +30,7 @@ def portable_metrics(run_dir: Path):
     run_dir = portable_results(run_dir)
     if (run_dir / "metrics").is_dir():
         return run_dir / "metrics"
-    if run_dir.name == "results" and (run_dir.parent / "metdadata.json").is_file():
+    if run_dir.name == "results" and (run_dir.parent / "metadata.json").is_file():
         return run_dir.parent / "metrics"
     return run_dir / "metrics"
 

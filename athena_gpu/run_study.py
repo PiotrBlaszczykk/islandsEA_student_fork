@@ -170,6 +170,8 @@ def _slurm_metadata() -> dict:
         key: os.environ.get(key)
         for key in (
             "SLURM_JOB_ID",
+            "SLURM_ARRAY_JOB_ID",
+            "SLURM_ARRAY_TASK_ID",
             "SLURM_JOB_NAME",
             "SLURM_JOB_ACCOUNT",
             "SLURM_JOB_PARTITION",

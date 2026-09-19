@@ -7,7 +7,7 @@ workspace `artifacts/run_wyniki_przyklad/run_123456` i zebrany run `run_3174577`
 $SCRATCH/islandsEA/exports/
 ├── run_<SLURM_JOB_ID>/
 │   ├── identifier.txt
-│   ├── metdadata.json
+│   ├── metadata.json
 │   ├── logs/
 │   │   ├── <oryginalna-nazwa-joba>.out
 │   │   ├── <oryginalna-nazwa-joba>.err
@@ -43,9 +43,9 @@ $SCRATCH/islandsEA/exports/
 └── run_<SLURM_JOB_ID>.tar.gz.sha256
 ```
 
-Pisownia **`metdadata.json`** pochodzi z przekazanego wzorca i jest zachowana
-celowo. Plik jest dokładną kopią `results/run_metadata.json`; nie zmieniamy
-schematu ani historycznych ścieżek zapisanych w naukowych metadanych.
+Plik **`metadata.json`** jest dokładną kopią `results/run_metadata.json`;
+nie zmieniamy schematu ani historycznych ścieżek zapisanych w naukowych
+metadanych.
 `results/bundle_manifest.json` podaje przenośne ścieżki względem katalogu runa,
 mapowanie źródeł, rozmiary i SHA-256 wszystkich pozostałych plików. Nie należy
 otwierać oryginalnych ścieżek HPC z `result_pointer.json` po pobraniu na laptop.

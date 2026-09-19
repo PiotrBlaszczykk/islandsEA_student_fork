@@ -15,6 +15,18 @@ from athena_gpu.validate_study_run import _spec as validation_spec
 
 
 class StudyContractTests(unittest.TestCase):
+    def test_slurm_metadata_preserves_array_identity_for_log_export(self):
+        environment = {
+            "SLURM_JOB_ID": "3185444",
+            "SLURM_ARRAY_JOB_ID": "3185443",
+            "SLURM_ARRAY_TASK_ID": "1",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            metadata = run_study._slurm_metadata()
+        self.assertEqual("3185444", metadata["SLURM_JOB_ID"])
+        self.assertEqual("3185443", metadata["SLURM_ARRAY_JOB_ID"])
+        self.assertEqual("1", metadata["SLURM_ARRAY_TASK_ID"])
+
     def test_unpinned_frozen_execution_records_dirty_state_without_blocking(self):
         environment = {
             "SLURM_JOB_ID": "123",
