@@ -8,13 +8,12 @@ workspace `artifacts/run_wyniki_przyklad/{run_123456,run_3174577}`.
 
 - Primary deliverable: `$SCRATCH/islandsEA/exports/run_<SLURM_JOB_ID>.tar.gz`
   and `.tar.gz.sha256`; extracted root is `run_<SLURM_JOB_ID>/` with exactly
-  `logs/`, `metrics/`, `results/`, `identifier.txt`, `metdadata.json`.
-  The `metdadata.json` spelling deliberately matches the user's template.
+  `logs/`, `metrics/`, `results/`, `identifier.txt`, `metadata.json`.
 - Every original raw file except the relocated metrics tree is in `results/`.
   The original `metrics/` becomes a sibling of `results/`; preserve all islands,
   the six files per island, `data_contract.json`, legacy outputs and GPU extras.
   SLURM `.out/.err` and available failure logs belong in `logs/`.
-- `metdadata.json` is a byte copy of `results/run_metadata.json`. Original HPC
+- `metadata.json` is a byte copy of `results/run_metadata.json`. Original HPC
   paths inside scientific JSON remain provenance, not usable laptop paths.
   `results/bundle_manifest.json` is the portable path/inventory/checksum map.
   It separates data completeness, scientific status, job exit and validation.

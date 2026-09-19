@@ -74,7 +74,7 @@ class BundleTests(unittest.TestCase):
         before = {p.relative_to(self.raw): bundle.sha256(p) for p in bundle.files_under(self.raw)}
         result = self.export()
         target = Path(result["directory"])
-        self.assertEqual({"logs", "metrics", "results", "identifier.txt", "metdadata.json"}, {p.name for p in target.iterdir()})
+        self.assertEqual({"logs", "metrics", "results", "identifier.txt", "metadata.json"}, {p.name for p in target.iterdir()})
         self.assertFalse((target / "results/metrics").exists())
         self.assertFalse((target / "results/cache").exists())
         self.assertEqual({"pilot-120_3.out", "pilot-120_3.err"}, {p.name for p in (target / "logs").iterdir()})

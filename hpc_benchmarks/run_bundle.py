@@ -15,8 +15,7 @@ import tempfile
 
 
 SCHEMA = "islandsea-run-bundle-v1"
-# User-supplied template spelling is intentional and part of this layout.
-METADATA = "metdadata.json"
+METADATA = "metadata.json"
 ISLAND_FILES = ("migration_events.jsonl.gz", "queue_fetches.jsonl.gz",
                 "fitness_history.jsonl.gz", "final_solution.json", "runtime.json", "summary.json")
 CORE_RESULTS = ("run_metadata.json", "experiment_manifest.json", "benchmark_manifest.json",
