@@ -284,6 +284,7 @@ def command_verify_canary(args) -> None:
     canary_spec["expected_steps_per_island"] = 28
     canary_dir = Path(args.artifact_root).resolve() / "pilot_canaries" / args.job_id
     errors: list[str] = []
+    canary_git_commit = None
     accounting = subprocess.run(
         [
             "sacct", "-n", "-X", "-j", args.job_id,
@@ -327,12 +328,17 @@ def command_verify_canary(args) -> None:
         require(param_path.is_file(), "canary param.json is missing", errors)
         require(metadata_path.is_file(), "canary run_metadata.json is missing", errors)
         if manifest_path.is_file():
+            manifest = load_json(manifest_path)
+            canary_git_commit = manifest.get("git_commit")
             check_manifest(
-                load_json(manifest_path),
+                manifest,
                 canary_spec,
                 1,
                 errors,
-                expected_commit=git_value("rev-parse", "HEAD"),
+                # A canary certifies the frozen scientific/runtime contract.
+                # Its commit remains provenance, but control-plane-only fixes
+                # do not invalidate a successful cluster certification.
+                expected_commit=None,
             )
         if topology_path.is_file():
             check_topology(load_json(topology_path), canary_spec, errors)
@@ -367,6 +373,9 @@ def command_verify_canary(args) -> None:
         "errors": errors,
         "sacct": accounting.stdout,
         "raw_run_directory": str(raw) if raw is not None else None,
+        "canary_git_commit": canary_git_commit,
+        "validator_git_commit": git_value("rev-parse", "HEAD"),
+        "commit_match_required": False,
     }
     dump_json(canary_dir / "canary_validation.json", validation)
     if errors:
@@ -1257,13 +1266,10 @@ def command_finalize(args) -> None:
 
     global_errors = []
     submission_path = pilot_dir / "submission.json"
-    expected_commit = None
     if not submission_path.is_file():
         global_errors.append("submission.json is missing")
     else:
         submission = load_json(submission_path)
-        expected_commit = submission.get("git_commit")
-        require(bool(expected_commit), "submission.json does not contain a Git commit", global_errors)
         require(submission.get("git_dirty") is False, "submission.json reports a dirty Git tree", global_errors)
         require(submission.get("spec_sha256") == sha256_file(SPEC_PATH), "submission spec hash differs from the finalizer spec", global_errors)
 
@@ -1276,7 +1282,7 @@ def command_finalize(args) -> None:
                     repeat,
                     spec,
                     analyzer,
-                    expected_commit,
+                    None,
                 )
             )
         except BaseException as error:

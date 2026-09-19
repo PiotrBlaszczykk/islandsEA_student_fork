@@ -146,7 +146,6 @@ export -f git module mkdir sacct sbatch bash
                 "SLURM_JOB_ID": "999",
                 "SLURM_ARRAY_JOB_ID": "456",
                 "SLURM_ARRAY_TASK_ID": "1",
-                "PILOT_EXPECTED_COMMIT": "test-commit",
             }
         )
 
@@ -327,6 +326,22 @@ export -f git module mkdir sacct sbatch bash
         self.assertNotIn(" verify-canary ", result.stderr)
         self.assertIn("PILOT_ARRAY_JOB_ID=12345", result.stdout)
         self.assertIn("PILOT_FINALIZER_JOB_ID=12345", result.stdout)
+
+    def test_pipeline_does_not_use_git_commit_as_cross_stage_lock(self):
+        for name in (
+            "launch_pilot.sh",
+            "submit_canary.sh",
+            "run_pilot_canary.sh",
+            "continue_after_canary.sh",
+            "submit_pilot.sh",
+            "run_pilot_array.sh",
+            "finalize_pilot.sh",
+        ):
+            with self.subTest(script=name):
+                content = (self.project / "pilot_run" / name).read_text(
+                    encoding="utf-8"
+                )
+                self.assertNotIn("PILOT_EXPECTED_COMMIT", content)
 
     def test_ray_launcher_reserves_head_resources_for_driver(self):
         content = (self.project / "hpc_benchmarks" / "run_ares.sh").read_text(

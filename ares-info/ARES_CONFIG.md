@@ -558,6 +558,14 @@ login node'a. Array i finalizer są wcześniej ustawione jako zależne od
 `afterok` gate oraz `--kill-on-invalid-dep=yes`; gate wyłącznie waliduje canary.
 Nie przywracać wywołania `submit_pilot.sh` ani `sbatch` wewnątrz gate.
 
+Canary jest certyfikacją konkretnego kontraktu naukowego i infrastruktury, nie
+konkretnego SHA Git. Walidator nadal sprawdza wszystkie parametry, topologię,
+zasoby, telemetrię, integralność migracji i kompletność wyniku, ale zgodność
+commita zapisuje informacyjnie. Dzięki temu poprawka submittera lub zależności
+SLURM nie wymusza ponownego kosztu canary, jeśli kod obliczeniowy i kontrakt są
+niezmienione. Każdy job zapisuje własny commit jako provenance; zgodność SHA
+nie jest blokadą wykonania między etapami. Pozostaje wymóg czystego checkoutu.
+
 ## 13. Naprawa błędu `/var/spool/slurmd`
 
 Zasada ogólna:
@@ -974,8 +982,7 @@ wersji Ray tylko dla UI w produkcyjnym venv bez pełnej rewalidacji środowiska.
 
 - Nie wykonywać benchmarków na laptopie ani login node.
 - Nie ponawiać automatycznie awarii; najpierw klasyfikacja przyczyny.
-- Nie wysyłać pełnego array bez zaliczonego canary tej samej konfiguracji i
-  przypiętego commita.
+- Nie wysyłać pełnego array bez zaliczonego canary tej samej konfiguracji.
 - Nie ufać samemu `COMPLETED`; wymagać markerów, manifestów i walidacji danych.
 - Nie lokalizować repo z `BASH_SOURCE` wewnątrz batch scriptu.
 - Nie używać względnych ścieżek do kodu w jobie.

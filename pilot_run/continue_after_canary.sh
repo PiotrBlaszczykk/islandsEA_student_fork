@@ -16,7 +16,6 @@
 set -euo pipefail
 [[ "$#" -eq 1 && "$1" =~ ^[0-9]+$ ]] || { echo "Usage: $0 CANARY_JOB_ID" >&2; exit 2; }
 : "${SLURM_JOB_ID:?Submit this gate with pilot_run/launch_pilot.sh}"
-: "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
 : "${ISLANDS_PROJECT_DIR:?Missing absolute repository path}"
 
 CANARY_JOB_ID="$1"
@@ -43,12 +42,6 @@ module load python/3.10.4-gcccore-11.3.0
 source "$VENV_DIR/bin/activate"
 cd "$PROJECT_DIR"
 
-ACTUAL_COMMIT=$(git rev-parse HEAD)
-[[ "$ACTUAL_COMMIT" == "$PILOT_EXPECTED_COMMIT" ]] || {
-    echo "GATE_BLOCKED: checkout changed after submission." >&2
-    echo "expected=$PILOT_EXPECTED_COMMIT actual=$ACTUAL_COMMIT" >&2
-    exit 2
-}
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
     echo "GATE_BLOCKED: checkout became dirty after submission." >&2
     git status --short >&2
@@ -71,7 +64,7 @@ done
     exit 1
 }
 
-echo "Validating canary $CANARY_JOB_ID for pinned commit $PILOT_EXPECTED_COMMIT"
+echo "Validating canary $CANARY_JOB_ID against the current scientific contract"
 echo "canary_state=$CANARY_STATE"
 CANARY_DIR="$ISLANDS_ARTIFACT_ROOT/pilot_canaries/$CANARY_JOB_ID"
 "$VENV_DIR/bin/python" "$SCRIPT_DIR/pilot_tools.py" verify-canary \

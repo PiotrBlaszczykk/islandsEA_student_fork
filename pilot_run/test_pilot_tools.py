@@ -389,6 +389,47 @@ class PilotContractTests(unittest.TestCase):
                 self.assertTrue(parsed["repeats"][str(repeat)]["available"])
                 self.assertEqual(job_id, parsed["repeats"][str(repeat)]["job_id"])
 
+    def test_canary_contract_does_not_require_validator_commit_match(self):
+        spec = pilot_tools.load_spec()
+        manifest = {
+            "status": "complete",
+            "git_dirty": False,
+            "git_commit": "canary-commit",
+            "args": {
+                "problem": spec["benchmark"],
+                "dimension": spec["dimension"],
+                "islands": spec["islands"],
+                "evaluations": 128,
+                "population": spec["population"],
+                "offspring": spec["offspring"],
+                "migrants": spec["migrants"],
+                "interval": spec["migration_interval"],
+                "topology": spec["topology"],
+                "torus_rows": spec["torus_rows"],
+                "torus_columns": spec["torus_columns"],
+                "strategy": spec["migrant_selection"],
+                "acceptance": spec["migrant_acceptance"],
+                "repeat": 1,
+                "seed": spec["base_seed"],
+            },
+            "required_ray_cpus": 289,
+            "required_slurm_cpus": 290,
+            "node_checks": [{} for _ in range(spec["slurm"]["nodes_per_repeat"])],
+            "metrics_profile": {
+                "name": spec["metrics_profile"],
+                "effect_horizon_steps": spec["effect_horizon_steps"],
+                "delivery_ack_timeout_seconds": 300.0,
+                "synchronous_writes_during_optimization": False,
+            },
+        }
+        canary_spec = dict(spec)
+        canary_spec["evaluations_per_island"] = 128
+        errors = []
+        pilot_tools.check_manifest(
+            manifest, canary_spec, 1, errors, expected_commit=None
+        )
+        self.assertEqual([], errors)
+
     def test_rich_delay_statistics(self):
         matplotlib = types.ModuleType("matplotlib")
         matplotlib.__path__ = []

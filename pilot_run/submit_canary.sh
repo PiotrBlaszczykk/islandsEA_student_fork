@@ -25,10 +25,6 @@ islandsea_validate_ray_cli "$VENV_DIR"
     exit 2
 }
 GIT_COMMIT=$(git rev-parse HEAD)
-if [[ -n "${PILOT_EXPECTED_COMMIT:-}" && "$GIT_COMMIT" != "$PILOT_EXPECTED_COMMIT" ]]; then
-    echo "Submission blocked: expected commit $PILOT_EXPECTED_COMMIT, found $GIT_COMMIT." >&2
-    exit 2
-fi
 
 mapfile -t CANARY_ARGS < <(
     "$VENV_DIR/bin/python" "$SCRIPT_DIR/pilot_tools.py" benchmark-args --repeat 1
@@ -63,7 +59,7 @@ mkdir -p "$ARTIFACT_ROOT/pilot_canaries"
 SUBMISSION=$(sbatch --parsable \
     --output="$ISLANDS_SLURM_LOG_DIR/pilot-canary-%j.out" \
     --error="$ISLANDS_SLURM_LOG_DIR/pilot-canary-%j.err" \
-    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR},PILOT_EXPECTED_COMMIT=${GIT_COMMIT}" \
+    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR}" \
     "$SCRIPT_DIR/run_pilot_canary.sh")
 JOB_ID="${SUBMISSION%%;*}"
 echo "PILOT_CANARY_JOB_ID=$JOB_ID"

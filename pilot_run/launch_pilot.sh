@@ -108,7 +108,6 @@ print("PILOT_DRY_RUN_OK")
 ' "$PLAN_JSON"
 
 export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
-export PILOT_EXPECTED_COMMIT="$COMMIT"
 CANARY_OUTPUT=$(bash "$SCRIPT_DIR/submit_canary.sh")
 printf '%s\n' "$CANARY_OUTPUT"
 CANARY_JOB_ID=$(awk -F= '/^PILOT_CANARY_JOB_ID=/{print $2}' <<<"$CANARY_OUTPUT")
@@ -121,7 +120,7 @@ GATE_SUBMISSION=$(sbatch --parsable \
     --dependency="afterany:${CANARY_JOB_ID}" \
     --output="$ISLANDS_SLURM_LOG_DIR/pilot-gate-%j.out" \
     --error="$ISLANDS_SLURM_LOG_DIR/pilot-gate-%j.err" \
-    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_ARTIFACT_ROOT=${ISLANDS_ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR},PILOT_EXPECTED_COMMIT=${COMMIT},PILOT_MAX_PARALLEL=${MAX_PARALLEL}" \
+    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_ARTIFACT_ROOT=${ISLANDS_ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR},PILOT_MAX_PARALLEL=${MAX_PARALLEL}" \
     "$SCRIPT_DIR/continue_after_canary.sh" "$CANARY_JOB_ID")
 GATE_JOB_ID="${GATE_SUBMISSION%%;*}"
 [[ "$GATE_JOB_ID" =~ ^[0-9]+$ ]] || {
@@ -133,7 +132,6 @@ GATE_JOB_ID="${GATE_SUBMISSION%%;*}"
 # here on the login node, but keep them blocked behind the strict canary gate.
 export PILOT_CANARY_JOB_ID="$CANARY_JOB_ID"
 export PILOT_GATE_JOB_ID="$GATE_JOB_ID"
-export PILOT_EXPECTED_COMMIT="$COMMIT"
 FULL_OUTPUT=$(bash "$SCRIPT_DIR/submit_pilot.sh")
 printf '%s\n' "$FULL_OUTPUT"
 ARRAY_JOB_ID=$(awk -F= '/^PILOT_ARRAY_JOB_ID=/{print $2}' <<<"$FULL_OUTPUT")

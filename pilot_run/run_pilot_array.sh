@@ -13,7 +13,6 @@
 set -euo pipefail
 : "${SLURM_ARRAY_JOB_ID:?Submit through pilot_run/submit_pilot.sh}"
 : "${SLURM_ARRAY_TASK_ID:?Missing SLURM_ARRAY_TASK_ID}"
-: "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
 : "${ISLANDS_PROJECT_DIR:?Missing absolute repository path}"
 
 case "$ISLANDS_PROJECT_DIR" in
@@ -44,11 +43,6 @@ mkdir -p "$RUN_ARTIFACT_DIR"
 module load python/3.10.4-gcccore-11.3.0
 source "$VENV_DIR/bin/activate"
 cd "$PROJECT_DIR"
-ACTUAL_COMMIT=$(git rev-parse HEAD)
-[[ "$ACTUAL_COMMIT" == "$PILOT_EXPECTED_COMMIT" ]] || {
-    echo "Pilot blocked: expected commit $PILOT_EXPECTED_COMMIT, found $ACTUAL_COMMIT." >&2
-    exit 2
-}
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
     echo "Pilot blocked: checkout became dirty after submission." >&2
     git status --short >&2

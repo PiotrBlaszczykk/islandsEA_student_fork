@@ -12,7 +12,6 @@
 
 set -euo pipefail
 : "${SLURM_JOB_ID:?Submit through pilot_run/submit_canary.sh}"
-: "${PILOT_EXPECTED_COMMIT:?Missing pinned pilot commit}"
 : "${ISLANDS_PROJECT_DIR:?Missing absolute repository path}"
 
 case "$ISLANDS_PROJECT_DIR" in
@@ -37,11 +36,6 @@ CANARY_DIR="$ARTIFACT_ROOT/pilot_canaries/$SLURM_JOB_ID"
 
 mkdir -p "$CANARY_DIR"
 cd "$PROJECT_DIR"
-ACTUAL_COMMIT=$(git rev-parse HEAD)
-[[ "$ACTUAL_COMMIT" == "$PILOT_EXPECTED_COMMIT" ]] || {
-    echo "Canary blocked: expected commit $PILOT_EXPECTED_COMMIT, found $ACTUAL_COMMIT." >&2
-    exit 2
-}
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
     echo "Canary blocked: checkout became dirty after submission." >&2
     git status --short >&2

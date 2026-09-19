@@ -40,7 +40,10 @@ traktuje trzy warianty jako strategie **wyboru** migrantów; dokument nie narzuc
 osobnej strategii przyjęcia. F1 w 200D jest utrwalonym rozszerzeniem IslandsEA,
 nie oficjalnym wymiarem CEC2014.
 
-144 wyspy zatwierdzono w mailu; torus12×12 zachowuje dotychczasowe 12 kolumn. Bramka CONFIRM_TORUS_200 została usunięta. Nadal wymagane są ID poprawnego canary na tej samej konfiguracji oraz przypięty czysty commit.
+144 wyspy zatwierdzono w mailu; torus12×12 zachowuje dotychczasowe 12 kolumn.
+Bramka CONFIRM_TORUS_200 została usunięta. Wymagane jest ID poprawnego canary
+tej samej konfiguracji. Commit każdego joba jest zapisywany jako provenance,
+ale nie blokuje wykonania aktualnego checkoutu.
 
 ## Co jest wysyłane
 
@@ -76,9 +79,11 @@ do `pilot_run/launch_pilot.sh`, aby nie powielać zamrożonej specyfikacji,
 walidacji, zależności SLURM ani limitów zasobów. Bezpośrednie wywołanie
 `pilot_run/launch_pilot.sh` z tym samym argumentem pozostaje równoważne.
 
-Argument jest celowo długi: potwierdza koszt pipeline’u ≤561.5 CPUh (zaokrąglony limit 562). Canary oraz właściwe joby są przypięte do commita obecnego przy
-uruchomieniu. Zmiana checkoutu lub brudne drzewo przed startem któregokolwiek
-etapu bezpiecznie zatrzyma pipeline. Launcher nie wykonuje automatycznych retry.
+Argument jest celowo długi: potwierdza koszt pipeline’u ≤561.5 CPUh (zaokrąglony limit 562). Canary certyfikuje zamrożoną konfigurację naukową, zasoby,
+Ray i kontrakt danych; jego commit jest provenance, a nie warunkiem ponownego
+użycia po poprawce samego submittera. Każdy job zapisuje rzeczywisty stan Git
+w metadanych; checkout nadal ma być czysty. Launcher nie wykonuje
+automatycznych retry.
 
 ## Ręczne uruchomienie etapami
 

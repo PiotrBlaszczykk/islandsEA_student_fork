@@ -61,10 +61,6 @@ export ISLANDS_PROJECT_DIR="$PROJECT_DIR"
     exit 2
 }
 GIT_COMMIT=$(git rev-parse HEAD)
-if [[ -n "${PILOT_EXPECTED_COMMIT:-}" && "$GIT_COMMIT" != "$PILOT_EXPECTED_COMMIT" ]]; then
-    echo "Submission blocked: expected commit $PILOT_EXPECTED_COMMIT, found $GIT_COMMIT." >&2
-    exit 2
-fi
 
 islandsea_validate_ray_cli "$VENV_DIR"
 ARRAY_DEPENDENCY_OPTIONS=()
@@ -86,7 +82,7 @@ ARRAY_SUBMISSION=$(sbatch --parsable \
     --array="1-3%${MAX_PARALLEL}" \
     --output="$ISLANDS_SLURM_LOG_DIR/pilot-%A_%a.out" \
     --error="$ISLANDS_SLURM_LOG_DIR/pilot-%A_%a.err" \
-    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR},PILOT_EXPECTED_COMMIT=${GIT_COMMIT}" \
+    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR}" \
     "$SCRIPT_DIR/run_pilot_array.sh")
 ARRAY_JOB_ID="${ARRAY_SUBMISSION%%;*}"
 if [[ -n "$FINALIZER_DEPENDENCY" ]]; then
@@ -99,7 +95,7 @@ FINALIZER_SUBMISSION=$(sbatch --parsable \
     ${GATE_JOB_ID:+--kill-on-invalid-dep=yes} \
     --output="$ISLANDS_SLURM_LOG_DIR/pilot-finalize-%j.out" \
     --error="$ISLANDS_SLURM_LOG_DIR/pilot-finalize-%j.err" \
-    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR},PILOT_EXPECTED_COMMIT=${GIT_COMMIT}" \
+    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_ARTIFACT_ROOT=${ARTIFACT_ROOT},ISLANDS_VENV_DIR=${VENV_DIR}" \
     "$SCRIPT_DIR/finalize_pilot.sh" "$ARRAY_JOB_ID")
 FINALIZER_JOB_ID="${FINALIZER_SUBMISSION%%;*}"
 
