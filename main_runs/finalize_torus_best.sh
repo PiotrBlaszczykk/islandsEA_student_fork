@@ -11,7 +11,10 @@
 #SBATCH --error=/tmp/torus-best-finalize-%j.err
 
 set -euo pipefail
-[[ "$#" -eq 1 ]] || { echo "Usage: $0 ARRAY_JOB_ID" >&2; exit 2; }
+[[ "$#" -ge 1 && "$#" -le 2 ]] || {
+    echo "Usage: $0 CAMPAIGN_ARRAY_JOB_ID [RETRY_ARRAY_JOB_ID]" >&2
+    exit 2
+}
 : "${ISLANDS_PROJECT_DIR:?Missing absolute repository path}"
 : "${ISLANDS_CAMPAIGN_DIR:?Missing absolute campaign path}"
 case "$ISLANDS_PROJECT_DIR:$ISLANDS_CAMPAIGN_DIR" in
@@ -20,6 +23,8 @@ case "$ISLANDS_PROJECT_DIR:$ISLANDS_CAMPAIGN_DIR" in
 esac
 
 ARRAY_JOB_ID="$1"
+ACCOUNTING_JOB_IDS="$ARRAY_JOB_ID"
+[[ "$#" -eq 1 ]] || ACCOUNTING_JOB_IDS="$ARRAY_JOB_ID,$2"
 PROJECT_DIR=$(cd -- "$ISLANDS_PROJECT_DIR" && pwd -P)
 CAMPAIGN_DIR=$(cd -- "$ISLANDS_CAMPAIGN_DIR" && pwd -P)
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
@@ -37,7 +42,7 @@ cd "$PROJECT_DIR"
 
 module load python/3.10.4-gcccore-11.3.0
 source "$VENV_DIR/bin/activate"
-sacct -n -P -j "$ARRAY_JOB_ID" \
+sacct -n -P -j "$ACCOUNTING_JOB_IDS" \
     --format=JobIDRaw,JobName,Partition,State,ExitCode,ElapsedRaw,AllocCPUS,CPUTimeRAW,TotalCPU,MaxRSS,MaxVMSize,AveRSS,ReqMem,NodeList \
     > "$CAMPAIGN_DIR/sacct.txt" || true
 

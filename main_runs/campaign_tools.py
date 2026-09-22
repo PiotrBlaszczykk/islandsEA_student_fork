@@ -189,18 +189,21 @@ def validate_metadata(metadata, task, array_job_id, job_id):
     return errors
 
 
-def validate_run(campaign_dir, plan_path, task_id, array_job_id, job_id):
+def validate_run(campaign_dir, plan_path, task_id, array_job_id, job_id,
+                 execution_array_job_id=None):
     """Validate one completed scientific run before its portable export."""
     campaign = Path(campaign_dir).resolve()
     plan = load_plan(plan_path)
     task = task_for(plan, task_id)
     task_dir = campaign / "tasks" / f"task-{task_id:03d}"
     errors = []
+    execution_array_job_id = str(execution_array_job_id or array_job_id)
     result = {
         "schema": SCHEMA, "campaign": CAMPAIGN, "mode": "full",
         "task_id": task_id, "benchmark": task["benchmark"],
         "repeat": task["repeat"], "job_id": str(job_id),
         "array_job_id": str(array_job_id), "checked_utc": utc_now(),
+        "execution_array_job_id": execution_array_job_id,
         "valid": False, "errors": errors,
     }
 
@@ -236,7 +239,7 @@ def validate_run(campaign_dir, plan_path, task_id, array_job_id, job_id):
         errors.append("raw run directory is missing or outside this campaign")
     else:
         metadata = json_file(raw / "run_metadata.json")
-        errors.extend(validate_metadata(metadata, task, array_job_id, job_id))
+        errors.extend(validate_metadata(metadata, task, execution_array_job_id, job_id))
         result["run_id"] = metadata.get("run_id")
         result["experiment_key"] = metadata.get("experiment_key")
         require(pointer.get("run_id") == metadata.get("run_id"), "pointer run_id mismatch")
@@ -379,12 +382,16 @@ def record_task(args):
         "schema": SCHEMA,
         "campaign": CAMPAIGN,
         "array_job_id": str(args.array_job_id),
+        "execution_array_job_id": str(args.execution_array_job_id or args.array_job_id),
         "job_id": str(args.job_id),
         "status": args.status,
         "exit_code": args.exit_code,
     }
-    if "started_utc" not in value:
+    if args.status == "running":
         value["started_utc"] = utc_now()
+        value.pop("finished_utc", None)
+        value.pop("archive", None)
+        value.pop("verification", None)
     if args.status in ("completed", "failed"):
         value["finished_utc"] = utc_now()
     if args.archive:
@@ -413,6 +420,7 @@ def finalize(campaign_dir, array_job_id):
             continue
         record = read_json(record_path)
         job_id = str(record.get("job_id", ""))
+        execution_array_job_id = str(record.get("execution_array_job_id", record.get("array_job_id", "")))
         if record.get("status") != "completed" or record.get("exit_code") != 0:
             errors.append(f"{prefix}: status={record.get('status')} exit={record.get('exit_code')}")
             continue
@@ -437,7 +445,9 @@ def finalize(campaign_dir, array_job_id):
         validation = read_json(validation_path)
         if not (validation.get("valid") is True and not validation.get("errors")
                 and validation.get("task_id") == task_id
-                and str(validation.get("job_id")) == job_id):
+                and str(validation.get("job_id")) == job_id
+                and str(validation.get("array_job_id")) == str(array_job_id)
+                and str(validation.get("execution_array_job_id", execution_array_job_id)) == execution_array_job_id):
             errors.append(f"{prefix}: scientific validation did not pass")
             continue
         if not (verification.get("verified") is True and verification.get("complete") is True
@@ -451,7 +461,7 @@ def finalize(campaign_dir, array_job_id):
             errors.append(f"{prefix}: archive SHA-256 mismatch")
             continue
         metadata = read_json(metadata_path)
-        metadata_errors = validate_metadata(metadata, task, array_job_id, job_id)
+        metadata_errors = validate_metadata(metadata, task, execution_array_job_id, job_id)
         if metadata_errors:
             errors.extend(f"{prefix}: {message}" for message in metadata_errors)
             continue
@@ -468,6 +478,7 @@ def finalize(campaign_dir, array_job_id):
         entries.append({
             **task,
             "job_id": job_id,
+            "execution_array_job_id": execution_array_job_id,
             "run_id": run_id,
             "experiment_key": metadata["experiment_key"],
             "archive": f"runs/{task['benchmark']}/repeat-{task['repeat']}/{archive.name}",
@@ -563,6 +574,7 @@ def parser():
     record.add_argument("--status", choices=("running", "completed", "failed"), required=True)
     record.add_argument("--job-id", required=True)
     record.add_argument("--array-job-id", required=True)
+    record.add_argument("--execution-array-job-id")
     record.add_argument("--exit-code", type=int, required=True)
     record.add_argument("--archive")
     record.add_argument("--verification")
@@ -572,6 +584,7 @@ def parser():
     check.add_argument("--task-id", type=int, required=True)
     check.add_argument("--job-id", required=True)
     check.add_argument("--array-job-id", required=True)
+    check.add_argument("--execution-array-job-id")
     submission = commands.add_parser("record-submission")
     submission.add_argument("--plan", type=Path, required=True)
     submission.add_argument("--output", type=Path, required=True)
@@ -597,7 +610,8 @@ def main():
     elif args.command == "record-task":
         record_task(args)
     elif args.command == "validate-run":
-        validate_run(args.campaign_dir, args.plan, args.task_id, args.array_job_id, args.job_id)
+        validate_run(args.campaign_dir, args.plan, args.task_id, args.array_job_id,
+                     args.job_id, args.execution_array_job_id)
     elif args.command == "record-submission":
         plan = load_plan(args.plan)
         write_json(args.output, {

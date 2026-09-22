@@ -57,6 +57,15 @@ Jeśli finalizer zakończy się błędem, `campaign_summary.json` zawiera listę
 nieudanych lub brakujących tasków. Pozostałe dane zostają na scratchu;
 skrypt nie uruchamia ich ponownie automatycznie.
 
+Pojedynczy task, który ma w `task.json` status `failed`, można wznowić jawnie
+bez ponawiania pozostałych 119 runów. Helper zachowuje identyfikator pierwotnej
+kampanii, wysyła wskazany task jako nową jednoelementową tablicę i po nim nowy
+finalizer. Przykład dla tasku 104:
+
+```bash
+bash main_runs/retry_torus_best_task.sh 104
+```
+
 Szczytowa równoległość to 3 runy, czyli 21 węzłów i 1008 przydzielonych CPU.
 Można ją zmniejszyć, np. `TORUS_BEST_MAX_PARALLEL=2`, ale nie zwiększyć ponad 3.
 Godzinny walltime na run daje sufit 40320 CPUh dla 120 runów; jest to

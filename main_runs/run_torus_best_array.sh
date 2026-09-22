@@ -26,6 +26,7 @@ CAMPAIGN_DIR=$(cd -- "$ISLANDS_CAMPAIGN_DIR" && pwd -P)
 TOOLS="$PROJECT_DIR/main_runs/campaign_tools.py"
 PLAN="$CAMPAIGN_DIR/campaign_plan.json"
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
+CAMPAIGN_ARRAY_JOB_ID="${ISLANDS_CAMPAIGN_ARRAY_JOB_ID:-$SLURM_ARRAY_JOB_ID}"
 TASK_DIR="$CAMPAIGN_DIR/tasks/task-$(printf '%03d' "$SLURM_ARRAY_TASK_ID")"
 POINTER="$TASK_DIR/result_pointer.json"
 VERIFICATION="$TASK_DIR/bundle_verification.json"
@@ -70,7 +71,8 @@ REPEAT="${TASK[2]}"
 "$VENV_DIR/bin/python" "$TOOLS" record-task \
     --plan "$PLAN" --campaign-dir "$CAMPAIGN_DIR" \
     --task-id "$SLURM_ARRAY_TASK_ID" --status running \
-    --job-id "$SLURM_JOB_ID" --array-job-id "$SLURM_ARRAY_JOB_ID" --exit-code 0
+    --job-id "$SLURM_JOB_ID" --array-job-id "$CAMPAIGN_ARRAY_JOB_ID" \
+    --execution-array-job-id "$SLURM_ARRAY_JOB_ID" --exit-code 0
 
 echo "CAMPAIGN_TASK task=$SLURM_ARRAY_TASK_ID benchmark=$BENCHMARK dimension=$DIMENSION repeat=$REPEAT job=$SLURM_JOB_ID"
 set +e
@@ -101,7 +103,8 @@ if (( STATUS == 0 )); then
     "$VENV_DIR/bin/python" "$TOOLS" validate-run \
         --plan "$PLAN" --campaign-dir "$CAMPAIGN_DIR" \
         --task-id "$SLURM_ARRAY_TASK_ID" \
-        --job-id "$SLURM_JOB_ID" --array-job-id "$SLURM_ARRAY_JOB_ID"
+        --job-id "$SLURM_JOB_ID" --array-job-id "$CAMPAIGN_ARRAY_JOB_ID" \
+        --execution-array-job-id "$SLURM_ARRAY_JOB_ID"
     STATUS=$?
     set -e
 fi
@@ -132,14 +135,16 @@ if (( STATUS == 0 )); then
     "$VENV_DIR/bin/python" "$TOOLS" record-task \
         --plan "$PLAN" --campaign-dir "$CAMPAIGN_DIR" \
         --task-id "$SLURM_ARRAY_TASK_ID" --status completed \
-        --job-id "$SLURM_JOB_ID" --array-job-id "$SLURM_ARRAY_JOB_ID" --exit-code 0 \
+        --job-id "$SLURM_JOB_ID" --array-job-id "$CAMPAIGN_ARRAY_JOB_ID" \
+        --execution-array-job-id "$SLURM_ARRAY_JOB_ID" --exit-code 0 \
         --archive "$ARCHIVE" --verification "$VERIFICATION"
     echo "CAMPAIGN_TASK_OK=$SLURM_ARRAY_TASK_ID"
 else
     "$VENV_DIR/bin/python" "$TOOLS" record-task \
         --plan "$PLAN" --campaign-dir "$CAMPAIGN_DIR" \
         --task-id "$SLURM_ARRAY_TASK_ID" --status failed \
-        --job-id "$SLURM_JOB_ID" --array-job-id "$SLURM_ARRAY_JOB_ID" --exit-code "$STATUS" \
+        --job-id "$SLURM_JOB_ID" --array-job-id "$CAMPAIGN_ARRAY_JOB_ID" \
+        --execution-array-job-id "$SLURM_ARRAY_JOB_ID" --exit-code "$STATUS" \
         --archive "$ARCHIVE"
     echo "CAMPAIGN_TASK_FAILED=$SLURM_ARRAY_TASK_ID status=$STATUS" >&2
 fi

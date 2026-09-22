@@ -110,6 +110,7 @@ class CampaignToolsTests(unittest.TestCase):
             campaign.write_json(root / "campaign_plan.json", plan)
             for task in plan["tasks"]:
                 job_id = 100000 + task["task_id"]
+                execution_array_job_id = "retry-104" if task["task_id"] == 104 else "9000"
                 archive = root / "runs" / f"run_{job_id}.tar.gz"
                 archive.parent.mkdir(parents=True, exist_ok=True)
                 archive.write_bytes(f"bundle-{job_id}".encode("ascii"))
@@ -119,7 +120,9 @@ class CampaignToolsTests(unittest.TestCase):
                 )
                 exported = root / "runs" / f"run_{job_id}"
                 exported.mkdir()
-                campaign.write_json(exported / "metadata.json", self.metadata(task, "9000", job_id))
+                campaign.write_json(exported / "metadata.json", self.metadata(
+                    task, execution_array_job_id, job_id
+                ))
                 task_dir = root / "tasks" / f"task-{task['task_id']:03d}"
                 campaign.write_json(task_dir / "bundle_verification.json", {
                     "verified": True, "complete": True, "validation": "passed",
@@ -127,11 +130,14 @@ class CampaignToolsTests(unittest.TestCase):
                 })
                 campaign.write_json(task_dir / "validation.json", {
                     "valid": True, "errors": [], "task_id": task["task_id"],
-                    "job_id": str(job_id), "scientific_counts": {"islands": 144},
+                    "job_id": str(job_id), "array_job_id": "9000",
+                    "execution_array_job_id": execution_array_job_id,
+                    "scientific_counts": {"islands": 144},
                 })
                 campaign.write_json(task_dir / "task.json", {
                     **task, "status": "completed", "exit_code": 0,
                     "array_job_id": "9000", "job_id": str(job_id),
+                    "execution_array_job_id": execution_array_job_id,
                     "archive": str(archive.resolve()),
                 })
             missing = root / "tasks/task-120/task.json"
@@ -151,6 +157,18 @@ class CampaignToolsTests(unittest.TestCase):
             self.assertIn("torus_best/campaign_summary.json", names)
             self.assertIn("torus_best/runs/r01_elliptic/repeat-1/run_100001.tar.gz", names)
             self.assertIn("torus_best/runs/b10_maxcut_ring/repeat-3/run_100120.tar.gz", names)
+
+    def test_finalizer_accepts_explicit_retry_array_identity(self):
+        task = campaign.task_matrix()[103]
+        self.assertEqual("b05_zeromax", task["benchmark"])
+        self.assertEqual(2, task["repeat"])
+        metadata = self.metadata(task, "retry-array", "retry-job")
+        self.assertEqual([], campaign.validate_metadata(
+            metadata, task, "retry-array", "retry-job"
+        ))
+        self.assertIn("SLURM array id mismatch", campaign.validate_metadata(
+            metadata, task, "campaign-array", "retry-job"
+        ))
 
     def test_scientific_validation_reads_all_144_islands_and_rejects_damage(self):
         with tempfile.TemporaryDirectory(prefix="torus-best-science-") as temporary:
