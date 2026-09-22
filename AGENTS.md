@@ -90,6 +90,16 @@ not override current study instructions; preserve their measured job records.
 - Named `run_benchmark.py` defaults to/requires 144 for study runs, validates graphs before Ray and records graph provenance. Ares submitters also validate before sbatch. The JSON defaults are now 144 islands and interval 5; active runtime overrides remain authoritative.
 - Ares: `submit_ares_144.sh`, branch `summer_benchmarks_ares`, 7 x 48 = 336 allocated CPUs, 335 advertised Ray CPUs, 289 required Ray CPUs plus driver (minimum 290 physical CPUs). Six nodes with 48 CPUs each are insufficient.
 - Pilot: `pilot_run/pilot_spec.json`, F1/r01 D=200, torus 12x12, 144 islands, best/plain, repeats 1-3. Full pipeline ceiling 561.5 CPUh. The production entrypoint for this one fixed matrix variant is `bash hpc_benchmarks/launch_full_torus_best_r01_3x.sh --confirm-144-and-562-cpuh`; it delegates to `pilot_run/launch_pilot.sh` so there is only one implementation. Ares rejects `sbatch` from compute-node batch jobs: the login-node launcher must pre-submit the canary, validation gate, dependency-blocked array and finalizer; the gate validates only and never submits. Canary validity follows the exact scientific/resource/data contract, not Git commit equality. Git state is recorded in each run as provenance; exact SHA equality is not a cross-stage execution lock, while the existing clean-checkout guard remains. No CONFIRM_TORUS_200 methodology gate remains. Keep canary verification, SCRATCH, finalizer and no-retry guards.
+- First campaign slice: `main_runs/launch_torus_best.sh` submits the fixed
+  torus12x12 / best/plain / D=200 slice with all 40 registered benchmarks and
+  repeats 1-3 (120 array elements, at most 3 concurrent). Every element uses
+  the proven 7x48 Ares profile, validates all 144 islands and migration event
+  conservation, creates and verifies its portable run bundle, and records the
+  exact task mapping. The `afterany` finalizer fails closed unless all 120
+  bundles and their scientific metadata match the frozen plan;
+  only then does it create `$SCRATCH/torus_best/torus_best.tar.gz` plus SHA-256.
+  All `sbatch` calls remain in the login-node launcher. There are no automatic
+  retries and no raw data are deleted before the aggregate is downloaded.
 - Old `*_ares_200.sh`, `run*-hpc.sh`, `run_delay_experiment.sh`, `run_local_venv_plgrid.sh` and `submit_all_topologies.sh` are retired/fail closed. Do not use them as campaign templates. Job paths use ISLANDS_PROJECT_DIR/SLURM_SUBMIT_DIR, not the SLURM spool copy's BASH_SOURCE.
 - The sibling Athena checkout now has a sharded144-island GPU runner (12 shards, batcher, router, A100 evaluator;15 Ray CPUs plus driver), still requiring target canary certification. Do not submit the Ares CPU profile there. Current graph data and metric definitions remain shared.
 - Historical 144-island migration evidence: `../../artifacts/study144/validation.json`, 33 tests per repo (66 total), real CLI dry-runs and exact attachment checks; `../../artifacts/study144/parity.json`, 170 instances / 5946 inputs per comparison, no unexpected source differences. This is CPU evidence, not a 144-island HPC run or validation of the complete 40-function backend on A100.
