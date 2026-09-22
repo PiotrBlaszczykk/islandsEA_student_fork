@@ -45,7 +45,10 @@ workspace `artifacts/run_wyniki_przyklad/{run_123456,run_3174577}`.
 
 ## Active study and source precedence (2026-09-17)
 
-This checkout targets **Ares CPU**, branch `summer_benchmarks_ares`. The Athena GPU checkout is a separate sibling repository.
+This checkout targets **Ares CPU**. The `main_runs/` campaign runs on branch
+`summer_ares_blaszczyk`, derived from `summer_benchmarks_ares`; older named
+benchmark and pilot submitters still require `summer_benchmarks_ares`. The
+Athena GPU checkout is a separate sibling repository.
 
 Read the updated [research scope](../../zakres_badan.md) and the repository's
 [STUDY_144.md](STUDY_144.md) first. The workspace Markdown preserves the PDF's
@@ -92,7 +95,8 @@ not override current study instructions; preserve their measured job records.
 - Pilot: `pilot_run/pilot_spec.json`, F1/r01 D=200, torus 12x12, 144 islands, best/plain, repeats 1-3. Full pipeline ceiling 561.5 CPUh. The production entrypoint for this one fixed matrix variant is `bash hpc_benchmarks/launch_full_torus_best_r01_3x.sh --confirm-144-and-562-cpuh`; it delegates to `pilot_run/launch_pilot.sh` so there is only one implementation. Ares rejects `sbatch` from compute-node batch jobs: the login-node launcher must pre-submit the canary, validation gate, dependency-blocked array and finalizer; the gate validates only and never submits. Canary validity follows the exact scientific/resource/data contract, not Git commit equality. Git state is recorded in each run as provenance; exact SHA equality is not a cross-stage execution lock, while the existing clean-checkout guard remains. No CONFIRM_TORUS_200 methodology gate remains. Keep canary verification, SCRATCH, finalizer and no-retry guards.
 - First campaign slice: `main_runs/launch_torus_best.sh` submits the fixed
   torus12x12 / best/plain / D=200 slice with all 40 registered benchmarks and
-  repeats 1-3 (120 array elements, at most 3 concurrent). Every element uses
+  repeats 1-3 from branch `summer_ares_blaszczyk` (120 array elements, at most
+  3 concurrent). Every element uses
   the proven 7x48 Ares profile, validates all 144 islands and migration event
   conservation, creates and verifies its portable run bundle, and records the
   exact task mapping. The `afterany` finalizer fails closed unless all 120
@@ -297,7 +301,7 @@ python analyze_migration_delays.py "logs/260505/Sphe200/120000 7rr-co5ilu5"
 - Old `run*-hpc.sh` launchers are retired fail-closed stubs; previously some passed only 8 args.
 - Historical `.sh.txt` archives still refer to missing `start_bm.py`; do not use them.
 - `run_smoke_ring.sh` is **not present** in this repository snapshot (it may exist only in local/HPC-side working copies).
-- Use documented named submitters and pilot_spec.json. Retired scripts are fail-closed stubs, not runnable templates. Supported Ares benchmark/pilot submitters require branch `summer_benchmarks_ares`.
+- Use documented named submitters and pilot_spec.json. Retired scripts are fail-closed stubs, not runnable templates. Older Ares benchmark/pilot submitters require branch `summer_benchmarks_ares`; the `main_runs/` campaign requires `summer_ares_blaszczyk`.
 
 ---
 

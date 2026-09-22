@@ -33,8 +33,8 @@ esac
 }
 
 cd "$PROJECT_DIR"
-[[ "$(git branch --show-current)" == "summer_benchmarks_ares" ]] || {
-    echo "Use branch summer_benchmarks_ares on Ares" >&2
+[[ "$(git branch --show-current)" == "summer_ares_blaszczyk" ]] || {
+    echo "Use branch summer_ares_blaszczyk on Ares" >&2
     exit 2
 }
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {

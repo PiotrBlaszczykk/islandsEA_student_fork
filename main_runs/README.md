@@ -36,7 +36,8 @@ Archiwum zbiorcze zawiera 120 pełnych przenośnych bundle, plan, podsumowanie,
 rekordy zadań, logi i `sacct.txt`. Surowe katalogi w `storage/` pozostają na
 scratchu jako niezależna kopia do czasu pobrania i weryfikacji archiwum.
 
-Po commicie, pushu i `git pull --ff-only` na Aresie, z czystego checkoutu:
+Po commicie i pushu brancha `summer_ares_blaszczyk`, wykonaj
+`git pull --ff-only` na Aresie. Następnie, z czystego checkoutu:
 
 ```bash
 bash main_runs/launch_torus_best.sh
