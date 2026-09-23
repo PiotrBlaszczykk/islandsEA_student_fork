@@ -1,10 +1,15 @@
 import ast
+from contextlib import redirect_stdout
 import copy
 import gzip
 import hashlib
 import importlib.util
+import io
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -28,6 +33,49 @@ class CampaignToolsTests(unittest.TestCase):
         self.assertIn('--array="1-120%${MAX_PARALLEL}"', launcher)
         self.assertIn('--dependency="afterany:${ARRAY_JOB_ID}"', launcher)
 
+    def test_random_launcher_uses_separate_storage_and_shared_runtime(self):
+        launcher = MODULE_PATH.with_name("launch_torus_random.sh").read_text(encoding="utf-8")
+        retry = MODULE_PATH.with_name("retry_torus_random_task.sh").read_text(encoding="utf-8")
+        batch = MODULE_PATH.with_name("run_torus_best_array.sh").read_text(encoding="utf-8")
+        finalizer = MODULE_PATH.with_name("finalize_torus_best.sh").read_text(encoding="utf-8")
+        self.assertIn('ISLANDS_CAMPAIGN_STRATEGY=random', launcher)
+        self.assertIn('CAMPAIGN_DIR="${TORUS_RANDOM_CAMPAIGN_DIR:-$SCRATCH/torus_random}"', launcher)
+        self.assertIn('--strategy random', launcher)
+        self.assertIn('--array="1-120%${MAX_PARALLEL}"', launcher)
+        self.assertIn('--job-name=torus-random', launcher)
+        self.assertIn('ISLANDS_CAMPAIGN_STRATEGY=random', retry)
+        self.assertIn('--strategy "$STRATEGY"', batch)
+        self.assertIn('TORUS_${STRATEGY^^}_FINALIZATION_OK', finalizer)
+
+    def test_random_plan_and_metadata_contract(self):
+        with tempfile.TemporaryDirectory(prefix="torus-random-contract-") as temporary:
+            plan_path = Path(temporary) / "campaign_plan.json"
+            env = {**os.environ, "ISLANDS_CAMPAIGN_STRATEGY": "random"}
+            subprocess.run([
+                sys.executable, str(MODULE_PATH), "create-plan", "--output", str(plan_path),
+                "--git-commit", "a" * 40,
+            ], env=env, check=True, capture_output=True, text=True)
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            self.assertEqual("torus_random", plan["campaign"])
+            self.assertEqual("random", plan["configuration"]["migration"]["selection"])
+            self.assertEqual(120, len(plan["tasks"]))
+            with self.assertRaises(ValueError):
+                campaign.validate_plan(plan)
+
+            metadata = self.metadata(plan["tasks"][0], "9000", "9001")
+            metadata["scientific_configuration"]["migration"]["selection"] = "random"
+            code = (
+                "import json, sys; sys.path.insert(0, sys.argv[1]); "
+                "import campaign_tools as c; "
+                "p=c.load_plan(sys.argv[2]); "
+                "m=json.load(sys.stdin); "
+                "print(json.dumps(c.validate_metadata(m, p['tasks'][0], '9000', '9001')))"
+            )
+            result = subprocess.run([
+                sys.executable, "-c", code, str(MODULE_PATH.parent), str(plan_path),
+            ], input=json.dumps(metadata), env=env, check=True, capture_output=True, text=True)
+            self.assertEqual([], json.loads(result.stdout))
+
     @staticmethod
     def metadata(task, array_job_id, job_id):
         return {
@@ -39,7 +87,7 @@ class CampaignToolsTests(unittest.TestCase):
                 "population": 16, "offspring": 4, "repeat": task["repeat"],
                 "migration": {"group_size": 5, "interval": 5,
                               "interval_unit": "evaluation-count difference",
-                              "selection": "best", "acceptance": "plain"},
+                              "selection": campaign.STRATEGY, "acceptance": "plain"},
                 "topology": {"name": "torus", "parameters": {"rows": 12, "columns": 12},
                              "adjacency_sha256": "t" * 64},
                 "seed": {"requested_base": 20260912, "repeat_base": task["repeat_seed"]},
@@ -145,18 +193,21 @@ class CampaignToolsTests(unittest.TestCase):
             missing.unlink()
             with self.assertRaisesRegex(ValueError, "campaign validation failed"):
                 campaign.finalize(root, "9000")
-            self.assertFalse((root / "torus_best.tar.gz").exists())
+            self.assertFalse((root / f"{campaign.CAMPAIGN}.tar.gz").exists())
             missing.write_bytes(saved)
-            campaign.finalize(root, "9000")
+            output = io.StringIO()
+            with redirect_stdout(output):
+                campaign.finalize(root, "9000")
+            self.assertIn(f"TORUS_{campaign.STRATEGY.upper()}_VALID_RUNS=120", output.getvalue())
             summary = campaign.read_json(root / "campaign_summary.json")
             self.assertTrue(summary["valid"])
             self.assertEqual(120, summary["valid_runs"])
-            self.assertTrue((root / "torus_best.tar.gz.sha256").is_file())
-            with tarfile.open(root / "torus_best.tar.gz", "r:gz") as stream:
+            self.assertTrue((root / f"{campaign.CAMPAIGN}.tar.gz.sha256").is_file())
+            with tarfile.open(root / f"{campaign.CAMPAIGN}.tar.gz", "r:gz") as stream:
                 names = set(stream.getnames())
-            self.assertIn("torus_best/campaign_summary.json", names)
-            self.assertIn("torus_best/runs/r01_elliptic/repeat-1/run_100001.tar.gz", names)
-            self.assertIn("torus_best/runs/b10_maxcut_ring/repeat-3/run_100120.tar.gz", names)
+            self.assertIn(f"{campaign.CAMPAIGN}/campaign_summary.json", names)
+            self.assertIn(f"{campaign.CAMPAIGN}/runs/r01_elliptic/repeat-1/run_100001.tar.gz", names)
+            self.assertIn(f"{campaign.CAMPAIGN}/runs/b10_maxcut_ring/repeat-3/run_100120.tar.gz", names)
 
     def test_finalizer_accepts_explicit_retry_array_identity(self):
         task = campaign.task_matrix()[103]

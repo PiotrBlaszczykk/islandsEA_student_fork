@@ -104,6 +104,12 @@ not override current study instructions; preserve their measured job records.
   only then does it create `$SCRATCH/torus_best/torus_best.tar.gz` plus SHA-256.
   All `sbatch` calls remain in the login-node launcher. There are no automatic
   retries and no raw data are deleted before the aggregate is downloaded.
+- Second campaign slice: `main_runs/launch_torus_random.sh` submits the same
+  torus / D=200 / 40 benchmarks x 3 repeats matrix with migration selection
+  `random` and acceptance `plain`. The batch, scientific validator and
+  finalizer share the proven implementation but require an explicit strategy
+  contract; outputs stay under `$SCRATCH/torus_random`, separate from
+  `$SCRATCH/torus_best`. Retry and single-download helpers are in `main_runs/`.
 - Old `*_ares_200.sh`, `run*-hpc.sh`, `run_delay_experiment.sh`, `run_local_venv_plgrid.sh` and `submit_all_topologies.sh` are retired/fail closed. Do not use them as campaign templates. Job paths use ISLANDS_PROJECT_DIR/SLURM_SUBMIT_DIR, not the SLURM spool copy's BASH_SOURCE.
 - The sibling Athena checkout now has a sharded144-island GPU runner (12 shards, batcher, router, A100 evaluator;15 Ray CPUs plus driver), still requiring target canary certification. Do not submit the Ares CPU profile there. Current graph data and metric definitions remain shared.
 - Historical 144-island migration evidence: `../../artifacts/study144/validation.json`, 33 tests per repo (66 total), real CLI dry-runs and exact attachment checks; `../../artifacts/study144/parity.json`, 170 instances / 5946 inputs per comparison, no unexpected source differences. This is CPU evidence, not a 144-island HPC run or validation of the complete 40-function backend on A100.

@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 
-# Submit the fixed torus/best campaign: 40 benchmarks x 3 independent repeats.
+# Submit the fixed torus/random campaign: 40 benchmarks x 3 independent repeats.
 # This file runs on the login node. All sbatch calls deliberately happen here.
 set -euo pipefail
-export ISLANDS_CAMPAIGN_STRATEGY=best
+export ISLANDS_CAMPAIGN_STRATEGY=random
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd -P)
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
-MAX_PARALLEL="${TORUS_BEST_MAX_PARALLEL:-3}"
+MAX_PARALLEL="${TORUS_RANDOM_MAX_PARALLEL:-3}"
 : "${SCRATCH:?SCRATCH must be available on Ares}"
-CAMPAIGN_DIR="${TORUS_BEST_CAMPAIGN_DIR:-$SCRATCH/torus_best}"
+CAMPAIGN_DIR="${TORUS_RANDOM_CAMPAIGN_DIR:-$SCRATCH/torus_random}"
 TOOLS="$SCRIPT_DIR/campaign_tools.py"
 PLAN="$CAMPAIGN_DIR/campaign_plan.json"
 ARRAY_JOB_ID=""
 FINALIZER_JOB_ID=""
 
 [[ "$MAX_PARALLEL" =~ ^[1-3]$ ]] || {
-    echo "TORUS_BEST_MAX_PARALLEL must be 1, 2 or 3" >&2
+    echo "TORUS_RANDOM_MAX_PARALLEL must be 1, 2 or 3" >&2
     exit 2
 }
 case "$CAMPAIGN_DIR" in
@@ -71,10 +71,10 @@ for benchmark in "${BENCHMARKS[@]}"; do
         --evaluations 8000 --population 16 --offspring 4 \
         --migrants 5 --interval 5 --topology torus \
         --torus-rows 12 --torus-columns 12 \
-        --strategy best --acceptance plain --repeat 1 --seed 20260912 \
+        --strategy random --acceptance plain --repeat 1 --seed 20260912 \
         --startup-timeout 300 --actor-startup-timeout 300 --dry-run >/dev/null
 done
-echo "TORUS_BEST_PREFLIGHT_OK benchmarks=40 tasks=120"
+echo "TORUS_RANDOM_PREFLIGHT_OK benchmarks=40 tasks=120"
 
 mkdir -p "$CAMPAIGN_DIR/logs" "$CAMPAIGN_DIR/tasks" "$CAMPAIGN_DIR/runs"
 "$VENV_DIR/bin/python" "$TOOLS" create-plan --output "$PLAN" --git-commit "$GIT_COMMIT"
@@ -91,18 +91,20 @@ rollback_submission() {
 trap rollback_submission EXIT
 
 ARRAY_SUBMISSION=$(sbatch --parsable \
+    --job-name=torus-random \
     --array="1-120%${MAX_PARALLEL}" \
-    --output="$CAMPAIGN_DIR/logs/torus-best-%A_%a.out" \
-    --error="$CAMPAIGN_DIR/logs/torus-best-%A_%a.err" \
-    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_CAMPAIGN_DIR=${CAMPAIGN_DIR},ISLANDS_VENV_DIR=${VENV_DIR},ISLANDS_CAMPAIGN_STRATEGY=best" \
+    --output="$CAMPAIGN_DIR/logs/torus-random-%A_%a.out" \
+    --error="$CAMPAIGN_DIR/logs/torus-random-%A_%a.err" \
+    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_CAMPAIGN_DIR=${CAMPAIGN_DIR},ISLANDS_VENV_DIR=${VENV_DIR},ISLANDS_CAMPAIGN_STRATEGY=random" \
     "$SCRIPT_DIR/run_torus_best_array.sh")
 ARRAY_JOB_ID="${ARRAY_SUBMISSION%%;*}"
 
 FINALIZER_SUBMISSION=$(sbatch --parsable \
+    --job-name=torus-random-finalize \
     --dependency="afterany:${ARRAY_JOB_ID}" \
-    --output="$CAMPAIGN_DIR/logs/torus-best-finalize-%j.out" \
-    --error="$CAMPAIGN_DIR/logs/torus-best-finalize-%j.err" \
-    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_CAMPAIGN_DIR=${CAMPAIGN_DIR},ISLANDS_VENV_DIR=${VENV_DIR},ISLANDS_CAMPAIGN_STRATEGY=best" \
+    --output="$CAMPAIGN_DIR/logs/torus-random-finalize-%j.out" \
+    --error="$CAMPAIGN_DIR/logs/torus-random-finalize-%j.err" \
+    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_CAMPAIGN_DIR=${CAMPAIGN_DIR},ISLANDS_VENV_DIR=${VENV_DIR},ISLANDS_CAMPAIGN_STRATEGY=random" \
     "$SCRIPT_DIR/finalize_torus_best.sh" "$ARRAY_JOB_ID")
 FINALIZER_JOB_ID="${FINALIZER_SUBMISSION%%;*}"
 
@@ -113,13 +115,13 @@ FINALIZER_JOB_ID="${FINALIZER_SUBMISSION%%;*}"
 trap - EXIT
 
 cat <<EOF
-TORUS_BEST_ARRAY_JOB_ID=$ARRAY_JOB_ID
-TORUS_BEST_FINALIZER_JOB_ID=$FINALIZER_JOB_ID
-TORUS_BEST_CAMPAIGN_DIR=$CAMPAIGN_DIR
-TORUS_BEST_EXPECTED_RUNS=120
-TORUS_BEST_MAX_PARALLEL=$MAX_PARALLEL
-TORUS_BEST_ALLOCATION_CEILING_CPUH=40320
+TORUS_RANDOM_ARRAY_JOB_ID=$ARRAY_JOB_ID
+TORUS_RANDOM_FINALIZER_JOB_ID=$FINALIZER_JOB_ID
+TORUS_RANDOM_CAMPAIGN_DIR=$CAMPAIGN_DIR
+TORUS_RANDOM_EXPECTED_RUNS=120
+TORUS_RANDOM_MAX_PARALLEL=$MAX_PARALLEL
+TORUS_RANDOM_ALLOCATION_CEILING_CPUH=40320
 Monitor: squeue -j $ARRAY_JOB_ID,$FINALIZER_JOB_ID -o "%.18i %.24j %.10T %.10M %.10l %R"
 Accounting: sacct -X -j $ARRAY_JOB_ID,$FINALIZER_JOB_ID --format=JobID,JobName,State,ExitCode,Elapsed,AllocCPUS,CPUTimeRAW,MaxRSS
-Final archive: $CAMPAIGN_DIR/torus_best.tar.gz
+Final archive: $CAMPAIGN_DIR/torus_random.tar.gz
 EOF

@@ -1,4 +1,42 @@
-# Torus / best / 40 benchmarków / 3 powtórzenia
+# Kampanie Torus / best i random / 40 benchmarków / 3 powtórzenia
+
+Druga, niezależna kampania z wyborem migrantów `random` ma launcher
+`main_runs/launch_torus_random.sh` i zapisuje wszystko pod
+`$SCRATCH/torus_random`. Ma tę samą macierz 40×3 i profil Ares; jedyną zmianą
+naukową jest `--strategy random` zamiast `best`. Wykorzystuje wspólny skrypt
+batch i finalizer, które odczytują strategię z jawnie eksportowanej zmiennej.
+Plan i metadane muszą się z nią zgadzać. Po commicie, pushu i pullu brancha
+`summer_ares_blaszczyk` uruchom na Aresie:
+
+```bash
+bash main_runs/launch_torus_random.sh
+```
+
+Skrypt wypisze ID tablicy i finalizera. Po ich zakończeniu wymagane są
+`COMPLETED 0:0`, `TORUS_RANDOM_VALID_RUNS=120` i
+`TORUS_RANDOM_FINALIZATION_OK` w
+`$SCRATCH/torus_random/logs/torus-random-finalize-<ID>.out`.
+Jeżeli padnie pojedynczy task, po diagnozie można go ponowić przez
+`bash main_runs/retry_torus_random_task.sh <TASK_ID>`.
+
+Na Windowsie pobierz jedno archiwum:
+
+```powershell
+.\main_runs\download_torus_random.ps1
+```
+
+Domyślnie helper pobiera `torus_random.tar.gz` i sprawdza jego SHA-256 bez
+rozpakowywania. Opcja `-Extract` dodatkowo tworzy katalog z 120 nadal
+skompresowanymi archiwami i sprawdza ich osobne SHA-256; wymaga przez to około
+drugie tyle miejsca. Przenośne bundle pozostają oddzielne dla każdego runu.
+
+Przed wysłaniem drugiej kampanii sprawdź na Aresie `hpc-fs`, które pokazuje
+również liczbę użytych plików. `ARES_INFO.md` podaje limit miliona inode'ów; pozostawione
+surowe i wyeksportowane katalogi `torus_best` zajmują znaczną część tej puli.
+Launcher sprawdza wolne bajty, ale `df` nie odzwierciedla wiarygodnie osobistej
+kwoty inode'ów na tym storage.
+
+Poniżej zachowano instrukcję pierwszej kampanii `best`.
 
 `launch_torus_best.sh` wysyła na Aresie dokładnie 120 niezależnych runów:
 

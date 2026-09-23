@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-# Explicitly retry one failed element of an existing torus_best campaign and
+# Explicitly retry one failed element of an existing torus_random campaign and
 # then re-run its fail-closed finalizer. Run this file on the login node.
 set -euo pipefail
-export ISLANDS_CAMPAIGN_STRATEGY=best
+export ISLANDS_CAMPAIGN_STRATEGY=random
 [[ "$#" -eq 1 && "$1" =~ ^([1-9]|[1-9][0-9]|1[01][0-9]|120)$ ]] || {
     echo "Usage: $0 TASK_ID (1..120)" >&2
     exit 2
@@ -13,7 +13,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd -P)
 VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
 : "${SCRATCH:?SCRATCH must be available on Ares}"
-CAMPAIGN_DIR="${TORUS_BEST_CAMPAIGN_DIR:-$SCRATCH/torus_best}"
+CAMPAIGN_DIR="${TORUS_RANDOM_CAMPAIGN_DIR:-$SCRATCH/torus_random}"
 
 cd "$PROJECT_DIR"
 [[ "$(git branch --show-current)" == "summer_ares_blaszczyk" ]] || {
@@ -28,7 +28,7 @@ cd "$PROJECT_DIR"
     echo "Existing campaign or Ares venv is missing" >&2
     exit 2
 }
-[[ ! -e "$CAMPAIGN_DIR/torus_best.tar.gz" ]] || {
+[[ ! -e "$CAMPAIGN_DIR/torus_random.tar.gz" ]] || {
     echo "Campaign archive already exists; refusing to modify a finalized campaign" >&2
     exit 2
 }
@@ -50,24 +50,26 @@ print(submission["array_job_id"], record["status"])
 }
 
 RETRY_SUBMISSION=$(sbatch --parsable \
+    --job-name=torus-random \
     --array="$TASK_ID" \
-    --output="$CAMPAIGN_DIR/logs/torus-best-retry-%A_%a.out" \
-    --error="$CAMPAIGN_DIR/logs/torus-best-retry-%A_%a.err" \
-    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_CAMPAIGN_DIR=${CAMPAIGN_DIR},ISLANDS_VENV_DIR=${VENV_DIR},ISLANDS_CAMPAIGN_STRATEGY=best,ISLANDS_CAMPAIGN_ARRAY_JOB_ID=${CAMPAIGN_ARRAY_JOB_ID}" \
+    --output="$CAMPAIGN_DIR/logs/torus-random-retry-%A_%a.out" \
+    --error="$CAMPAIGN_DIR/logs/torus-random-retry-%A_%a.err" \
+    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_CAMPAIGN_DIR=${CAMPAIGN_DIR},ISLANDS_VENV_DIR=${VENV_DIR},ISLANDS_CAMPAIGN_STRATEGY=random,ISLANDS_CAMPAIGN_ARRAY_JOB_ID=${CAMPAIGN_ARRAY_JOB_ID}" \
     "$SCRIPT_DIR/run_torus_best_array.sh")
 RETRY_ARRAY_JOB_ID="${RETRY_SUBMISSION%%;*}"
 
 FINALIZER_SUBMISSION=$(sbatch --parsable \
+    --job-name=torus-random-finalize \
     --dependency="afterany:${RETRY_ARRAY_JOB_ID}" \
-    --output="$CAMPAIGN_DIR/logs/torus-best-finalize-%j.out" \
-    --error="$CAMPAIGN_DIR/logs/torus-best-finalize-%j.err" \
-    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_CAMPAIGN_DIR=${CAMPAIGN_DIR},ISLANDS_VENV_DIR=${VENV_DIR},ISLANDS_CAMPAIGN_STRATEGY=best" \
+    --output="$CAMPAIGN_DIR/logs/torus-random-finalize-%j.out" \
+    --error="$CAMPAIGN_DIR/logs/torus-random-finalize-%j.err" \
+    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_CAMPAIGN_DIR=${CAMPAIGN_DIR},ISLANDS_VENV_DIR=${VENV_DIR},ISLANDS_CAMPAIGN_STRATEGY=random" \
     "$SCRIPT_DIR/finalize_torus_best.sh" "$CAMPAIGN_ARRAY_JOB_ID" "$RETRY_ARRAY_JOB_ID")
 FINALIZER_JOB_ID="${FINALIZER_SUBMISSION%%;*}"
 
 cat <<EOF
-TORUS_BEST_RETRY_TASK=$TASK_ID
-TORUS_BEST_RETRY_ARRAY_JOB_ID=$RETRY_ARRAY_JOB_ID
-TORUS_BEST_RETRY_FINALIZER_JOB_ID=$FINALIZER_JOB_ID
+TORUS_RANDOM_RETRY_TASK=$TASK_ID
+TORUS_RANDOM_RETRY_ARRAY_JOB_ID=$RETRY_ARRAY_JOB_ID
+TORUS_RANDOM_RETRY_FINALIZER_JOB_ID=$FINALIZER_JOB_ID
 Monitor: squeue -j $RETRY_ARRAY_JOB_ID,$FINALIZER_JOB_ID -o "%.18i %.24j %.10T %.10M %.10l %R"
 EOF

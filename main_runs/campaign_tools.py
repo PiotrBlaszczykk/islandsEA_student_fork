@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan, audit and finalize the fixed torus/best 40x3 Ares campaign."""
+"""Plan, audit and finalize a fixed torus/best or torus/random 40x3 Ares campaign."""
 from __future__ import annotations
 
 import argparse
@@ -15,8 +15,11 @@ import tarfile
 import zlib
 
 
-SCHEMA = "islandsea-torus-best-campaign-v1"
-CAMPAIGN = "torus_best"
+STRATEGY = os.environ.get("ISLANDS_CAMPAIGN_STRATEGY", "best")
+if STRATEGY not in ("best", "random"):
+    raise ValueError(f"unsupported torus campaign strategy: {STRATEGY}")
+SCHEMA = f"islandsea-torus-{STRATEGY}-campaign-v1"
+CAMPAIGN = f"torus_{STRATEGY}"
 BASE_SEED = 20260912
 DIMENSION = 200
 REPEATS = (1, 2, 3)
@@ -46,7 +49,7 @@ CONFIGURATION = {
         "group_size": 5,
         "interval": 5,
         "interval_unit": "evaluation-count difference",
-        "selection": "best",
+        "selection": STRATEGY,
         "acceptance": "plain",
     },
     "topology": {"name": "torus", "rows": 12, "columns": 12},
@@ -169,7 +172,7 @@ def validate_metadata(metadata, task, array_job_id, job_id):
     require(migration.get("group_size") == 5, "migrant count mismatch")
     require(migration.get("interval") == 5, "migration interval mismatch")
     require(migration.get("interval_unit") == "evaluation-count difference", "migration interval unit mismatch")
-    require(migration.get("selection") == "best", "migration selection mismatch")
+    require(migration.get("selection") == STRATEGY, "migration selection mismatch")
     require(migration.get("acceptance") == "plain", "migration acceptance mismatch")
     require(topology.get("name") == "torus", "topology mismatch")
     require(parameters.get("rows") == 12 and parameters.get("columns") == 12, "torus shape mismatch")
@@ -552,10 +555,11 @@ def finalize(campaign_dir, array_job_id):
             temporary.unlink()
     digest = sha256(archive)
     checksum.write_text(f"{digest}  {archive.name}\n", encoding="ascii")
-    print(f"TORUS_BEST_VALID_RUNS={len(entries)}")
-    print(f"TORUS_BEST_SUMMARY={summary_path}")
-    print(f"TORUS_BEST_ARCHIVE={archive}")
-    print(f"TORUS_BEST_SHA256={checksum}")
+    marker = f"TORUS_{STRATEGY.upper()}"
+    print(f"{marker}_VALID_RUNS={len(entries)}")
+    print(f"{marker}_SUMMARY={summary_path}")
+    print(f"{marker}_ARCHIVE={archive}")
+    print(f"{marker}_SHA256={checksum}")
 
 
 def parser():

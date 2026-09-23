@@ -11,6 +11,12 @@
 #SBATCH --error=/tmp/torus-best-%A_%a.err
 
 set -euo pipefail
+STRATEGY="${ISLANDS_CAMPAIGN_STRATEGY:-best}"
+[[ "$STRATEGY" == best || "$STRATEGY" == random ]] || {
+    echo "Unsupported campaign strategy: $STRATEGY" >&2
+    exit 2
+}
+export ISLANDS_CAMPAIGN_STRATEGY="$STRATEGY"
 : "${SLURM_JOB_ID:?This file must run as a SLURM array task}"
 : "${SLURM_ARRAY_JOB_ID:?Missing SLURM_ARRAY_JOB_ID}"
 : "${SLURM_ARRAY_TASK_ID:?Missing SLURM_ARRAY_TASK_ID}"
@@ -88,7 +94,7 @@ bash "$PROJECT_DIR/hpc_benchmarks/run_ares.sh" \
     --topology torus \
     --torus-rows 12 \
     --torus-columns 12 \
-    --strategy best \
+    --strategy "$STRATEGY" \
     --acceptance plain \
     --repeat "$REPEAT" \
     --seed 20260912 \
