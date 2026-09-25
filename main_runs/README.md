@@ -1,4 +1,39 @@
-# Kampanie Torus / best i random / 40 benchmarków / 3 powtórzenia
+# Kampanie Torus / best, random i maxDistance / 40 benchmarków / 3 powtórzenia
+
+Trzecia kampania zmienia wyłącznie strategię wyboru migrantów na
+`maxDistance`; strategia przyjmowania pozostaje `plain`. Zachowuje ten sam
+torus 12×12, 144 wyspy, D=200, 40 benchmarków, trzy niezależne powtórzenia,
+profil 7×48 CPU i najwyżej trzy równoległe taski. Dane trafiają wyłącznie do
+`$SCRATCH/torus_maxdistance`, a finalizer tworzy
+`torus_maxdistance.tar.gz` i jego SHA-256 po pozytywnej walidacji 120 runów.
+Po commicie i pushu brancha `summer_ares_blaszczyk` wykonaj na Aresie
+`git pull --ff-only`. Przed uruchomieniem sprawdź `hpc-fs`; zakończoną kampanię
+`torus_random` usuń ze SCRATCH dopiero po pobraniu i lokalnym potwierdzeniu
+SHA-256 oraz `valid_runs=120`. Pozwala to odzyskać quota plików. Następnie:
+
+```bash
+bash main_runs/launch_torus_maxdistance.sh
+```
+
+Po zakończeniu wymagana jest para `COMPLETED 0:0`,
+`TORUS_MAXDISTANCE_VALID_RUNS=120` i `TORUS_MAXDISTANCE_FINALIZATION_OK` w
+`$SCRATCH/torus_maxdistance/logs/torus-maxdistance-finalize-<ID>.out`.
+W razie pojedynczego nieudanego tasku dostępny jest jawny retry:
+
+```bash
+bash main_runs/retry_torus_maxdistance_task.sh <TASK_ID>
+```
+
+Na Windowsie pobierz jedno archiwum i sprawdź jego SHA-256 bez rozpakowania:
+
+```powershell
+.\main_runs\download_torus_maxdistance.ps1
+```
+
+`-Extract` dodatkowo sprawdza SHA-256 wszystkich 120 wewnętrznych bundle,
+ale wymaga drugie tyle miejsca na dysku. Archiwa pojedynczych runów pozostają
+oddzielne w zbiorczym tarze. Do czasu pobrania i weryfikacji nie kasuj
+surowych danych ze SCRATCH.
 
 Druga, niezależna kampania z wyborem migrantów `random` ma launcher
 `main_runs/launch_torus_random.sh` i zapisuje wszystko pod

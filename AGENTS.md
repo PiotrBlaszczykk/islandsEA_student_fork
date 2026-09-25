@@ -110,6 +110,12 @@ not override current study instructions; preserve their measured job records.
   finalizer share the proven implementation but require an explicit strategy
   contract; outputs stay under `$SCRATCH/torus_random`, separate from
   `$SCRATCH/torus_best`. Retry and single-download helpers are in `main_runs/`.
+- Third campaign slice: `main_runs/launch_torus_maxdistance.sh` uses the same
+  40 x 3 torus matrix with migration selection `maxDistance` and acceptance
+  `plain`. It has a separate `$SCRATCH/torus_maxdistance` tree and aggregate
+  archive, plus matching retry and single-download helpers. The strategy is
+  case-sensitive in the CLI and scientific metadata; the storage slug is
+  lowercase `maxdistance`.
 - Old `*_ares_200.sh`, `run*-hpc.sh`, `run_delay_experiment.sh`, `run_local_venv_plgrid.sh` and `submit_all_topologies.sh` are retired/fail closed. Do not use them as campaign templates. Job paths use ISLANDS_PROJECT_DIR/SLURM_SUBMIT_DIR, not the SLURM spool copy's BASH_SOURCE.
 - The sibling Athena checkout now has a sharded144-island GPU runner (12 shards, batcher, router, A100 evaluator;15 Ray CPUs plus driver), still requiring target canary certification. Do not submit the Ares CPU profile there. Current graph data and metric definitions remain shared.
 - Historical 144-island migration evidence: `../../artifacts/study144/validation.json`, 33 tests per repo (66 total), real CLI dry-runs and exact attachment checks; `../../artifacts/study144/parity.json`, 170 instances / 5946 inputs per comparison, no unexpected source differences. This is CPU evidence, not a 144-island HPC run or validation of the complete 40-function backend on A100.

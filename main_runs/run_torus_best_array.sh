@@ -12,7 +12,7 @@
 
 set -euo pipefail
 STRATEGY="${ISLANDS_CAMPAIGN_STRATEGY:-best}"
-[[ "$STRATEGY" == best || "$STRATEGY" == random ]] || {
+[[ "$STRATEGY" == best || "$STRATEGY" == random || "$STRATEGY" == maxDistance ]] || {
     echo "Unsupported campaign strategy: $STRATEGY" >&2
     exit 2
 }

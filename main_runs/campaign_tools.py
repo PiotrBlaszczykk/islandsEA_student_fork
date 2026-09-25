@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan, audit and finalize a fixed torus/best or torus/random 40x3 Ares campaign."""
+"""Plan, audit and finalize fixed torus 40x3 Ares selection campaigns."""
 from __future__ import annotations
 
 import argparse
@@ -16,10 +16,11 @@ import zlib
 
 
 STRATEGY = os.environ.get("ISLANDS_CAMPAIGN_STRATEGY", "best")
-if STRATEGY not in ("best", "random"):
+if STRATEGY not in ("best", "random", "maxDistance"):
     raise ValueError(f"unsupported torus campaign strategy: {STRATEGY}")
-SCHEMA = f"islandsea-torus-{STRATEGY}-campaign-v1"
-CAMPAIGN = f"torus_{STRATEGY}"
+CAMPAIGN_SLUG = STRATEGY.lower()
+SCHEMA = f"islandsea-torus-{CAMPAIGN_SLUG}-campaign-v1"
+CAMPAIGN = f"torus_{CAMPAIGN_SLUG}"
 BASE_SEED = 20260912
 DIMENSION = 200
 REPEATS = (1, 2, 3)

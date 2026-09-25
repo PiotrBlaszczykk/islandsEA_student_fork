@@ -47,34 +47,56 @@ class CampaignToolsTests(unittest.TestCase):
         self.assertIn('--strategy "$STRATEGY"', batch)
         self.assertIn('TORUS_${STRATEGY^^}_FINALIZATION_OK', finalizer)
 
-    def test_random_plan_and_metadata_contract(self):
-        with tempfile.TemporaryDirectory(prefix="torus-random-contract-") as temporary:
-            plan_path = Path(temporary) / "campaign_plan.json"
-            env = {**os.environ, "ISLANDS_CAMPAIGN_STRATEGY": "random"}
-            subprocess.run([
-                sys.executable, str(MODULE_PATH), "create-plan", "--output", str(plan_path),
-                "--git-commit", "a" * 40,
-            ], env=env, check=True, capture_output=True, text=True)
-            plan = json.loads(plan_path.read_text(encoding="utf-8"))
-            self.assertEqual("torus_random", plan["campaign"])
-            self.assertEqual("random", plan["configuration"]["migration"]["selection"])
-            self.assertEqual(120, len(plan["tasks"]))
-            with self.assertRaises(ValueError):
-                campaign.validate_plan(plan)
+    def test_maxdistance_launcher_uses_separate_storage_and_shared_runtime(self):
+        launcher = MODULE_PATH.with_name("launch_torus_maxdistance.sh").read_text(encoding="utf-8")
+        retry = MODULE_PATH.with_name("retry_torus_maxdistance_task.sh").read_text(encoding="utf-8")
+        downloader = MODULE_PATH.with_name("download_torus_maxdistance.ps1").read_text(encoding="utf-8")
+        batch = MODULE_PATH.with_name("run_torus_best_array.sh").read_text(encoding="utf-8")
+        finalizer = MODULE_PATH.with_name("finalize_torus_best.sh").read_text(encoding="utf-8")
+        self.assertIn('ISLANDS_CAMPAIGN_STRATEGY=maxDistance', launcher)
+        self.assertIn('CAMPAIGN_DIR="${TORUS_MAXDISTANCE_CAMPAIGN_DIR:-$SCRATCH/torus_maxdistance}"', launcher)
+        self.assertIn('--strategy maxDistance', launcher)
+        self.assertIn('--array="1-120%${MAX_PARALLEL}"', launcher)
+        self.assertIn('--dependency="afterany:${ARRAY_JOB_ID}"', launcher)
+        self.assertIn('ISLANDS_CAMPAIGN_STRATEGY=maxDistance', retry)
+        self.assertIn('maxDistance', batch)
+        self.assertIn('maxDistance', finalizer)
+        self.assertIn('$RemoteCampaignDir/torus_maxdistance.tar.gz*', downloader)
 
-            metadata = self.metadata(plan["tasks"][0], "9000", "9001")
-            metadata["scientific_configuration"]["migration"]["selection"] = "random"
-            code = (
-                "import json, sys; sys.path.insert(0, sys.argv[1]); "
-                "import campaign_tools as c; "
-                "p=c.load_plan(sys.argv[2]); "
-                "m=json.load(sys.stdin); "
-                "print(json.dumps(c.validate_metadata(m, p['tasks'][0], '9000', '9001')))"
-            )
-            result = subprocess.run([
-                sys.executable, "-c", code, str(MODULE_PATH.parent), str(plan_path),
-            ], input=json.dumps(metadata), env=env, check=True, capture_output=True, text=True)
-            self.assertEqual([], json.loads(result.stdout))
+    def test_nondefault_plan_and_metadata_contract(self):
+        for strategy in ("random", "maxDistance"):
+            with self.subTest(strategy=strategy), tempfile.TemporaryDirectory(
+                prefix=f"torus-{strategy}-contract-"
+            ) as temporary:
+                plan_path = Path(temporary) / "campaign_plan.json"
+                env = {**os.environ, "ISLANDS_CAMPAIGN_STRATEGY": strategy}
+                subprocess.run([
+                    sys.executable, str(MODULE_PATH), "create-plan", "--output", str(plan_path),
+                    "--git-commit", "a" * 40,
+                ], env=env, check=True, capture_output=True, text=True)
+                plan = json.loads(plan_path.read_text(encoding="utf-8"))
+                self.assertEqual(f"torus_{strategy.lower()}", plan["campaign"])
+                self.assertEqual(strategy, plan["configuration"]["migration"]["selection"])
+                self.assertEqual(120, len(plan["tasks"]))
+                if strategy == campaign.STRATEGY:
+                    campaign.validate_plan(plan)
+                else:
+                    with self.assertRaises(ValueError):
+                        campaign.validate_plan(plan)
+
+                metadata = self.metadata(plan["tasks"][0], "9000", "9001")
+                metadata["scientific_configuration"]["migration"]["selection"] = strategy
+                code = (
+                    "import json, sys; sys.path.insert(0, sys.argv[1]); "
+                    "import campaign_tools as c; "
+                    "p=c.load_plan(sys.argv[2]); "
+                    "m=json.load(sys.stdin); "
+                    "print(json.dumps(c.validate_metadata(m, p['tasks'][0], '9000', '9001')))"
+                )
+                result = subprocess.run([
+                    sys.executable, "-c", code, str(MODULE_PATH.parent), str(plan_path),
+                ], input=json.dumps(metadata), env=env, check=True, capture_output=True, text=True)
+                self.assertEqual([], json.loads(result.stdout))
 
     @staticmethod
     def metadata(task, array_job_id, job_id):
@@ -148,7 +170,9 @@ class CampaignToolsTests(unittest.TestCase):
         task = campaign.task_matrix()[0]
         metadata = self.metadata(task, "9000", "9001")
         self.assertEqual([], campaign.validate_metadata(metadata, task, "9000", "9001"))
-        metadata["scientific_configuration"]["migration"]["selection"] = "random"
+        metadata["scientific_configuration"]["migration"]["selection"] = (
+            "best" if campaign.STRATEGY == "random" else "random"
+        )
         self.assertIn("migration selection mismatch", campaign.validate_metadata(metadata, task, "9000", "9001"))
 
     def test_finalizer_requires_and_packages_all_120_runs(self):
