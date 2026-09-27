@@ -170,6 +170,172 @@ class CampaignToolsTests(unittest.TestCase):
         self.assertIn("migration selection mismatch",
                       ws3_maxdistance.validate_metadata(metadata, task, "9000", "9001"))
 
+    def test_complete_campaigns_match_runtime_graph_and_strategy(self):
+        with mock.patch.object(sys, "path", [str(MODULE_PATH.parents[1] / "islands_desync"), *sys.path]):
+            from islands_desync.islands.topologies.CompleteTopology import CompleteTopology
+            with redirect_stdout(io.StringIO()):
+                runtime_adjacency = CompleteTopology(144, lambda island: island).create()
+        adjacency = {str(island): neighbours for island, neighbours in runtime_adjacency.items()}
+        self.assertEqual(20592, sum(map(len, adjacency.values())))
+        digest = hashlib.sha256(json.dumps(
+            adjacency, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")).hexdigest()
+        self.assertEqual(campaign.COMPLETE_ADJACENCY_SHA256, digest)
+        damaged_source = copy.deepcopy(runtime_adjacency)
+        damaged_source[0][0] = 0
+        with mock.patch.object(CompleteTopology, "create", return_value=damaged_source):
+            with self.assertRaisesRegex(ValueError, "source adjacency"):
+                self.campaign_for("complete").expected_plan("a" * 40)
+        from hpc_benchmarks import run_benchmark as runtime
+        args = runtime.parser().parse_args([
+            "--problem", "r01_elliptic", "--dimension", "200", "--topology", "complete",
+        ])
+        saved_topology = json.loads(json.dumps(runtime.topology_payload(args, runtime_adjacency)))
+        self.assertEqual(digest, saved_topology["graph_metrics"]["adjacency_sha256"])
+
+        for strategy in ("best", "random", "maxDistance"):
+            with self.subTest(strategy=strategy):
+                slug = strategy.lower()
+                label = slug.upper()
+                launcher = MODULE_PATH.with_name(f"launch_complete_{slug}.sh").read_text(encoding="utf-8")
+                retry = MODULE_PATH.with_name(f"retry_complete_{slug}_task.sh").read_text(encoding="utf-8")
+                downloader = MODULE_PATH.with_name(f"download_complete_{slug}.ps1").read_text(encoding="utf-8")
+                self.assertIn(f'ISLANDS_CAMPAIGN_STRATEGY={strategy}', launcher)
+                self.assertIn('ISLANDS_CAMPAIGN_TOPOLOGY=complete', launcher)
+                self.assertIn(f'CAMPAIGN_DIR="${{COMPLETE_{label}_CAMPAIGN_DIR:-$SCRATCH/complete_{slug}}}"', launcher)
+                self.assertIn('--topology complete', launcher)
+                self.assertIn(f'--strategy {strategy}', launcher)
+                self.assertNotIn('--torus-rows', launcher)
+                self.assertIn('--array="1-120%${MAX_PARALLEL}"', launcher)
+                self.assertIn('--dependency="afterany:${ARRAY_JOB_ID}"', launcher)
+                self.assertIn(f'ISLANDS_CAMPAIGN_STRATEGY={strategy},ISLANDS_CAMPAIGN_TOPOLOGY=complete', retry)
+                self.assertIn(f'$RemoteCampaignDir/complete_{slug}.tar.gz*', downloader)
+
+                complete = self.campaign_for("complete", strategy)
+                plan = complete.expected_plan("a" * 40)
+                complete.validate_plan(plan)
+                self.assertEqual(f"complete_{slug}", plan["campaign"])
+                self.assertEqual(strategy, plan["configuration"]["migration"]["selection"])
+                self.assertEqual(120, len(plan["tasks"]))
+                self.assertEqual({"name": "complete", "parameters": None,
+                                  "adjacency_sha256": digest},
+                                 plan["configuration"]["topology"])
+                with self.assertRaises(ValueError):
+                    self.campaign_for("ws3", strategy).validate_plan(plan)
+
+                task = plan["tasks"][0]
+                metadata = self.metadata(task, "9000", "9001")
+                metadata["scientific_configuration"]["migration"]["selection"] = strategy
+                metadata["scientific_configuration"]["topology"] = {
+                    "name": "complete", "parameters": None,
+                    "adjacency_sha256": digest,
+                }
+                self.assertEqual([], complete.validate_metadata(metadata, task, "9000", "9001"))
+                metadata["scientific_configuration"]["migration"]["selection"] = "wrong"
+                self.assertIn("migration selection mismatch",
+                              complete.validate_metadata(metadata, task, "9000", "9001"))
+                metadata["scientific_configuration"]["migration"]["selection"] = strategy
+
+                topology = saved_topology
+                with tempfile.TemporaryDirectory(prefix="complete-topology-") as temporary:
+                    root = Path(temporary)
+                    (root / "topology.png").write_bytes(b"image")
+                    self.assertEqual([], complete.validate_topology_payload(topology, metadata, root))
+                    damaged = copy.deepcopy(topology)
+                    damaged["adjacency"]["0"][0] = 0
+                    self.assertIn("complete topology file adjacency differs from the approved graph",
+                                  complete.validate_topology_payload(damaged, metadata, root))
+                    damaged = copy.deepcopy(topology)
+                    damaged["graph_metrics"]["directed_edge_count_with_multiplicity"] = 20591
+                    self.assertIn("complete topology edge count mismatch",
+                                  complete.validate_topology_payload(damaged, metadata, root))
+
+    def test_ba_campaigns_match_supplied_graph_and_strategy(self):
+        ba_best = self.campaign_for("ba")
+        document = ba_best.read_json(ba_best.BA_GRAPH_PATH)
+        with mock.patch.object(sys, "path", [str(MODULE_PATH.parents[1] / "islands_desync"), *sys.path]):
+            from islands_desync.islands.topologies.BATopology import BATopology
+            from islands_desync.islands.topologies.fixed_graph import graph_parameters
+            self.assertEqual(ba_best.BA_PARAMETERS, graph_parameters("ba"))
+            adjacency = BATopology(144, lambda island: island).create()
+        self.assertEqual(7710, sum(map(len, adjacency.values())))
+        self.assertEqual(document["adjacency"],
+                         {str(island): neighbours for island, neighbours in adjacency.items()})
+        digest = hashlib.sha256(json.dumps(
+            document["adjacency"], sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")).hexdigest()
+        self.assertEqual(ba_best.BA_ADJACENCY_SHA256, digest)
+        damaged_source = copy.deepcopy(document)
+        damaged_source["adjacency"]["0"][0] = 0
+        with tempfile.TemporaryDirectory(prefix="ba-source-") as temporary:
+            altered = Path(temporary) / "ba.json"
+            ba_best.write_json(altered, damaged_source)
+            with mock.patch.object(ba_best, "BA_GRAPH_PATH", altered):
+                with self.assertRaisesRegex(ValueError, "adjacency hash"):
+                    ba_best.expected_plan("a" * 40)
+
+        from hpc_benchmarks import run_benchmark as runtime
+        args = runtime.parser().parse_args([
+            "--problem", "r01_elliptic", "--dimension", "200", "--topology", "ba",
+        ])
+        saved_topology = json.loads(json.dumps(runtime.topology_payload(args, adjacency)))
+        self.assertEqual(digest, saved_topology["graph_metrics"]["adjacency_sha256"])
+        for strategy in ("best", "random", "maxDistance"):
+            with self.subTest(strategy=strategy):
+                slug = strategy.lower()
+                label = slug.upper()
+                launcher = MODULE_PATH.with_name(f"launch_ba_{slug}.sh").read_text(encoding="utf-8")
+                retry = MODULE_PATH.with_name(f"retry_ba_{slug}_task.sh").read_text(encoding="utf-8")
+                downloader = MODULE_PATH.with_name(f"download_ba_{slug}.ps1").read_text(encoding="utf-8")
+                self.assertIn(f'ISLANDS_CAMPAIGN_STRATEGY={strategy}', launcher)
+                self.assertIn('ISLANDS_CAMPAIGN_TOPOLOGY=ba', launcher)
+                self.assertIn(f'CAMPAIGN_DIR="${{BA_{label}_CAMPAIGN_DIR:-$SCRATCH/ba_{slug}}}"', launcher)
+                self.assertIn('--topology ba', launcher)
+                self.assertIn(f'--strategy {strategy}', launcher)
+                self.assertNotIn('--torus-rows', launcher)
+                self.assertIn('--array="1-120%${MAX_PARALLEL}"', launcher)
+                self.assertIn('--dependency="afterany:${ARRAY_JOB_ID}"', launcher)
+                self.assertIn(f'ISLANDS_CAMPAIGN_STRATEGY={strategy},ISLANDS_CAMPAIGN_TOPOLOGY=ba', retry)
+                self.assertIn(f'$RemoteCampaignDir/ba_{slug}.tar.gz*', downloader)
+
+                ba = self.campaign_for("ba", strategy)
+                plan = ba.expected_plan("a" * 40)
+                ba.validate_plan(plan)
+                self.assertEqual(f"ba_{slug}", plan["campaign"])
+                self.assertEqual(strategy, plan["configuration"]["migration"]["selection"])
+                self.assertEqual(120, len(plan["tasks"]))
+                self.assertEqual({"name": "ba", "parameters": ba.BA_PARAMETERS,
+                                  "adjacency_sha256": digest},
+                                 plan["configuration"]["topology"])
+                with self.assertRaises(ValueError):
+                    self.campaign_for("ws3", strategy).validate_plan(plan)
+
+                task = plan["tasks"][0]
+                metadata = self.metadata(task, "9000", "9001")
+                metadata["scientific_configuration"]["migration"]["selection"] = strategy
+                metadata["scientific_configuration"]["topology"] = {
+                    "name": "ba", "parameters": ba.BA_PARAMETERS,
+                    "adjacency_sha256": digest,
+                }
+                self.assertEqual([], ba.validate_metadata(metadata, task, "9000", "9001"))
+                metadata["scientific_configuration"]["migration"]["selection"] = "wrong"
+                self.assertIn("migration selection mismatch",
+                              ba.validate_metadata(metadata, task, "9000", "9001"))
+                metadata["scientific_configuration"]["migration"]["selection"] = strategy
+
+                with tempfile.TemporaryDirectory(prefix="ba-topology-") as temporary:
+                    root = Path(temporary)
+                    (root / "topology.png").write_bytes(b"image")
+                    self.assertEqual([], ba.validate_topology_payload(saved_topology, metadata, root))
+                    damaged = copy.deepcopy(saved_topology)
+                    damaged["adjacency"]["0"][0] = 0
+                    self.assertIn("BA topology file adjacency differs from the approved graph",
+                                  ba.validate_topology_payload(damaged, metadata, root))
+                    damaged = copy.deepcopy(saved_topology)
+                    damaged["parameters"]["m"] = 29
+                    self.assertIn("BA topology file parameters/provenance mismatch",
+                                  ba.validate_topology_payload(damaged, metadata, root))
+
     def test_ws3_source_plan_metadata_and_topology_contract(self):
         ws3 = self.campaign_for("ws3")
         document = ws3.read_json(ws3.WS3_GRAPH_PATH)
@@ -401,42 +567,62 @@ class CampaignToolsTests(unittest.TestCase):
     def test_ws3_finalizer_archives_all_120_runs(self):
         for strategy in ("best", "random", "maxDistance"):
             with self.subTest(strategy=strategy):
-                self._assert_ws3_finalizer_archives_all_120_runs(strategy)
+                self._assert_graph_finalizer_archives_all_120_runs("ws3", strategy)
 
-    def _assert_ws3_finalizer_archives_all_120_runs(self, strategy):
-        ws3 = self.campaign_for("ws3", strategy)
+    def test_complete_finalizer_archives_all_120_runs(self):
+        for strategy in ("best", "random", "maxDistance"):
+            with self.subTest(strategy=strategy):
+                self._assert_graph_finalizer_archives_all_120_runs("complete", strategy)
+
+    def test_ba_finalizer_archives_all_120_runs(self):
+        for strategy in ("best", "random", "maxDistance"):
+            with self.subTest(strategy=strategy):
+                self._assert_graph_finalizer_archives_all_120_runs("ba", strategy)
+
+    def _assert_graph_finalizer_archives_all_120_runs(self, topology, strategy):
+        graph = self.campaign_for(topology, strategy)
         slug = strategy.lower()
-        with tempfile.TemporaryDirectory(prefix=f"ws3-{strategy}-finalize-") as temporary:
+        parameters = {
+            "ws3": graph.WS3_PARAMETERS,
+            "complete": None,
+            "ba": graph.BA_PARAMETERS,
+        }[topology]
+        adjacency_hash = {
+            "ws3": graph.WS3_ADJACENCY_SHA256,
+            "complete": graph.COMPLETE_ADJACENCY_SHA256,
+            "ba": graph.BA_ADJACENCY_SHA256,
+        }[topology]
+        with tempfile.TemporaryDirectory(prefix=f"{topology}-{slug}-finalize-") as temporary:
             root = Path(temporary)
-            plan = ws3.expected_plan("a" * 40)
-            ws3.write_json(root / "campaign_plan.json", plan)
+            plan = graph.expected_plan("a" * 40)
+            graph.write_json(root / "campaign_plan.json", plan)
             for task in plan["tasks"]:
                 job_id = 200000 + task["task_id"]
                 archive = root / "runs" / f"run_{job_id}.tar.gz"
                 archive.parent.mkdir(parents=True, exist_ok=True)
                 archive.write_bytes(f"bundle-{job_id}".encode("ascii"))
                 archive.with_name(archive.name + ".sha256").write_text(
-                    f"{ws3.sha256(archive)}  {archive.name}\n", encoding="ascii"
+                    f"{graph.sha256(archive)}  {archive.name}\n", encoding="ascii"
                 )
                 metadata = self.metadata(task, "9000", job_id)
                 metadata["scientific_configuration"]["migration"]["selection"] = strategy
                 metadata["scientific_configuration"]["topology"] = {
-                    "name": "ws3", "parameters": ws3.WS3_PARAMETERS,
-                    "adjacency_sha256": ws3.WS3_ADJACENCY_SHA256,
+                    "name": topology, "parameters": parameters,
+                    "adjacency_sha256": adjacency_hash,
                 }
-                ws3.write_json(root / "runs" / f"run_{job_id}" / "metadata.json", metadata)
+                graph.write_json(root / "runs" / f"run_{job_id}" / "metadata.json", metadata)
                 task_dir = root / "tasks" / f"task-{task['task_id']:03d}"
-                ws3.write_json(task_dir / "bundle_verification.json", {
+                graph.write_json(task_dir / "bundle_verification.json", {
                     "verified": True, "complete": True, "validation": "passed",
                     "job_id": str(job_id), "files": 2193,
                 })
-                ws3.write_json(task_dir / "validation.json", {
+                graph.write_json(task_dir / "validation.json", {
                     "valid": True, "errors": [], "task_id": task["task_id"],
                     "job_id": str(job_id), "array_job_id": "9000",
                     "execution_array_job_id": "9000",
                     "scientific_counts": {"islands": 144},
                 })
-                ws3.write_json(task_dir / "task.json", {
+                graph.write_json(task_dir / "task.json", {
                     **task, "status": "completed", "exit_code": 0,
                     "array_job_id": "9000", "job_id": str(job_id),
                     "execution_array_job_id": "9000",
@@ -444,19 +630,19 @@ class CampaignToolsTests(unittest.TestCase):
                 })
             output = io.StringIO()
             with redirect_stdout(output):
-                ws3.finalize(root, "9000")
-            self.assertIn(f"WS3_{strategy.upper()}_VALID_RUNS=120", output.getvalue())
-            summary = ws3.read_json(root / "campaign_summary.json")
+                graph.finalize(root, "9000")
+            self.assertIn(f"{topology.upper()}_{strategy.upper()}_VALID_RUNS=120", output.getvalue())
+            summary = graph.read_json(root / "campaign_summary.json")
             self.assertTrue(summary["valid"])
             self.assertEqual(120, summary["valid_runs"])
-            self.assertEqual(ws3.WS3_ADJACENCY_SHA256,
+            self.assertEqual(adjacency_hash,
                              summary["topology_adjacency_sha256"])
-            self.assertTrue((root / f"ws3_{slug}.tar.gz.sha256").is_file())
-            with tarfile.open(root / f"ws3_{slug}.tar.gz", "r:gz") as stream:
+            self.assertTrue((root / f"{topology}_{slug}.tar.gz.sha256").is_file())
+            with tarfile.open(root / f"{topology}_{slug}.tar.gz", "r:gz") as stream:
                 names = set(stream.getnames())
-            self.assertIn(f"ws3_{slug}/campaign_summary.json", names)
-            self.assertIn(f"ws3_{slug}/runs/r01_elliptic/repeat-1/run_200001.tar.gz", names)
-            self.assertIn(f"ws3_{slug}/runs/b10_maxcut_ring/repeat-3/run_200120.tar.gz", names)
+            self.assertIn(f"{topology}_{slug}/campaign_summary.json", names)
+            self.assertIn(f"{topology}_{slug}/runs/r01_elliptic/repeat-1/run_200001.tar.gz", names)
+            self.assertIn(f"{topology}_{slug}/runs/b10_maxcut_ring/repeat-3/run_200120.tar.gz", names)
 
     def test_finalizer_accepts_explicit_retry_array_identity(self):
         task = campaign.task_matrix()[103]

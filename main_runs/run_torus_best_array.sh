@@ -17,7 +17,7 @@ STRATEGY="${ISLANDS_CAMPAIGN_STRATEGY:-best}"
     exit 2
 }
 TOPOLOGY="${ISLANDS_CAMPAIGN_TOPOLOGY:-torus}"
-[[ "$TOPOLOGY" == torus || "$TOPOLOGY" == ws3 ]] || {
+[[ "$TOPOLOGY" == torus || "$TOPOLOGY" == ws3 || "$TOPOLOGY" == complete || "$TOPOLOGY" == ba ]] || {
     echo "Unsupported campaign topology: $TOPOLOGY" >&2
     exit 2
 }

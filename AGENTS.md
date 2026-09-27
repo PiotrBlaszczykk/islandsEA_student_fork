@@ -137,6 +137,24 @@ not override current study instructions; preserve their measured job records.
   scientific metadata and finalizer enforce the selected graph and strategy;
   results, retry and single-download helper use `$SCRATCH/ws3_maxdistance`
   and `artifacts/ws3_maxdistance`.
+- The next three campaign slices are `main_runs/launch_complete_{best,random,maxdistance}.sh`.
+  Each submits the same 40 x 3 matrix for the 144-node complete graph, with
+  one source-side strategy (`best`, `random`, `maxDistance`) and `plain`
+  acceptance. The exact 20,592-entry loop-free ordered adjacency and its
+  SHA-256 are checked against runtime metadata and `topology.json`.
+  Individual scratch trees, explicit retry helpers and single-download
+  scripts use `complete_best`, `complete_random`, `complete_maxdistance`.
+  Run these campaigns sequentially; verify and download one before deleting
+  its scratch tree and starting the next to respect Ares file quota.
+- The BA slices are `main_runs/launch_ba_{best,random,maxdistance}.sh`, with
+  40 x 3 runs each and the same 144-island Ares profile. They use the exact
+  supplied BA attachment (`m0=30`, `m=30`, 3855 undirected edges), never a
+  regenerated graph. Plan, metadata and `topology.json` validation require
+  the committed source provenance and ordered adjacency SHA-256. Strategies
+  are `best`, `random`, `maxDistance` with `plain` acceptance. Scratch trees,
+  retry helpers and single-download archives are `ba_best`, `ba_random`,
+  `ba_maxdistance`. Run sequentially and free the previous verified scratch
+  tree between campaigns.
 - Old `*_ares_200.sh`, `run*-hpc.sh`, `run_delay_experiment.sh`, `run_local_venv_plgrid.sh` and `submit_all_topologies.sh` are retired/fail closed. Do not use them as campaign templates. Job paths use ISLANDS_PROJECT_DIR/SLURM_SUBMIT_DIR, not the SLURM spool copy's BASH_SOURCE.
 - The sibling Athena checkout now has a sharded144-island GPU runner (12 shards, batcher, router, A100 evaluator;15 Ray CPUs plus driver), still requiring target canary certification. Do not submit the Ares CPU profile there. Current graph data and metric definitions remain shared.
 - Historical 144-island migration evidence: `../../artifacts/study144/validation.json`, 33 tests per repo (66 total), real CLI dry-runs and exact attachment checks; `../../artifacts/study144/parity.json`, 170 instances / 5946 inputs per comparison, no unexpected source differences. This is CPU evidence, not a 144-island HPC run or validation of the complete 40-function backend on A100.

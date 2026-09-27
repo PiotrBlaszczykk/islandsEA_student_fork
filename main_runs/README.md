@@ -1,5 +1,83 @@
 # Kampanie Ares / 40 benchmarków / 3 powtórzenia
 
+## BA / best, random, maxDistance
+
+Trzy kampanie `ba` używają dokładnej instancji Barabásiego-Alberta z
+załącznika `BA grapf - 144 nodes.txt`: 144 węzły, `m0=30`, `m=30`,
+3855 krawędzi nieskierowanych. Oryginalne identyfikatory i kolejność
+sąsiadów są zachowane. Plan oraz walidator wymagają parametrów,
+pochodzenia pliku i hasha uporządkowanej adjacencji
+`6f261e5960a86e2e13112f77748dff316207f5802022f99f98edabb1fadc1e00`.
+Graf nie jest generowany ponownie między runami.
+
+Każda kampania obejmuje 40 benchmarków przy D=200 i trzy niezależne
+powtórzenia: 120 runów z 144 wyspami, 8000 ewaluacji na wyspę,
+populacją 16, offspring 4, pięcioma migrantami co pięć ewaluacji,
+akceptacją `plain` i pełnymi metrykami. Profil Ares to 7×48 CPU na run;
+jednocześnie pracują najwyżej trzy elementy array. Zmienia się tylko
+strategia wyboru migrantów.
+
+Po commicie/pushu na `summer_ares_blaszczyk` i `git pull --ff-only` na Aresie
+uruchamiaj **po jednej kampanii na raz**:
+
+| Strategia | Launcher | Katalog na scratch | Pobieranie na Windowsie |
+|---|---|---|---|
+| best | `bash main_runs/launch_ba_best.sh` | `$SCRATCH/ba_best` | `.\main_runs\download_ba_best.ps1` |
+| random | `bash main_runs/launch_ba_random.sh` | `$SCRATCH/ba_random` | `.\main_runs\download_ba_random.ps1` |
+| maxDistance | `bash main_runs/launch_ba_maxdistance.sh` | `$SCRATCH/ba_maxdistance` | `.\main_runs\download_ba_maxdistance.ps1` |
+
+Launcher sprawdza wszystkie 40 kombinacji dry-runem przed wysłaniem
+120-elementowego array i finalizera `afterany`. Po zakończeniu sprawdź
+121 wpisów `COMPLETED|0:0`, znacznik `BA_<STRATEGY>_VALID_RUNS=120`
+oraz `BA_<STRATEGY>_FINALIZATION_OK`. W znaczniku `maxDistance` ma postać
+`MAXDISTANCE`, a w ścieżkach `maxdistance`. Finalizer tworzy jedno archiwum
+`ba_<strategia>.tar.gz` z SHA-256 tylko przy 120 zweryfikowanych runach.
+Downloadery domyślnie pobierają tar bez rozpakowania i sprawdzają SHA-256;
+`-Extract` wymaga dodatkowego miejsca. Po sprawdzeniu lokalnej kopii
+zwolnij katalog zakończonej kampanii na scratch przed następną.
+W razie pojedynczej porażki po diagnozie użyj odpowiednio
+`retry_ba_best_task.sh`, `retry_ba_random_task.sh` lub
+`retry_ba_maxdistance_task.sh` z argumentem `<TASK_ID>`.
+
+## Complete / best, random, maxDistance
+
+Trzy kampanie `complete` obejmują po 120 niezależnych runów: 144 wyspy,
+40 benchmarków przy D=200 i trzy powtórzenia. Każda zachowuje 8000 ewaluacji
+na wyspę, populację 16, offspring 4, pięciu migrantów co pięć ewaluacji,
+akceptację `plain`, pełne metryki i profil Ares 7×48 CPU. Zmienia się
+wyłącznie strategia wyboru migrantów: `best`, `random` albo `maxDistance`.
+Graf pełny łączy każdy węzeł ze wszystkimi pozostałymi: 144 węzły,
+20 592 skierowane wpisy sąsiedztwa, bez pętli. Walidator wymaga dokładnego
+uporządkowania list sąsiadów, hasha
+`ce2d15a0567515f9b81654814679a265e83e2395f4e90fb609cd7301ee196062`
+oraz zgodności strategii w planie, metadanych i `topology.json`.
+
+Po commicie/pushu na `summer_ares_blaszczyk` i `git pull --ff-only` na Aresie
+uruchamiaj **jedną kampanię na raz**, w tej kolejności:
+
+| Strategia | Launcher | Katalog na scratch | Pobieranie na Windowsie |
+|---|---|---|---|
+| best | `bash main_runs/launch_complete_best.sh` | `$SCRATCH/complete_best` | `.\main_runs\download_complete_best.ps1` |
+| random | `bash main_runs/launch_complete_random.sh` | `$SCRATCH/complete_random` | `.\main_runs\download_complete_random.ps1` |
+| maxDistance | `bash main_runs/launch_complete_maxdistance.sh` | `$SCRATCH/complete_maxdistance` | `.\main_runs\download_complete_maxdistance.ps1` |
+
+Każdy launcher wykonuje 40 dry-runów preflight i wysyła 120-elementowy array
+z limitem trzech jednoczesnych tasków oraz finalizer `afterany`. Nazwy
+archiwów to odpowiednio `complete_best.tar.gz`, `complete_random.tar.gz`
+i `complete_maxdistance.tar.gz`, każde z plikiem `.sha256`. Po zakończeniu
+sprawdź 121 rekordów `COMPLETED|0:0` oraz znaczniki
+`COMPLETE_<STRATEGY>_VALID_RUNS=120` i
+`COMPLETE_<STRATEGY>_FINALIZATION_OK` w logu finalizera. W znacznikach
+`maxDistance` ma postać `MAXDISTANCE`; ścieżki używają małych liter.
+
+Helpery pobierają archiwum i sprawdzają SHA-256 bez rozpakowania. Po
+potwierdzeniu lokalnej kopii oraz 120 poprawnych runów zwolnij katalog
+zakończonej kampanii na scratch przed uruchomieniem następnej, aby nie
+przekroczyć kwoty plików. Opcja `-Extract` wymaga dodatkowego miejsca.
+W razie pojedynczego nieudanego tasku po diagnozie użyj odpowiednio
+`retry_complete_best_task.sh`, `retry_complete_random_task.sh` lub
+`retry_complete_maxdistance_task.sh` z argumentem `<TASK_ID>`.
+
 ## WS3 / maxDistance
 
 `main_runs/launch_ws3_maxdistance.sh` uruchamia 120 niezależnych runów na tej

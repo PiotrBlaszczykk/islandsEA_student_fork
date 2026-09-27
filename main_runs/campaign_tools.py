@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import contextlib
 from datetime import datetime, timezone
 import gzip
 import hashlib
+import io
 import json
 import math
 import os
 from pathlib import Path
+import sys
 import tarfile
 import zlib
 
@@ -19,7 +22,7 @@ STRATEGY = os.environ.get("ISLANDS_CAMPAIGN_STRATEGY", "best")
 if STRATEGY not in ("best", "random", "maxDistance"):
     raise ValueError(f"unsupported campaign strategy: {STRATEGY}")
 TOPOLOGY = os.environ.get("ISLANDS_CAMPAIGN_TOPOLOGY", "torus")
-if TOPOLOGY not in ("torus", "ws3"):
+if TOPOLOGY not in ("torus", "ws3", "complete", "ba"):
     raise ValueError(f"unsupported campaign topology: {TOPOLOGY}")
 CAMPAIGN_SLUG = STRATEGY.lower()
 SCHEMA = f"islandsea-{TOPOLOGY}-{CAMPAIGN_SLUG}-campaign-v1"
@@ -28,6 +31,8 @@ BASE_SEED = 20260912
 DIMENSION = 200
 REPEATS = (1, 2, 3)
 WS3_ADJACENCY_SHA256 = "8dbf64ece5d63c0f6d9ee09adeb91b287d6fa594379008605a11c24ba585d9ee"
+BA_ADJACENCY_SHA256 = "6f261e5960a86e2e13112f77748dff316207f5802022f99f98edabb1fadc1e00"
+COMPLETE_ADJACENCY_SHA256 = "ce2d15a0567515f9b81654814679a265e83e2395f4e90fb609cd7301ee196062"
 WS3_DATA_PARAMETERS = {
     "family": "Watts-Strogatz",
     "selection": "WS3",
@@ -49,11 +54,35 @@ WS3_PROVENANCE = {
 WS3_PARAMETERS = {**WS3_DATA_PARAMETERS, "nodes": 144, "provenance": WS3_PROVENANCE}
 WS3_GRAPH_PATH = (Path(__file__).resolve().parents[1]
                   / "islands_desync/islands_desync/islands/topologies/data/ws3.json")
-TOPOLOGY_CONFIGURATION = (
-    {"name": "torus", "rows": 12, "columns": 12}
-    if TOPOLOGY == "torus" else
-    {"name": "ws3", "parameters": WS3_PARAMETERS, "adjacency_sha256": WS3_ADJACENCY_SHA256}
-)
+BA_DATA_PARAMETERS = {"family": "Barabasi-Albert", "m0": 30, "m": 30}
+BA_PROVENANCE = {
+    "source_filename": "BA grapf - 144 nodes.txt",
+    "source_sha256": "3961eac3f1ffea8b1ac189fd12e801a03f0e85ce97b12e48cf9b84914566270b",
+    "adjacency_sha256": BA_ADJACENCY_SHA256,
+    "transformation": "none; original node IDs and neighbour order preserved",
+    "parameter_source": "supplied attachment label; null means not provided",
+    "study_status": "approved-144",
+}
+BA_PARAMETERS = {**BA_DATA_PARAMETERS, "nodes": 144, "provenance": BA_PROVENANCE}
+BA_GRAPH_PATH = (Path(__file__).resolve().parents[1]
+                 / "islands_desync/islands_desync/islands/topologies/data/ba.json")
+if TOPOLOGY == "torus":
+    TOPOLOGY_CONFIGURATION = {"name": "torus", "rows": 12, "columns": 12}
+elif TOPOLOGY == "ws3":
+    TOPOLOGY_CONFIGURATION = {
+        "name": "ws3", "parameters": WS3_PARAMETERS,
+        "adjacency_sha256": WS3_ADJACENCY_SHA256,
+    }
+elif TOPOLOGY == "ba":
+    TOPOLOGY_CONFIGURATION = {
+        "name": "ba", "parameters": BA_PARAMETERS,
+        "adjacency_sha256": BA_ADJACENCY_SHA256,
+    }
+else:
+    TOPOLOGY_CONFIGURATION = {
+        "name": "complete", "parameters": None,
+        "adjacency_sha256": COMPLETE_ADJACENCY_SHA256,
+    }
 CONTINUOUS = (
     "r01_elliptic", "r02_bent_cigar", "r03_discus", "r04_rosenbrock",
     "r05_ackley", "r06_weierstrass", "r07_griewank", "r08_rastrigin",
@@ -113,7 +142,42 @@ def reject_nonfinite(value):
 
 
 def validate_study_graph_source():
-    """Fail before submission if the selected WS3 attachment changed."""
+    """Fail before submission if the selected graph differs from the study graph."""
+    if TOPOLOGY == "complete":
+        package_root = Path(__file__).resolve().parents[1] / "islands_desync"
+        sys.path.insert(0, str(package_root))
+        try:
+            from islands_desync.islands.topologies.CompleteTopology import CompleteTopology
+            with contextlib.redirect_stdout(io.StringIO()):
+                runtime_adjacency = CompleteTopology(144, lambda island: island).create()
+        finally:
+            sys.path.pop(0)
+        if set(runtime_adjacency) != set(range(144)):
+            raise ValueError("complete topology source does not define 144 islands")
+        adjacency = {str(island): neighbours for island, neighbours in runtime_adjacency.items()}
+        canonical = json.dumps(adjacency, sort_keys=True, separators=(",", ":"),
+                               allow_nan=False).encode("utf-8")
+        if hashlib.sha256(canonical).hexdigest() != COMPLETE_ADJACENCY_SHA256:
+            raise ValueError("complete topology source adjacency differs from the approved graph")
+        return
+    if TOPOLOGY == "ba":
+        document = read_json(BA_GRAPH_PATH)
+        if (document.get("schema_version") != 1 or document.get("name") != "ba"
+                or document.get("nodes") != 144
+                or document.get("parameters") != BA_DATA_PARAMETERS
+                or document.get("provenance") != BA_PROVENANCE):
+            raise ValueError("BA source identity or parameters differ from the approved graph")
+        adjacency = document.get("adjacency")
+        if (not isinstance(adjacency, dict)
+                or set(adjacency) != {str(island) for island in range(144)}
+                or any(not isinstance(targets, list) or not targets
+                       or any(type(target) is not int or not 0 <= target < 144 for target in targets)
+                       for targets in adjacency.values())):
+            raise ValueError("BA source has invalid island neighbours")
+        canonical = json.dumps(adjacency, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        if hashlib.sha256(canonical).hexdigest() != BA_ADJACENCY_SHA256:
+            raise ValueError("BA source adjacency hash differs from the approved graph")
+        return
     if TOPOLOGY != "ws3":
         return
     document = read_json(WS3_GRAPH_PATH)
@@ -233,10 +297,18 @@ def validate_metadata(metadata, task, array_job_id, job_id):
     if TOPOLOGY == "torus":
         require(parameters.get("rows") == 12 and parameters.get("columns") == 12,
                 "torus shape mismatch")
-    else:
+    elif TOPOLOGY == "ws3":
         require(parameters == WS3_PARAMETERS, "WS3 parameters/provenance mismatch")
         require(topology.get("adjacency_sha256") == WS3_ADJACENCY_SHA256,
                 "WS3 adjacency hash mismatch")
+    elif TOPOLOGY == "ba":
+        require(parameters == BA_PARAMETERS, "BA parameters/provenance mismatch")
+        require(topology.get("adjacency_sha256") == BA_ADJACENCY_SHA256,
+                "BA adjacency hash mismatch")
+    else:
+        require(parameters is None, "complete topology parameters mismatch")
+        require(topology.get("adjacency_sha256") == COMPLETE_ADJACENCY_SHA256,
+                "complete topology adjacency hash mismatch")
     require(seed.get("requested_base") == BASE_SEED, "base seed mismatch")
     require(seed.get("repeat_base") == task["repeat_seed"], "repeat seed mismatch")
     require(metrics.get("profile") == "research-v1-full-buffered", "metrics profile mismatch")
@@ -265,7 +337,7 @@ def validate_topology_payload(topology, metadata, raw):
     if TOPOLOGY == "torus":
         require(topology.get("torus_shape", {}).get("rows") == 12, "topology rows mismatch")
         require(topology.get("torus_shape", {}).get("columns") == 12, "topology columns mismatch")
-    else:
+    elif TOPOLOGY == "ws3":
         require(topology.get("parameters") == WS3_PARAMETERS,
                 "WS3 topology file parameters/provenance mismatch")
         require((raw / "topology.png").is_file(), "WS3 topology image is missing")
@@ -279,6 +351,44 @@ def validate_topology_payload(topology, metadata, raw):
             errors.append("WS3 topology file adjacency is missing")
         require(topology.get("graph_metrics", {}).get("adjacency_sha256")
                 == WS3_ADJACENCY_SHA256, "WS3 topology metrics hash mismatch")
+    elif TOPOLOGY == "ba":
+        require(topology.get("parameters") == BA_PARAMETERS,
+                "BA topology file parameters/provenance mismatch")
+        require((raw / "topology.png").is_file(), "BA topology image is missing")
+        adjacency = topology.get("adjacency")
+        if isinstance(adjacency, dict):
+            canonical = json.dumps(adjacency, sort_keys=True, separators=(",", ":"),
+                                   allow_nan=False).encode("utf-8")
+            require(hashlib.sha256(canonical).hexdigest() == BA_ADJACENCY_SHA256,
+                    "BA topology file adjacency differs from the approved graph")
+        else:
+            errors.append("BA topology file adjacency is missing")
+        metrics = topology.get("graph_metrics", {})
+        require(metrics.get("adjacency_sha256") == BA_ADJACENCY_SHA256,
+                "BA topology metrics hash mismatch")
+        require(metrics.get("directed_edge_count_with_multiplicity") == 7710,
+                "BA topology edge count mismatch")
+        require(metrics.get("self_loop_count_with_multiplicity") == 0,
+                "BA topology self-loop count mismatch")
+    else:
+        require(topology.get("torus_shape") is None, "complete topology has a torus shape")
+        require(topology.get("parameters") is None, "complete topology file parameters mismatch")
+        require((raw / "topology.png").is_file(), "complete topology image is missing")
+        adjacency = topology.get("adjacency")
+        if isinstance(adjacency, dict):
+            canonical = json.dumps(adjacency, sort_keys=True, separators=(",", ":"),
+                                   allow_nan=False).encode("utf-8")
+            require(hashlib.sha256(canonical).hexdigest() == COMPLETE_ADJACENCY_SHA256,
+                    "complete topology file adjacency differs from the approved graph")
+        else:
+            errors.append("complete topology file adjacency is missing")
+        metrics = topology.get("graph_metrics", {})
+        require(metrics.get("adjacency_sha256") == COMPLETE_ADJACENCY_SHA256,
+                "complete topology metrics hash mismatch")
+        require(metrics.get("directed_edge_count_with_multiplicity") == 20592,
+                "complete topology edge count mismatch")
+        require(metrics.get("self_loop_count_with_multiplicity") == 0,
+                "complete topology self-loop count mismatch")
     require(
         topology.get("graph_metrics", {}).get("adjacency_sha256")
         == metadata.get("scientific_configuration", {}).get("topology", {}).get("adjacency_sha256"),
