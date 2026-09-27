@@ -131,6 +131,12 @@ not override current study instructions; preserve their measured job records.
   finalizer require both the WS3 identity and the random strategy. Results,
   retry and single-download helper are isolated under `$SCRATCH/ws3_random`
   and `artifacts/ws3_random`.
+- Sixth campaign slice: `main_runs/launch_ws3_maxdistance.sh` keeps the same
+  frozen WS3 graph and 40 x 3 Ares profile with source-side selection
+  `maxDistance` (case-sensitive) and destination acceptance `plain`. Plan,
+  scientific metadata and finalizer enforce the selected graph and strategy;
+  results, retry and single-download helper use `$SCRATCH/ws3_maxdistance`
+  and `artifacts/ws3_maxdistance`.
 - Old `*_ares_200.sh`, `run*-hpc.sh`, `run_delay_experiment.sh`, `run_local_venv_plgrid.sh` and `submit_all_topologies.sh` are retired/fail closed. Do not use them as campaign templates. Job paths use ISLANDS_PROJECT_DIR/SLURM_SUBMIT_DIR, not the SLURM spool copy's BASH_SOURCE.
 - The sibling Athena checkout now has a sharded144-island GPU runner (12 shards, batcher, router, A100 evaluator;15 Ray CPUs plus driver), still requiring target canary certification. Do not submit the Ares CPU profile there. Current graph data and metric definitions remain shared.
 - Historical 144-island migration evidence: `../../artifacts/study144/validation.json`, 33 tests per repo (66 total), real CLI dry-runs and exact attachment checks; `../../artifacts/study144/parity.json`, 170 instances / 5946 inputs per comparison, no unexpected source differences. This is CPU evidence, not a 144-island HPC run or validation of the complete 40-function backend on A100.

@@ -131,6 +131,45 @@ class CampaignToolsTests(unittest.TestCase):
         self.assertIn("migration selection mismatch",
                       ws3_random.validate_metadata(metadata, task, "9000", "9001"))
 
+    def test_ws3_maxdistance_launcher_and_scientific_contract(self):
+        launcher = MODULE_PATH.with_name("launch_ws3_maxdistance.sh").read_text(encoding="utf-8")
+        retry = MODULE_PATH.with_name("retry_ws3_maxdistance_task.sh").read_text(encoding="utf-8")
+        downloader = MODULE_PATH.with_name("download_ws3_maxdistance.ps1").read_text(encoding="utf-8")
+        self.assertIn('ISLANDS_CAMPAIGN_TOPOLOGY=ws3', launcher)
+        self.assertIn('ISLANDS_CAMPAIGN_STRATEGY=maxDistance', launcher)
+        self.assertIn('CAMPAIGN_DIR="${WS3_MAXDISTANCE_CAMPAIGN_DIR:-$SCRATCH/ws3_maxdistance}"', launcher)
+        self.assertIn('--topology ws3', launcher)
+        self.assertIn('--strategy maxDistance', launcher)
+        self.assertNotIn('--torus-rows', launcher)
+        self.assertIn('--array="1-120%${MAX_PARALLEL}"', launcher)
+        self.assertIn('--dependency="afterany:${ARRAY_JOB_ID}"', launcher)
+        self.assertIn('ISLANDS_CAMPAIGN_STRATEGY=maxDistance,ISLANDS_CAMPAIGN_TOPOLOGY=ws3', launcher)
+        self.assertIn('ISLANDS_CAMPAIGN_STRATEGY=maxDistance,ISLANDS_CAMPAIGN_TOPOLOGY=ws3', retry)
+        self.assertIn('$RemoteCampaignDir/ws3_maxdistance.tar.gz*', downloader)
+
+        ws3_maxdistance = self.campaign_for("ws3", "maxDistance")
+        plan = ws3_maxdistance.expected_plan("a" * 40)
+        ws3_maxdistance.validate_plan(plan)
+        self.assertEqual("ws3_maxdistance", plan["campaign"])
+        self.assertEqual("maxDistance", plan["configuration"]["migration"]["selection"])
+        self.assertEqual(120, len(plan["tasks"]))
+        self.assertEqual(ws3_maxdistance.WS3_ADJACENCY_SHA256,
+                         plan["configuration"]["topology"]["adjacency_sha256"])
+        with self.assertRaises(ValueError):
+            self.campaign_for("ws3", "random").validate_plan(plan)
+
+        task = plan["tasks"][0]
+        metadata = self.metadata(task, "9000", "9001")
+        metadata["scientific_configuration"]["migration"]["selection"] = "maxDistance"
+        metadata["scientific_configuration"]["topology"] = {
+            "name": "ws3", "parameters": ws3_maxdistance.WS3_PARAMETERS,
+            "adjacency_sha256": ws3_maxdistance.WS3_ADJACENCY_SHA256,
+        }
+        self.assertEqual([], ws3_maxdistance.validate_metadata(metadata, task, "9000", "9001"))
+        metadata["scientific_configuration"]["migration"]["selection"] = "random"
+        self.assertIn("migration selection mismatch",
+                      ws3_maxdistance.validate_metadata(metadata, task, "9000", "9001"))
+
     def test_ws3_source_plan_metadata_and_topology_contract(self):
         ws3 = self.campaign_for("ws3")
         document = ws3.read_json(ws3.WS3_GRAPH_PATH)
@@ -360,12 +399,13 @@ class CampaignToolsTests(unittest.TestCase):
             self.assertIn(f"{campaign.CAMPAIGN}/runs/b10_maxcut_ring/repeat-3/run_100120.tar.gz", names)
 
     def test_ws3_finalizer_archives_all_120_runs(self):
-        for strategy in ("best", "random"):
+        for strategy in ("best", "random", "maxDistance"):
             with self.subTest(strategy=strategy):
                 self._assert_ws3_finalizer_archives_all_120_runs(strategy)
 
     def _assert_ws3_finalizer_archives_all_120_runs(self, strategy):
         ws3 = self.campaign_for("ws3", strategy)
+        slug = strategy.lower()
         with tempfile.TemporaryDirectory(prefix=f"ws3-{strategy}-finalize-") as temporary:
             root = Path(temporary)
             plan = ws3.expected_plan("a" * 40)
@@ -411,12 +451,12 @@ class CampaignToolsTests(unittest.TestCase):
             self.assertEqual(120, summary["valid_runs"])
             self.assertEqual(ws3.WS3_ADJACENCY_SHA256,
                              summary["topology_adjacency_sha256"])
-            self.assertTrue((root / f"ws3_{strategy}.tar.gz.sha256").is_file())
-            with tarfile.open(root / f"ws3_{strategy}.tar.gz", "r:gz") as stream:
+            self.assertTrue((root / f"ws3_{slug}.tar.gz.sha256").is_file())
+            with tarfile.open(root / f"ws3_{slug}.tar.gz", "r:gz") as stream:
                 names = set(stream.getnames())
-            self.assertIn(f"ws3_{strategy}/campaign_summary.json", names)
-            self.assertIn(f"ws3_{strategy}/runs/r01_elliptic/repeat-1/run_200001.tar.gz", names)
-            self.assertIn(f"ws3_{strategy}/runs/b10_maxcut_ring/repeat-3/run_200120.tar.gz", names)
+            self.assertIn(f"ws3_{slug}/campaign_summary.json", names)
+            self.assertIn(f"ws3_{slug}/runs/r01_elliptic/repeat-1/run_200001.tar.gz", names)
+            self.assertIn(f"ws3_{slug}/runs/b10_maxcut_ring/repeat-3/run_200120.tar.gz", names)
 
     def test_finalizer_accepts_explicit_retry_array_identity(self):
         task = campaign.task_matrix()[103]

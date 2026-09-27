@@ -1,5 +1,43 @@
 # Kampanie Ares / 40 benchmarków / 3 powtórzenia
 
+## WS3 / maxDistance
+
+`main_runs/launch_ws3_maxdistance.sh` uruchamia 120 niezależnych runów na tej
+samej, zamrożonej instancji WS3 co kampanie `best` i `random`: 40 benchmarków
+przy D=200, trzy powtórzenia, 144 wyspy, pełne metryki i profil 7×48 CPU.
+Wybór migrantów to dokładnie `maxDistance` (wielkość liter ma znaczenie),
+akceptacja pozostaje `plain`. Maksymalnie trzy elementy array pracują
+jednocześnie. Plan, metadane runów i finalizer walidują strategię oraz
+tożsamość grafu WS3.
+
+Po pobraniu archiwum WS3/random i potwierdzeniu SHA-256 oraz
+`WS3_RANDOM_VALID_RUNS=120` można zwolnić `$SCRATCH/ws3_random`, aby odzyskać
+kwotę plików. Po commicie/pushu i `git pull --ff-only` na Aresie uruchom:
+
+```bash
+bash main_runs/launch_ws3_maxdistance.sh
+```
+
+Wyniki trafiają wyłącznie do `$SCRATCH/ws3_maxdistance`. Po zakończeniu
+sprawdź 120 elementów array i finalizer jako `COMPLETED 0:0` oraz znaczniki
+`WS3_MAXDISTANCE_VALID_RUNS=120` i `WS3_MAXDISTANCE_FINALIZATION_OK` w
+`$SCRATCH/ws3_maxdistance/logs/ws3-maxdistance-finalize-<ID>.out`. Dopiero
+wtedy finalizer tworzy `ws3_maxdistance.tar.gz` i `.sha256`. Pojedynczy
+nieudany task można po diagnozie ponowić jawnie:
+
+```bash
+bash main_runs/retry_ws3_maxdistance_task.sh <TASK_ID>
+```
+
+Na Windowsie pobierz jedno archiwum i sprawdź jego SHA-256 bez rozpakowania:
+
+```powershell
+.\main_runs\download_ws3_maxdistance.ps1
+```
+
+Opcja `-Extract` dodatkowo weryfikuje 120 wewnętrznych bundle i zajmuje
+więcej miejsca na dysku.
+
 ## WS3 / random
 
 `main_runs/launch_ws3_random.sh` uruchamia tę samą zamrożoną instancję WS3 i
