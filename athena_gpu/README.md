@@ -103,6 +103,22 @@ jobów następczych. Maksymalny łączny koszt to 6 GPUh.
 Aktualny commit i stan Git pozostają w metadanych wyłącznie jako proweniencja;
 nie są bramką uruchomienia tego arraya.
 
+Produkcyjny launcher dla całej czterdziestki z `er4` i `best/plain` jest
+`submit_production_er4_best_120.sh`. Jedno ręczne wywołanie zgłasza array
+`1-120%3`: 40 benchmarków × powtórzenia 1–3, D=200, 144 wyspy,
+8000 ewaluacji/wyspę. Limit to 2 GPUh na element, maksymalnie 240 GPUh.
+Stałą mapę tasków i hash zatwierdzonego grafu sprawdza
+`production_er4_best.py`; każdy element przechodzi pełny walidator i tworzy
+osobne archiwum `run_<SLURM_JOB_ID>.tar.gz`. Nie ma canary ani bramki commita.
+Plan kampanii i zweryfikowane paczki trafiają też do
+`$SCRATCH/islandsEA/campaigns/er4_best_<ARRAY_ID>/`, skąd jeden helper
+`download_production_er4_best_120.ps1 -ArrayJobId <ARRAY_ID>` pobiera je pod
+`artifacts/run_wyniki/athena/` i sprawdza 120 rekordów oraz 120 sum SHA-256.
+Kampania nie uruchamia dodatkowego finalizera na A100 i nie tworzy drugiej
+kopii danych na SCRATCH; pojedyncze bundle pozostają w formacie wspólnym z
+Aresem.
+Zobacz [runbook produkcyjny](../athena-info/ATHENA_HOW_TO_RUN.md).
+
 Lokalnie po poprawce przechodzi 32 testy kontraktu, a jeden test real-Ray jest
 domyślnie opt-in. Uruchomiony jawnie smoke wykonał pełny
 cykl 4 logicznych wysp na 2 shardach (20 requestów, 128 wierszy), migracje i

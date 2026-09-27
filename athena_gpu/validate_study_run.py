@@ -17,6 +17,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "islands_desync"))
 
 from pilot_run import pilot_tools
+from islands_desync.geneticAlgorithm.utils.benchmarks_refined import BENCHMARKS
+from islands_desync.islands.topologies.fixed_graph import graph_parameters, load_graph
 from athena_gpu.environment_contract import (
     ATHENA_EXPECTED_DISTRIBUTIONS,
     ATHENA_PYTHON,
@@ -30,6 +32,8 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--mode", choices=("canary", "full"), required=True)
     result.add_argument("--expected-commit", required=True)
     result.add_argument("--expected-repeat", type=int, choices=(1, 2, 3), default=1)
+    result.add_argument("--expected-problem", choices=BENCHMARKS, default="r01_elliptic")
+    result.add_argument("--expected-topology", choices=("torus", "er4"), default="torus")
     return result
 
 
@@ -37,16 +41,25 @@ def _load(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _spec(mode: str, repeat: int = 1) -> dict:
+def _spec(
+    mode: str,
+    repeat: int = 1,
+    problem: str = "r01_elliptic",
+    topology: str = "torus",
+) -> dict:
     full = mode == "full"
     if not full and repeat != 1:
         raise ValueError("Athena canary must use repeat 1")
+    if problem not in BENCHMARKS:
+        raise ValueError(f"Unknown refined benchmark: {problem}")
+    if topology not in ("torus", "er4") or (not full and topology != "torus"):
+        raise ValueError("Athena canary uses torus; full study supports torus or er4")
     islands = 144 if full else 12
     evaluations = 8000 if full else 128
     population = 16
     offspring = 4
     return {
-        "benchmark": "r01_elliptic",
+        "benchmark": problem,
         "dimension": 200,
         "islands": islands,
         "evaluations_per_island": evaluations,
@@ -54,9 +67,9 @@ def _spec(mode: str, repeat: int = 1) -> dict:
         "offspring": offspring,
         "migrants": 5,
         "migration_interval": 5,
-        "topology": "torus",
-        "torus_rows": 12 if full else 3,
-        "torus_columns": 12 if full else 4,
+        "topology": topology,
+        "torus_rows": (12 if full else 3) if topology == "torus" else None,
+        "torus_columns": (12 if full else 4) if topology == "torus" else None,
         "migrant_selection": "best",
         "migrant_acceptance": "plain",
         "base_seed": 20260912,
@@ -73,6 +86,25 @@ def _spec(mode: str, repeat: int = 1) -> dict:
 def _require(condition: bool, message: str, errors: list[str]) -> None:
     if not condition:
         errors.append(message)
+
+
+def _check_er4_topology(topology: dict, spec: dict, errors: list[str]) -> None:
+    """Match the persisted run graph to the approved, versioned ER4 attachment."""
+    document = load_graph("er4")
+    expected_parameters = graph_parameters("er4")
+    expected_adjacency = document["adjacency"]
+    expected_sha256 = document["provenance"]["adjacency_sha256"]
+    _require(topology.get("schema_version") == 2, "saved ER4 topology has wrong schema", errors)
+    _require(topology.get("name") == "er4", "saved topology is not ER4", errors)
+    _require(topology.get("islands") == spec["islands"], "saved ER4 has wrong island count", errors)
+    _require(topology.get("torus_shape") is None, "ER4 incorrectly records a torus shape", errors)
+    _require(topology.get("parameters") == expected_parameters, "saved ER4 parameters/provenance differ", errors)
+    _require(topology.get("adjacency") == expected_adjacency, "saved ER4 adjacency differs", errors)
+    metrics = topology.get("graph_metrics") or {}
+    _require(metrics.get("adjacency_sha256") == expected_sha256, "saved ER4 adjacency hash differs", errors)
+    _require(metrics.get("node_count") == 144, "saved ER4 graph metrics have wrong node count", errors)
+    _require(metrics.get("weakly_connected") is True, "saved ER4 is not connected", errors)
+    _require(metrics.get("strongly_connected") is True, "saved ER4 is not strongly connected", errors)
 
 
 def _check_manifest(manifest: dict, spec: dict, mode: str, expected_commit: str, errors: list[str]):
@@ -134,6 +166,14 @@ def _check_manifest(manifest: dict, spec: dict, mode: str, expected_commit: str,
     scientific_seed = scientific.get("seed", {})
     migration = scientific.get("migration", {})
     algorithm = scientific.get("algorithm_configuration", {})
+    scientific_topology = scientific.get("topology", {})
+    _require(scientific_topology.get("name") == spec["topology"], "scientific topology is wrong", errors)
+    if spec["topology"] == "er4":
+        _require(
+            scientific_topology.get("parameters") == graph_parameters("er4"),
+            "scientific ER4 graph parameters differ from the approved graph",
+            errors,
+        )
     _require(
         migration.get("selection") == spec["migrant_selection"],
         "scientific migration selection is stale",
@@ -291,6 +331,7 @@ def _scheduler_quality(raw: Path, shards: list[dict], mode: str, errors: list[st
     fitness = []
     wall = []
     winners = Counter()
+    tied_winner_shards = 0
     for island, position in sorted(position_by_island.items()):
         result = results.get(str(island), {})
         _require(
@@ -312,8 +353,15 @@ def _scheduler_quality(raw: Path, shards: list[dict], mode: str, errors: list[st
             if isinstance(results.get(str(island), {}).get("final_fitness"), (int, float))
         ]
         if valid:
-            winner = min(valid, key=lambda island: results[str(island)]["final_fitness"])
-            winners[position_by_island[winner]] += 1
+            best_fitness = min(results[str(island)]["final_fitness"] for island in valid)
+            minima = [
+                island for island in valid
+                if results[str(island)]["final_fitness"] == best_fitness
+            ]
+            if len(minima) == 1:
+                winners[position_by_island[minima[0]]] += 1
+            else:
+                tied_winner_shards += 1
     fitness_correlation = _pearson(positions, fitness)
     wall_correlation = _pearson(positions, wall)
     winner_count = max(winners.values(), default=0)
@@ -322,17 +370,19 @@ def _scheduler_quality(raw: Path, shards: list[dict], mode: str, errors: list[st
         "position_vs_final_fitness_pearson": fitness_correlation,
         "position_vs_wall_time_pearson": wall_correlation,
         "winning_positions": dict(winners),
+        "tied_winner_shards": tied_winner_shards,
+        "unique_winner_shards": sum(winners.values()),
         "maximum_same_position_winner_count": winner_count,
         "maximum_same_position_winner_fraction": winner_fraction,
     }
     if mode == "full":
         _require(
-            fitness_correlation is not None and abs(fitness_correlation) <= 0.5,
+            fitness_correlation is None or abs(fitness_correlation) <= 0.5,
             "final fitness remains strongly correlated with shard position",
             errors,
         )
         _require(
-            wall_correlation is not None and abs(wall_correlation) <= 0.5,
+            wall_correlation is None or abs(wall_correlation) <= 0.5,
             "wall time remains strongly correlated with shard position",
             errors,
         )
@@ -487,7 +537,7 @@ def _check_athena_metrics(raw: Path, spec: dict, mode: str, errors: list[str]) -
 
 def validate(args) -> dict:
     errors: list[str] = []
-    spec = _spec(args.mode, args.expected_repeat)
+    spec = _spec(args.mode, args.expected_repeat, args.expected_problem, args.expected_topology)
     _require(args.pointer.is_file(), "result pointer is missing", errors)
     raw = None
     pointer = {}
@@ -532,7 +582,11 @@ def validate(args) -> dict:
                 _load(paths["metadata"]), spec, spec["repeat"], raw, errors
             )
         if paths["topology"].is_file():
-            pilot_tools.check_topology(_load(paths["topology"]), spec, errors)
+            saved_topology = _load(paths["topology"])
+            if spec["topology"] == "er4":
+                _check_er4_topology(saved_topology, spec, errors)
+            else:
+                pilot_tools.check_topology(saved_topology, spec, errors)
         if paths["param"].is_file():
             pilot_tools.check_param(_load(paths["param"]), spec, errors)
         _, _, immigrant_payloads = pilot_tools.parse_island_outputs(raw, spec, errors)
@@ -565,6 +619,13 @@ def validate(args) -> dict:
         "schema_version": 1,
         "checked_utc": datetime.now(timezone.utc).isoformat(),
         "mode": args.mode,
+        "benchmark": spec["benchmark"],
+        "dimension": spec["dimension"],
+        "topology": spec["topology"],
+        "migrant_selection": spec["migrant_selection"],
+        "migrant_acceptance": spec["migrant_acceptance"],
+        "base_seed": spec["base_seed"],
+        "repeat_seed": spec["repeat_seed"],
         "repeat": spec["repeat"],
         "status": "passed" if not errors else "failed",
         "valid": not errors,

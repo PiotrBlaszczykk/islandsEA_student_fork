@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-: "${SLURM_JOB_ID:?Submit through athena_gpu/submit_study.sh}"
+: "${SLURM_JOB_ID:?Submit through an athena_gpu/submit_*.sh launcher}"
 : "${ISLANDS_PROJECT_DIR:?Submitter must export the repository path}"
 : "${ISLANDS_VENV_DIR:?Submitter must export the Athena venv path}"
 : "${ATHENA_STUDY_MODE:?Submitter must select canary or full}"
@@ -24,7 +24,29 @@ case "$ATHENA_STUDY_MODE" in
     *) echo "Invalid ATHENA_STUDY_MODE=$ATHENA_STUDY_MODE" >&2; exit 2 ;;
 esac
 
-if [[ "${ATHENA_FROZEN_ARRAY:-0}" == 1 ]]; then
+# The Athena venv dynamically links the cluster's Python 3.10 shared library.
+# The production task mapper uses that venv before the main run begins.
+module load Python/3.10.4
+
+STUDY_PROBLEM=r01_elliptic
+STUDY_TOPOLOGY=torus
+if [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" == 1 ]]; then
+    [[ "$ATHENA_STUDY_MODE" == full ]] || {
+        echo "ER4/best production array requires ATHENA_STUDY_MODE=full" >&2
+        exit 2
+    }
+    : "${SLURM_ARRAY_JOB_ID:?ER4/best production run requires a SLURM array}"
+    : "${SLURM_ARRAY_TASK_ID:?ER4/best production run requires a SLURM array task}"
+    TASK_CONFIGURATION=$("$ISLANDS_VENV_DIR/bin/python" \
+        "$ISLANDS_PROJECT_DIR/athena_gpu/production_er4_best.py" \
+        --task-id "$SLURM_ARRAY_TASK_ID")
+    IFS=$'\t' read -r STUDY_PROBLEM STUDY_REPEAT <<< "$TASK_CONFIGURATION"
+    [[ -n "$STUDY_PROBLEM" && -n "$STUDY_REPEAT" ]] || {
+        echo "Invalid production task mapping: $TASK_CONFIGURATION" >&2
+        exit 2
+    }
+    STUDY_TOPOLOGY=er4
+elif [[ "${ATHENA_FROZEN_ARRAY:-0}" == 1 ]]; then
     [[ "$ATHENA_STUDY_MODE" == full ]] || {
         echo "Frozen three-repeat array requires ATHENA_STUDY_MODE=full" >&2
         exit 2
@@ -41,7 +63,7 @@ case "$STUDY_REPEAT" in
     1|2|3) ;;
     *) echo "Invalid Athena study repeat: $STUDY_REPEAT" >&2; exit 2 ;;
 esac
-if [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "$STUDY_REPEAT" != "$SLURM_ARRAY_TASK_ID" ]]; then
+if [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" != 1 && -n "${SLURM_ARRAY_TASK_ID:-}" && "$STUDY_REPEAT" != "$SLURM_ARRAY_TASK_ID" ]]; then
     echo "Repeat $STUDY_REPEAT differs from SLURM array task $SLURM_ARRAY_TASK_ID" >&2
     exit 2
 fi
@@ -84,6 +106,20 @@ cleanup() {
         islandsea_bundle_finish "$status"
         local bundle_status=$?
         if (( status == 0 && bundle_status != 0 )); then status=$bundle_status; fi
+        if (( status == 0 )) && [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" == 1 ]]; then
+            "$VENV_DIR/bin/python" "$PROJECT_DIR/athena_gpu/campaign_er4_best.py" record \
+                --campaign-dir "$ISLANDS_STORAGE_ROOT/campaigns/er4_best_${SLURM_ARRAY_JOB_ID}" \
+                --array-job-id "$SLURM_ARRAY_JOB_ID" \
+                --task-id "$SLURM_ARRAY_TASK_ID" \
+                --job-id "$SLURM_JOB_ID" \
+                --run-dir "$RUN_DIR" \
+                --archive "$ISLANDS_EXPORT_ROOT/run_${SLURM_JOB_ID}.tar.gz"
+            local campaign_status=$?
+            if (( campaign_status != 0 )); then
+                echo "ATHENA_ER4_BEST_RECORD_FAILED=$SLURM_ARRAY_TASK_ID; per-run archive retained" >&2
+                status=74
+            fi
+        fi
     fi
     exit "$status"
 }
@@ -91,7 +127,6 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-module load Python/3.10.4
 module load CUDA/11.7.0
 source "$VENV_DIR/bin/activate"
 
@@ -147,13 +182,13 @@ nvidia-smi --query-gpu=index,uuid,name,driver_version,memory.total --format=csv 
     > "$RUN_DIR/nvidia-smi.csv"
 
 COMMON_ARGS=(
-    --problem r01_elliptic
+    --problem "$STUDY_PROBLEM"
     --dimension 200
     --population 16
     --offspring 4
     --migrants 5
     --interval 5
-    --topology torus
+    --topology "$STUDY_TOPOLOGY"
     --strategy best
     --acceptance plain
     --repeat "$STUDY_REPEAT"
@@ -185,14 +220,15 @@ else
         --islands 144
         --shards 12
         --evaluations 8000
-        --torus-rows 12
-        --torus-columns 12
         --operation-timeout-seconds 180
         --actor-startup-timeout 300
         --run-timeout-seconds 4200
         --finalization-timeout-seconds 600
         --confirm-study-144
     )
+    if [[ "$STUDY_TOPOLOGY" == torus ]]; then
+        MODE_ARGS+=(--torus-rows 12 --torus-columns 12)
+    fi
 fi
 
 echo "=== ATHENA SHARDED STUDY RUN ==="
@@ -200,6 +236,8 @@ echo "mode=$ATHENA_STUDY_MODE"
 echo "job_id=$SLURM_JOB_ID"
 echo "array_job_id=${SLURM_ARRAY_JOB_ID:-none}"
 echo "repeat=$STUDY_REPEAT"
+echo "problem=$STUDY_PROBLEM"
+echo "topology=$STUDY_TOPOLOGY"
 echo "host=$(hostname -f)"
 echo "commit=$ACTUAL_COMMIT"
 echo "result_dir=$RUN_DIR"
@@ -218,7 +256,9 @@ PYTHON_JOB_PID=""
     --output "$RUN_DIR/validation.json" \
     --mode "$ATHENA_STUDY_MODE" \
     --expected-commit "$ACTUAL_COMMIT" \
-    --expected-repeat "$STUDY_REPEAT"
+    --expected-repeat "$STUDY_REPEAT" \
+    --expected-problem "$STUDY_PROBLEM" \
+    --expected-topology "$STUDY_TOPOLOGY"
 
 echo "ATHENA_STUDY_RESULT=$RUN_DIR"
 echo "ATHENA_STUDY_JOB_OK=1"

@@ -116,6 +116,37 @@ class ShardedContractTests(unittest.TestCase):
         self.assertTrue(any("correlated" in error for error in errors))
         self.assertTrue(any("shard winners" in error for error in errors))
 
+    def test_full_validator_accepts_genuine_tied_optima_without_inventing_winners(self):
+        from athena_gpu.validate_study_run import _scheduler_quality
+
+        shards = []
+        results = {}
+        for shard_id in range(12):
+            islands = list(range(shard_id * 12, (shard_id + 1) * 12))
+            shards.append({
+                "shard_id": shard_id,
+                "islands": islands,
+                "scheduler_order": islands,
+                "scheduler": {"algorithm": "rotating-round-robin-bounded-lead-v1"},
+            })
+            for position, island in enumerate(islands):
+                results[str(island)] = {
+                    "final_fitness": -200.0,
+                    "time": 10.0,
+                    "shard_position": position,
+                }
+        with tempfile.TemporaryDirectory() as temporary:
+            raw = Path(temporary)
+            (raw / "iterations_per_second.json").write_text(
+                json.dumps(results), encoding="utf-8"
+            )
+            errors = []
+            quality = _scheduler_quality(raw, shards, "full", errors)
+        self.assertEqual([], errors)
+        self.assertIsNone(quality["position_vs_final_fitness_pearson"])
+        self.assertEqual(12, quality["tied_winner_shards"])
+        self.assertEqual(0.0, quality["maximum_same_position_winner_fraction"])
+
     def test_request_validation_and_grouping(self):
         normalized, values = validate_request(
             request(),

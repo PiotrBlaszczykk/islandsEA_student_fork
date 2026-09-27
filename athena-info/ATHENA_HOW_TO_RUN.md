@@ -1,16 +1,95 @@
 > **Nowy eksport pojedynczego joba (2026-09-19):** wrapper zapisuje
 > `run_<job_id>.tar.gz` i SHA-256 w `$SCRATCH/islandsEA/exports`, według
 > [wspólnego układu](../hpc_benchmarks/RUN_ARTIFACTS.md). Instrukcje starych
-> zbiorczych paczek poniżej są historią; nowe runy pobieraj przez `download_run.ps1`.
+> zbiorczych paczek poniżej są historią; pojedyncze runy pobieraj przez
+> `download_run.ps1`, a pełną kampanię ER4/best przez opisany niżej helper.
 
 # Athena GPU: sprawdzony runbook uruchomieniowy i zapis walidacji
 
-Ostatnia aktualizacja: **2026-09-19** (targetowa walidacja poprawionego
-runnera na A100: canary `3181809` i full `3185051`).
+Aktualizacja **2026-09-27**: przygotowano produkcyjny launcher ER4/best;
+ostatnia targetowa walidacja runnera na A100 to canary `3181809` i full `3185051`.
+
+## Produkcyjna partia ER4 / best / 40 × 3
+
+Przygotowany, lecz **jeszcze nieuruchomiony** launcher zgłasza dokładnie jeden
+array SLURM `1-120%3`. Każdy element jest niezależnym pełnym runem: jedna A100,
+16 CPU, 144 logiczne wyspy na 12 shardach, 8000 ewaluacji/wyspę, populacja 16,
+potomkowie 4, pięciu migrantów co 5 ewaluacji, `er4`, `best/plain`, D=200,
+seed bazowy 20260912, seed instancji binarnej 20260511. Wszystkie 30 funkcji
+ciągłych i 10 binarnych mają po trzy powtórzenia. D=200 dla CEC jest
+rozszerzeniem IslandsEA, nie oficjalną instancją CEC2014.
+
+Mapowanie jest stałe: task `3*i+1`, `3*i+2`, `3*i+3` to powtórzenia 1, 2, 3
+benchmarku o indeksie `i` (od zera) w `BENCHMARKS`. Pierwszy task to
+`r01_elliptic`/1, ostatni `b10_maxcut_ring`/3. Przed submittem skrypt
+kontroluje liczbę funkcji i hash zatwierdzonego grafu ER4
+`469cc283543dcc60d5bf8f07db2eabfb12cab34637f4a6d26bca51d07f85cccc`.
+Nie generuje grafu i nie zmienia seeda w zależności od pozycji w arrayu:
+powtórzenia używają repeat-base 20260912, 21260912, 22260912.
+
+Po wykonanym przez użytkownika commit/push i pull na Athenie użytkownik
+ręcznie uruchamia:
+
+```bash
+cd "$HOME/islandsEA_student_fork"
+bash athena_gpu/submit_production_er4_best_120.sh
+```
+
+Nie ma canary, bramki określonego commita, retry ani jobów następczych.
+Commit i stan Git są zapisywane jako proweniencja. Nie robić `git pull` ani
+lokalnych zmian w checkoutcie na Athenie, dopóki cały array nie zakończy
+pracy: kolejne elementy startują później i mogłyby odczytać inny kod.
+Limit to 2 godziny / 2 GPUh
+na element (górna granica 240 GPUh całego arraya), najwyżej trzy elementy
+jednocześnie. Każdy element ma osobny numeryczny `SLURM_JOB_ID`, katalog
+`$SCRATCH/islandsEA/results/athena_production_er4_best_120/<JOB_ID>/`,
+`validation.json`, logi `athena-er4-best-120-<ARRAY_ID>_<TASK_ID>.{out,err}`
+oraz `exports/run_<JOB_ID>.tar.gz` z SHA-256. Tylko `COMPLETED 0:0`,
+`validation.json` z `status=passed`/`valid=true` i markery
+`ATHENA_STUDY_FULL_RUN_OK=1`, `ATHENA_STUDY_JOB_OK=1` oraz
+`ATHENA_ER4_BEST_TASK_OK=<TASK_ID>` oznaczają zaliczony
+element; samo pojawienie się archiwum nie wystarcza. Walidator sprawdza
+faktyczną adjacencję i proweniencję ER4, budżet, seedy, migracje, metryki
+GPU i komplet wyników.
+
+Podczas submitu powstaje plan 120 konfiguracji. Po sukcesie każdego elementu
+skrypt niezależnie weryfikuje przenośny bundle i zapisuje rekord zadania oraz
+twarde dowiązanie archiwum i SHA-256 w:
+
+```text
+$SCRATCH/islandsEA/campaigns/er4_best_<ARRAY_ID>/
+├── campaign_plan.json
+├── tasks/task-001.json ... task-120.json
+└── runs/<benchmark>/repeat-<1|2|3>/run_<JOB_ID>.tar.gz[.sha256]
+```
+
+To ten sam pojedynczy format `run_<JOB_ID>` co na Aresie, z podobnym układem
+kampanii `tasks/` i `runs/`. Athena **nie tworzy dodatkowego zbiorczego tara**:
+nie potrzeba 121. joba na A100 ani drugiej kopii 120 dużych archiwów na
+SCRATCH. Dowiązania dotyczą tylko plików na tym samym SCRATCH; kanoniczne
+`$SCRATCH/islandsEA/exports/run_<JOB_ID>.tar.gz` pozostają dostępne dla
+wspólnego `download_run.ps1`.
+
+Po zakończeniu sprawdzić array przez `sacct -j <ARRAY_ID> -P
+--format=JobIDRaw,ArrayJobID,ArrayTaskID,State,ExitCode,Elapsed,AllocTRES`.
+Na laptopie jedno polecenie pobiera katalog kampanii i weryfikuje dokładnie
+120 rekordów, 40×3 powtórzeń oraz SHA-256 każdego archiwum. Dopiero po
+zaliczeniu całej kontroli zapisuje lokalne `campaign_summary.json` z
+`valid_runs=120` i listą zaobserwowanych commitów (proweniencja, nie bramka):
+
+```powershell
+.\athena_gpu\download_production_er4_best_120.ps1 -ArrayJobId <ARRAY_ID>
+```
+
+Domyślny lokalny katalog to
+`artifacts/run_wyniki/athena/er4_best_<ARRAY_ID>/`; skrypt nie nadpisuje
+wcześniejszego pobrania. Nie mieszać go z Ares. Przy brakującym albo błędnym
+tasku kontrola kończy się błędem; surowe dane i paczki pozostają na SCRATCH.
+Nie zgłaszać ponownie całej partii po pojedynczym błędzie: najpierw ustalić,
+które elementy ukończyły się poprawnie. ID arraya nie jest ID każdego runa.
 
 Ten dokument utrwala działającą procedurę dla Atheny, wyniki wykonanych
-walidacji oraz znane ograniczenia. Dotyczy wyłącznie brancha
-`summer_benchmarks_athena` i kodu z `athena_gpu/`. Nie jest instrukcją dla
+walidacji oraz znane ograniczenia. Dotyczy kodu z `athena_gpu/`. Nie jest instrukcją dla
 Aresa i nie wolno przenosić tutaj profilu CPU Aresa.
 
 Najważniejszy stan na 2026-09-19:

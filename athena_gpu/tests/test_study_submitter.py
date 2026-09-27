@@ -42,6 +42,7 @@ esac
             bin_dir / "sbatch",
             '''#!/usr/bin/env bash
 printf '%s\n' "$@" > "$MOCK_CAPTURE"
+printf 'sbatch\n' >> "$MOCK_CALLS"
 echo 7654321
 ''',
         )
@@ -53,8 +54,13 @@ echo 7654321
         self.write_executable(bin_dir / "module", "#!/usr/bin/env bash\nexit 0\n")
         venv_bin = self.root / "venv" / "bin"
         venv_bin.mkdir(parents=True)
-        self.write_executable(venv_bin / "python", "#!/usr/bin/env bash\nexit 0\n")
+        self.write_executable(
+            venv_bin / "python",
+            "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$MOCK_PYTHON_CAPTURE\"\nexit 0\n",
+        )
         self.capture = self.root / "submission.txt"
+        self.calls = self.root / "calls.txt"
+        self.python_capture = self.root / "python.txt"
         self.env = os.environ.copy()
         for key in (
             "SLURM_JOB_ID",
@@ -65,12 +71,15 @@ echo 7654321
             "ATHENA_STUDY_CANARY_JOB_ID",
             "ATHENA_FROZEN_RUN_ROOT",
             "ATHENA_FROZEN_ARRAY",
+            "ATHENA_PRODUCTION_ER4_BEST",
             "ATHENA_STUDY_REPEAT",
         ):
             self.env.pop(key, None)
         self.env.update(
             MOCK_BIN=bash_path(bin_dir),
             MOCK_CAPTURE=bash_path(self.capture),
+            MOCK_CALLS=bash_path(self.calls),
+            MOCK_PYTHON_CAPTURE=bash_path(self.python_capture),
             ISLANDS_VENV_DIR=bash_path(venv_bin.parent),
             SCRATCH=bash_path(self.root / "scratch"),
         )
@@ -177,8 +186,33 @@ echo 7654321
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(self.capture.exists())
 
+    def test_er4_best_production_submits_exactly_one_bounded_array(self):
+        result = self.submit(
+            "",
+            {"ATHENA_EXPECTED_COMMIT": "stale", "ATHENA_STUDY_CANARY_JOB_ID": "999"},
+            script="submit_production_er4_best_120.sh",
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        arguments = self.capture.read_text(encoding="utf-8").splitlines()
+        for value in (
+            "--array=1-120%3", "--nodes=1", "--cpus-per-task=16",
+            "--gres=gpu:1", "--time=02:00:00",
+            "--account=plgintobl-gpu-a100",
+        ):
+            self.assertIn(value, arguments)
+        exported = "\n".join(arguments)
+        self.assertIn("ATHENA_PRODUCTION_ER4_BEST=1", exported)
+        self.assertNotIn("ATHENA_EXPECTED_COMMIT", exported)
+        self.assertNotIn("ATHENA_STUDY_CANARY_JOB_ID", exported)
+        self.assertIn("MAX_TOTAL_GPU_HOURS=240.0", result.stdout)
+        self.assertIn("No automatic retry", result.stdout)
+        self.assertEqual(["sbatch"], self.calls.read_text(encoding="utf-8").splitlines())
+        invoked = self.python_capture.read_text(encoding="utf-8")
+        self.assertIn("production_er4_best.py --check", invoked)
+        self.assertIn("campaign_er4_best.py plan", invoked)
+
     def test_job_wrapper_has_valid_bash_syntax(self):
-        for script in ("run_study_job.sh", "submit_frozen_torus3.sh"):
+        for script in ("run_study_job.sh", "submit_frozen_torus3.sh", "submit_production_er4_best_120.sh"):
             with self.subTest(script=script):
                 result = subprocess.run(
                     [self.bash, "-n", str(self.scripts / script)],
@@ -194,7 +228,7 @@ echo 7654321
         self.assertIn('--expected-repeat "$STUDY_REPEAT"', script)
         self.assertIn('STUDY_REPEAT="$SLURM_ARRAY_TASK_ID"', script)
         for argument in (
-            "--problem r01_elliptic",
+            "STUDY_PROBLEM=r01_elliptic",
             "--dimension 200",
             "--islands 144",
             "--evaluations 8000",
@@ -204,7 +238,7 @@ echo 7654321
             "--interval 5",
             "--torus-rows 12",
             "--torus-columns 12",
-            "--topology torus",
+            "STUDY_TOPOLOGY=torus",
             "--strategy best",
             "--acceptance plain",
             "--seed 20260912",
