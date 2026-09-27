@@ -1,5 +1,39 @@
 # Kampanie Ares / 40 benchmarków / 3 powtórzenia
 
+## WS3 / random
+
+`main_runs/launch_ws3_random.sh` uruchamia tę samą zamrożoną instancję WS3 i
+ten sam profil 144 wysp, D=200, 40 benchmarków × 3 powtórzenia co kampania
+WS3/best. Jedyną zmianą naukową jest selekcja migrantów `random`; akceptacja
+pozostaje `plain`. Plan, metadane każdego runu i finalizer wymagają zgodnej
+strategii oraz dokładnego grafu WS3. Maksymalnie trzy z 120 elementów array
+pracują jednocześnie.
+
+Po pobraniu i sprawdzeniu SHA-256 archiwum WS3/best oraz potwierdzeniu
+`WS3_BEST_VALID_RUNS=120` można zwolnić jego katalog na Aresie, aby odzyskać
+kwotę plików. Następnie, po commicie/pushu i `git pull --ff-only` na Aresie:
+
+```bash
+bash main_runs/launch_ws3_random.sh
+```
+
+Wyniki są odseparowane w `$SCRATCH/ws3_random`. Po zakończeniu wymagane są
+120 elementów array i finalizer w stanie `COMPLETED 0:0`, a w
+`$SCRATCH/ws3_random/logs/ws3-random-finalize-<ID>.out` znaczniki
+`WS3_RANDOM_VALID_RUNS=120` i `WS3_RANDOM_FINALIZATION_OK`. Finalizer tworzy
+`ws3_random.tar.gz` oraz `.sha256` dopiero po pełnej walidacji. Pojedynczy
+nieudany task można jawnie ponowić przez
+`bash main_runs/retry_ws3_random_task.sh <TASK_ID>`.
+
+Na Windowsie pobierz jedno archiwum i zweryfikuj sumę bez rozpakowywania:
+
+```powershell
+.\main_runs\download_ws3_random.ps1
+```
+
+Opcja `-Extract` sprawdza także 120 wewnętrznych bundle, lecz wymaga
+dodatkowego miejsca na dysku.
+
 ## WS3 / best
 
 `main_runs/launch_ws3_best.sh` uruchamia 120 niezależnych runów: zamrożony
