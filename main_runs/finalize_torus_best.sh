@@ -16,7 +16,13 @@ STRATEGY="${ISLANDS_CAMPAIGN_STRATEGY:-best}"
     echo "Unsupported campaign strategy: $STRATEGY" >&2
     exit 2
 }
+TOPOLOGY="${ISLANDS_CAMPAIGN_TOPOLOGY:-torus}"
+[[ "$TOPOLOGY" == torus || "$TOPOLOGY" == ws3 ]] || {
+    echo "Unsupported campaign topology: $TOPOLOGY" >&2
+    exit 2
+}
 export ISLANDS_CAMPAIGN_STRATEGY="$STRATEGY"
+export ISLANDS_CAMPAIGN_TOPOLOGY="$TOPOLOGY"
 [[ "$#" -ge 1 && "$#" -le 2 ]] || {
     echo "Usage: $0 CAMPAIGN_ARRAY_JOB_ID [RETRY_ARRAY_JOB_ID]" >&2
     exit 2
@@ -55,4 +61,4 @@ sacct -n -P -j "$ACCOUNTING_JOB_IDS" \
 "$VENV_DIR/bin/python" "$TOOLS" finalize \
     --campaign-dir "$CAMPAIGN_DIR" \
     --array-job-id "$ARRAY_JOB_ID"
-echo "TORUS_${STRATEGY^^}_FINALIZATION_OK"
+echo "${TOPOLOGY^^}_${STRATEGY^^}_FINALIZATION_OK"

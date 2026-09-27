@@ -16,7 +16,13 @@ STRATEGY="${ISLANDS_CAMPAIGN_STRATEGY:-best}"
     echo "Unsupported campaign strategy: $STRATEGY" >&2
     exit 2
 }
+TOPOLOGY="${ISLANDS_CAMPAIGN_TOPOLOGY:-torus}"
+[[ "$TOPOLOGY" == torus || "$TOPOLOGY" == ws3 ]] || {
+    echo "Unsupported campaign topology: $TOPOLOGY" >&2
+    exit 2
+}
 export ISLANDS_CAMPAIGN_STRATEGY="$STRATEGY"
+export ISLANDS_CAMPAIGN_TOPOLOGY="$TOPOLOGY"
 : "${SLURM_JOB_ID:?This file must run as a SLURM array task}"
 : "${SLURM_ARRAY_JOB_ID:?Missing SLURM_ARRAY_JOB_ID}"
 : "${SLURM_ARRAY_TASK_ID:?Missing SLURM_ARRAY_TASK_ID}"
@@ -81,6 +87,10 @@ REPEAT="${TASK[2]}"
     --execution-array-job-id "$SLURM_ARRAY_JOB_ID" --exit-code 0
 
 echo "CAMPAIGN_TASK task=$SLURM_ARRAY_TASK_ID benchmark=$BENCHMARK dimension=$DIMENSION repeat=$REPEAT job=$SLURM_JOB_ID"
+TOPOLOGY_ARGS=(--topology "$TOPOLOGY")
+if [[ "$TOPOLOGY" == torus ]]; then
+    TOPOLOGY_ARGS+=(--torus-rows 12 --torus-columns 12)
+fi
 set +e
 bash "$PROJECT_DIR/hpc_benchmarks/run_ares.sh" \
     --problem "$BENCHMARK" \
@@ -91,9 +101,7 @@ bash "$PROJECT_DIR/hpc_benchmarks/run_ares.sh" \
     --offspring 4 \
     --migrants 5 \
     --interval 5 \
-    --topology torus \
-    --torus-rows 12 \
-    --torus-columns 12 \
+    "${TOPOLOGY_ARGS[@]}" \
     --strategy "$STRATEGY" \
     --acceptance plain \
     --repeat "$REPEAT" \

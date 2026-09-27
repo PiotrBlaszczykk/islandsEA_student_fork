@@ -1,4 +1,53 @@
-# Kampanie Torus / best, random i maxDistance / 40 benchmarków / 3 powtórzenia
+# Kampanie Ares / 40 benchmarków / 3 powtórzenia
+
+## WS3 / best
+
+`main_runs/launch_ws3_best.sh` uruchamia 120 niezależnych runów: zamrożony
+graf WS3 z załącznika (`ws3`, 144 wyspy), selekcja migrantów `best`, akceptacja
+`plain`, 30 benchmarków ciągłych i 10 binarnych przy D=200, po trzy
+powtórzenia. Pozostałe parametry są takie same jak dla Torusa: 8000 ewaluacji
+na wyspę, populacja 16, offspring 4, pięciu migrantów co pięć ewaluacji,
+baza seedów 20260912, pełne metryki i profil Ares 7×48 CPU. Jednocześnie
+pracują najwyżej trzy elementy tablicy.
+
+Plan i walidator wymagają dokładnej instancji WS3: 144 węzłów, parametrów
+`dim=2`, `lat=12`, `nei=3`, `probab=0.003181`, `scenario=2`, pochodzenia
+załącznika i hasha pełnej, uporządkowanej listy sąsiadów. Nie losujemy grafu
+ponownie. Każdy run zachowuje `topology.json` i `topology.png`; finalizer
+tworzy `$SCRATCH/ws3_best/ws3_best.tar.gz` i SHA-256 tylko przy 120
+zweryfikowanych runach. Osobne archiwa runów pozostają w zbiorczym tarze.
+
+Po commicie i pushu brancha `summer_ares_blaszczyk` wykonaj na Aresie
+`git pull --ff-only`. Sprawdź `hpc-fs`; starszą kampanię
+`torus_maxdistance` usuń ze SCRATCH dopiero po pobraniu i lokalnym
+potwierdzeniu SHA-256, podsumowania `valid_runs=120` i obecności 120 bundle.
+Potem uruchom:
+
+```bash
+bash main_runs/launch_ws3_best.sh
+```
+
+Po zakończeniu wymagane są 120 elementów tablicy i finalizer w stanie
+`COMPLETED 0:0` oraz `WS3_BEST_VALID_RUNS=120` i
+`WS3_BEST_FINALIZATION_OK` w
+`$SCRATCH/ws3_best/logs/ws3-best-finalize-<ID>.out`.
+W razie pojedynczej porażki, po diagnozie uruchom jawny retry:
+
+```bash
+bash main_runs/retry_ws3_best_task.sh <TASK_ID>
+```
+
+Na Windowsie pobierz jedno archiwum bez rozpakowania i sprawdź jego SHA-256:
+
+```powershell
+.\main_runs\download_ws3_best.ps1
+```
+
+Opcja `-Extract` dodatkowo sprawdza SHA-256 120 wewnętrznych archiwów, ale
+zużywa około drugie tyle miejsca. Do lokalnej weryfikacji podsumowania można
+odczytać `campaign_summary.json` bez rozpakowywania całego tara.
+
+## Torus / best, random i maxDistance
 
 Trzecia kampania zmienia wyłącznie strategię wyboru migrantów na
 `maxDistance`; strategia przyjmowania pozostaje `plain`. Zachowuje ten sam

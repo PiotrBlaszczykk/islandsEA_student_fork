@@ -13,6 +13,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 
 
 MODULE_PATH = Path(__file__).with_name("campaign_tools.py")
@@ -22,6 +23,19 @@ SPEC.loader.exec_module(campaign)
 
 
 class CampaignToolsTests(unittest.TestCase):
+    @staticmethod
+    def campaign_for(topology, strategy="best"):
+        spec = importlib.util.spec_from_file_location(
+            f"campaign_tools_{topology}_{strategy}", MODULE_PATH
+        )
+        module = importlib.util.module_from_spec(spec)
+        with mock.patch.dict(os.environ, {
+            "ISLANDS_CAMPAIGN_TOPOLOGY": topology,
+            "ISLANDS_CAMPAIGN_STRATEGY": strategy,
+        }):
+            spec.loader.exec_module(module)
+        return module
+
     def test_batch_scripts_use_absolute_project_path_without_nested_submit(self):
         for filename in ("run_torus_best_array.sh", "finalize_torus_best.sh"):
             script = MODULE_PATH.with_name(filename).read_text(encoding="utf-8")
@@ -45,7 +59,7 @@ class CampaignToolsTests(unittest.TestCase):
         self.assertIn('--job-name=torus-random', launcher)
         self.assertIn('ISLANDS_CAMPAIGN_STRATEGY=random', retry)
         self.assertIn('--strategy "$STRATEGY"', batch)
-        self.assertIn('TORUS_${STRATEGY^^}_FINALIZATION_OK', finalizer)
+        self.assertIn('${TOPOLOGY^^}_${STRATEGY^^}_FINALIZATION_OK', finalizer)
 
     def test_maxdistance_launcher_uses_separate_storage_and_shared_runtime(self):
         launcher = MODULE_PATH.with_name("launch_torus_maxdistance.sh").read_text(encoding="utf-8")
@@ -63,13 +77,86 @@ class CampaignToolsTests(unittest.TestCase):
         self.assertIn('maxDistance', finalizer)
         self.assertIn('$RemoteCampaignDir/torus_maxdistance.tar.gz*', downloader)
 
+    def test_ws3_launcher_uses_fixed_graph_and_separate_storage(self):
+        launcher = MODULE_PATH.with_name("launch_ws3_best.sh").read_text(encoding="utf-8")
+        retry = MODULE_PATH.with_name("retry_ws3_best_task.sh").read_text(encoding="utf-8")
+        downloader = MODULE_PATH.with_name("download_ws3_best.ps1").read_text(encoding="utf-8")
+        batch = MODULE_PATH.with_name("run_torus_best_array.sh").read_text(encoding="utf-8")
+        self.assertIn('ISLANDS_CAMPAIGN_TOPOLOGY=ws3', launcher)
+        self.assertIn('CAMPAIGN_DIR="${WS3_BEST_CAMPAIGN_DIR:-$SCRATCH/ws3_best}"', launcher)
+        self.assertIn('--topology ws3', launcher)
+        self.assertNotIn('--torus-rows', launcher)
+        self.assertIn('--array="1-120%${MAX_PARALLEL}"', launcher)
+        self.assertIn('--dependency="afterany:${ARRAY_JOB_ID}"', launcher)
+        self.assertIn('ISLANDS_CAMPAIGN_TOPOLOGY=ws3', retry)
+        self.assertIn('"${TOPOLOGY_ARGS[@]}"', batch)
+        self.assertIn('$RemoteCampaignDir/ws3_best.tar.gz*', downloader)
+
+    def test_ws3_source_plan_metadata_and_topology_contract(self):
+        ws3 = self.campaign_for("ws3")
+        document = ws3.read_json(ws3.WS3_GRAPH_PATH)
+        with mock.patch.object(sys, "path", [str(MODULE_PATH.parents[1] / "islands_desync"), *sys.path]):
+            from islands_desync.islands.topologies.fixed_graph import graph_parameters
+            self.assertEqual(ws3.WS3_PARAMETERS, graph_parameters("ws3"))
+        plan = ws3.expected_plan("a" * 40)
+        ws3.validate_plan(plan)
+        self.assertEqual("ws3_best", plan["campaign"])
+        self.assertEqual("best", plan["configuration"]["migration"]["selection"])
+        self.assertEqual(120, len(plan["tasks"]))
+        self.assertEqual(ws3.WS3_PARAMETERS, plan["configuration"]["topology"]["parameters"])
+        with tempfile.TemporaryDirectory(prefix="ws3-plan-cli-") as temporary:
+            output = Path(temporary) / "campaign_plan.json"
+            env = {**os.environ, "ISLANDS_CAMPAIGN_TOPOLOGY": "ws3",
+                   "ISLANDS_CAMPAIGN_STRATEGY": "best"}
+            subprocess.run([
+                sys.executable, str(MODULE_PATH), "create-plan", "--output", str(output),
+                "--git-commit", "a" * 40,
+            ], env=env, check=True, capture_output=True, text=True)
+            ws3.validate_plan(ws3.read_json(output))
+        with self.assertRaises(ValueError):
+            self.campaign_for("torus").validate_plan(plan)
+
+        task = plan["tasks"][0]
+        metadata = self.metadata(task, "9000", "9001")
+        metadata["scientific_configuration"]["migration"]["selection"] = "best"
+        metadata["scientific_configuration"]["topology"] = {
+            "name": "ws3", "parameters": ws3.WS3_PARAMETERS,
+            "adjacency_sha256": ws3.WS3_ADJACENCY_SHA256,
+        }
+        self.assertEqual([], ws3.validate_metadata(metadata, task, "9000", "9001"))
+        topology = {
+            "name": "ws3", "islands": 144, "parameters": ws3.WS3_PARAMETERS,
+            "adjacency": document["adjacency"],
+            "graph_metrics": {"adjacency_sha256": ws3.WS3_ADJACENCY_SHA256},
+        }
+        with tempfile.TemporaryDirectory(prefix="ws3-topology-contract-") as temporary:
+            root = Path(temporary)
+            (root / "topology.png").write_bytes(b"image")
+            self.assertEqual([], ws3.validate_topology_payload(topology, metadata, root))
+            changed = copy.deepcopy(topology)
+            changed["adjacency"]["0"][0] = 42
+            self.assertIn("WS3 topology file adjacency differs from the approved graph",
+                          ws3.validate_topology_payload(changed, metadata, root))
+            changed = copy.deepcopy(topology)
+            changed["parameters"]["nei"] = 4
+            self.assertIn("WS3 topology file parameters/provenance mismatch",
+                          ws3.validate_topology_payload(changed, metadata, root))
+            damaged = copy.deepcopy(document)
+            damaged["adjacency"]["0"][0] = 42
+            altered_path = root / "ws3.json"
+            ws3.write_json(altered_path, damaged)
+            with mock.patch.object(ws3, "WS3_GRAPH_PATH", altered_path):
+                with self.assertRaisesRegex(ValueError, "adjacency hash"):
+                    ws3.expected_plan("a" * 40)
+
     def test_nondefault_plan_and_metadata_contract(self):
         for strategy in ("random", "maxDistance"):
             with self.subTest(strategy=strategy), tempfile.TemporaryDirectory(
                 prefix=f"torus-{strategy}-contract-"
             ) as temporary:
                 plan_path = Path(temporary) / "campaign_plan.json"
-                env = {**os.environ, "ISLANDS_CAMPAIGN_STRATEGY": strategy}
+                env = {**os.environ, "ISLANDS_CAMPAIGN_STRATEGY": strategy,
+                       "ISLANDS_CAMPAIGN_TOPOLOGY": "torus"}
                 subprocess.run([
                     sys.executable, str(MODULE_PATH), "create-plan", "--output", str(plan_path),
                     "--git-commit", "a" * 40,
@@ -78,7 +165,7 @@ class CampaignToolsTests(unittest.TestCase):
                 self.assertEqual(f"torus_{strategy.lower()}", plan["campaign"])
                 self.assertEqual(strategy, plan["configuration"]["migration"]["selection"])
                 self.assertEqual(120, len(plan["tasks"]))
-                if strategy == campaign.STRATEGY:
+                if strategy == campaign.STRATEGY and campaign.TOPOLOGY == "torus":
                     campaign.validate_plan(plan)
                 else:
                     with self.assertRaises(ValueError):
@@ -232,6 +319,60 @@ class CampaignToolsTests(unittest.TestCase):
             self.assertIn(f"{campaign.CAMPAIGN}/campaign_summary.json", names)
             self.assertIn(f"{campaign.CAMPAIGN}/runs/r01_elliptic/repeat-1/run_100001.tar.gz", names)
             self.assertIn(f"{campaign.CAMPAIGN}/runs/b10_maxcut_ring/repeat-3/run_100120.tar.gz", names)
+
+    def test_ws3_finalizer_archives_all_120_runs(self):
+        ws3 = self.campaign_for("ws3")
+        with tempfile.TemporaryDirectory(prefix="ws3-best-finalize-") as temporary:
+            root = Path(temporary)
+            plan = ws3.expected_plan("a" * 40)
+            ws3.write_json(root / "campaign_plan.json", plan)
+            for task in plan["tasks"]:
+                job_id = 200000 + task["task_id"]
+                archive = root / "runs" / f"run_{job_id}.tar.gz"
+                archive.parent.mkdir(parents=True, exist_ok=True)
+                archive.write_bytes(f"bundle-{job_id}".encode("ascii"))
+                archive.with_name(archive.name + ".sha256").write_text(
+                    f"{ws3.sha256(archive)}  {archive.name}\n", encoding="ascii"
+                )
+                metadata = self.metadata(task, "9000", job_id)
+                metadata["scientific_configuration"]["migration"]["selection"] = "best"
+                metadata["scientific_configuration"]["topology"] = {
+                    "name": "ws3", "parameters": ws3.WS3_PARAMETERS,
+                    "adjacency_sha256": ws3.WS3_ADJACENCY_SHA256,
+                }
+                ws3.write_json(root / "runs" / f"run_{job_id}" / "metadata.json", metadata)
+                task_dir = root / "tasks" / f"task-{task['task_id']:03d}"
+                ws3.write_json(task_dir / "bundle_verification.json", {
+                    "verified": True, "complete": True, "validation": "passed",
+                    "job_id": str(job_id), "files": 2193,
+                })
+                ws3.write_json(task_dir / "validation.json", {
+                    "valid": True, "errors": [], "task_id": task["task_id"],
+                    "job_id": str(job_id), "array_job_id": "9000",
+                    "execution_array_job_id": "9000",
+                    "scientific_counts": {"islands": 144},
+                })
+                ws3.write_json(task_dir / "task.json", {
+                    **task, "status": "completed", "exit_code": 0,
+                    "array_job_id": "9000", "job_id": str(job_id),
+                    "execution_array_job_id": "9000",
+                    "archive": str(archive.resolve()),
+                })
+            output = io.StringIO()
+            with redirect_stdout(output):
+                ws3.finalize(root, "9000")
+            self.assertIn("WS3_BEST_VALID_RUNS=120", output.getvalue())
+            summary = ws3.read_json(root / "campaign_summary.json")
+            self.assertTrue(summary["valid"])
+            self.assertEqual(120, summary["valid_runs"])
+            self.assertEqual(ws3.WS3_ADJACENCY_SHA256,
+                             summary["topology_adjacency_sha256"])
+            self.assertTrue((root / "ws3_best.tar.gz.sha256").is_file())
+            with tarfile.open(root / "ws3_best.tar.gz", "r:gz") as stream:
+                names = set(stream.getnames())
+            self.assertIn("ws3_best/campaign_summary.json", names)
+            self.assertIn("ws3_best/runs/r01_elliptic/repeat-1/run_200001.tar.gz", names)
+            self.assertIn("ws3_best/runs/b10_maxcut_ring/repeat-3/run_200120.tar.gz", names)
 
     def test_finalizer_accepts_explicit_retry_array_identity(self):
         task = campaign.task_matrix()[103]

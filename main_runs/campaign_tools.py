@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan, audit and finalize fixed torus 40x3 Ares selection campaigns."""
+"""Plan, audit and finalize fixed 40x3 Ares study campaigns."""
 from __future__ import annotations
 
 import argparse
@@ -17,13 +17,43 @@ import zlib
 
 STRATEGY = os.environ.get("ISLANDS_CAMPAIGN_STRATEGY", "best")
 if STRATEGY not in ("best", "random", "maxDistance"):
-    raise ValueError(f"unsupported torus campaign strategy: {STRATEGY}")
+    raise ValueError(f"unsupported campaign strategy: {STRATEGY}")
+TOPOLOGY = os.environ.get("ISLANDS_CAMPAIGN_TOPOLOGY", "torus")
+if TOPOLOGY not in ("torus", "ws3"):
+    raise ValueError(f"unsupported campaign topology: {TOPOLOGY}")
 CAMPAIGN_SLUG = STRATEGY.lower()
-SCHEMA = f"islandsea-torus-{CAMPAIGN_SLUG}-campaign-v1"
-CAMPAIGN = f"torus_{CAMPAIGN_SLUG}"
+SCHEMA = f"islandsea-{TOPOLOGY}-{CAMPAIGN_SLUG}-campaign-v1"
+CAMPAIGN = f"{TOPOLOGY}_{CAMPAIGN_SLUG}"
 BASE_SEED = 20260912
 DIMENSION = 200
 REPEATS = (1, 2, 3)
+WS3_ADJACENCY_SHA256 = "8dbf64ece5d63c0f6d9ee09adeb91b287d6fa594379008605a11c24ba585d9ee"
+WS3_DATA_PARAMETERS = {
+    "family": "Watts-Strogatz",
+    "selection": "WS3",
+    "dim": 2,
+    "lat": 12,
+    "nei": 3,
+    "probab": 0.003181,
+    "scenario": 2,
+    "source_label": "graphWS_dim2_size12_nei3_probab0.003181_scenario2_1.json",
+}
+WS3_PROVENANCE = {
+    "source_filename": "WS3Topology.py",
+    "source_sha256": "da6efb7484057481d88296e989bfb3b19a2574d0f87e14ae464922880ca18688",
+    "adjacency_sha256": WS3_ADJACENCY_SHA256,
+    "transformation": "none; original node IDs and neighbour order preserved",
+    "parameter_source": "supplied attachment label; null means not provided",
+    "study_status": "approved-144",
+}
+WS3_PARAMETERS = {**WS3_DATA_PARAMETERS, "nodes": 144, "provenance": WS3_PROVENANCE}
+WS3_GRAPH_PATH = (Path(__file__).resolve().parents[1]
+                  / "islands_desync/islands_desync/islands/topologies/data/ws3.json")
+TOPOLOGY_CONFIGURATION = (
+    {"name": "torus", "rows": 12, "columns": 12}
+    if TOPOLOGY == "torus" else
+    {"name": "ws3", "parameters": WS3_PARAMETERS, "adjacency_sha256": WS3_ADJACENCY_SHA256}
+)
 CONTINUOUS = (
     "r01_elliptic", "r02_bent_cigar", "r03_discus", "r04_rosenbrock",
     "r05_ackley", "r06_weierstrass", "r07_griewank", "r08_rastrigin",
@@ -53,7 +83,7 @@ CONFIGURATION = {
         "selection": STRATEGY,
         "acceptance": "plain",
     },
-    "topology": {"name": "torus", "rows": 12, "columns": 12},
+    "topology": TOPOLOGY_CONFIGURATION,
     "metrics_profile": "research-v1-full-buffered",
     "base_seed": BASE_SEED,
 }
@@ -82,6 +112,28 @@ def reject_nonfinite(value):
     raise ValueError(f"non-finite JSON value: {value}")
 
 
+def validate_study_graph_source():
+    """Fail before submission if the selected WS3 attachment changed."""
+    if TOPOLOGY != "ws3":
+        return
+    document = read_json(WS3_GRAPH_PATH)
+    if (document.get("schema_version") != 1 or document.get("name") != "ws3"
+            or document.get("nodes") != 144
+            or document.get("parameters") != WS3_DATA_PARAMETERS
+            or document.get("provenance") != WS3_PROVENANCE):
+        raise ValueError("WS3 source identity or parameters differ from the approved graph")
+    adjacency = document.get("adjacency")
+    if (not isinstance(adjacency, dict)
+            or set(adjacency) != {str(island) for island in range(144)}
+            or any(not isinstance(targets, list) or not targets
+                   or any(type(target) is not int or not 0 <= target < 144 for target in targets)
+                   for targets in adjacency.values())):
+        raise ValueError("WS3 source has invalid island neighbours")
+    canonical = json.dumps(adjacency, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    if hashlib.sha256(canonical).hexdigest() != WS3_ADJACENCY_SHA256:
+        raise ValueError("WS3 source adjacency hash differs from the approved graph")
+
+
 def task_matrix():
     tasks = []
     for benchmark in BENCHMARKS:
@@ -98,6 +150,7 @@ def task_matrix():
 
 
 def expected_plan(git_commit):
+    validate_study_graph_source()
     return {
         "schema": SCHEMA,
         "campaign": CAMPAIGN,
@@ -112,6 +165,7 @@ def expected_plan(git_commit):
 
 
 def validate_plan(plan):
+    validate_study_graph_source()
     if plan.get("schema") != SCHEMA or plan.get("campaign") != CAMPAIGN:
         raise ValueError("invalid campaign plan identity")
     if plan.get("configuration") != CONFIGURATION:
@@ -175,8 +229,14 @@ def validate_metadata(metadata, task, array_job_id, job_id):
     require(migration.get("interval_unit") == "evaluation-count difference", "migration interval unit mismatch")
     require(migration.get("selection") == STRATEGY, "migration selection mismatch")
     require(migration.get("acceptance") == "plain", "migration acceptance mismatch")
-    require(topology.get("name") == "torus", "topology mismatch")
-    require(parameters.get("rows") == 12 and parameters.get("columns") == 12, "torus shape mismatch")
+    require(topology.get("name") == TOPOLOGY, "topology mismatch")
+    if TOPOLOGY == "torus":
+        require(parameters.get("rows") == 12 and parameters.get("columns") == 12,
+                "torus shape mismatch")
+    else:
+        require(parameters == WS3_PARAMETERS, "WS3 parameters/provenance mismatch")
+        require(topology.get("adjacency_sha256") == WS3_ADJACENCY_SHA256,
+                "WS3 adjacency hash mismatch")
     require(seed.get("requested_base") == BASE_SEED, "base seed mismatch")
     require(seed.get("repeat_base") == task["repeat_seed"], "repeat seed mismatch")
     require(metrics.get("profile") == "research-v1-full-buffered", "metrics profile mismatch")
@@ -190,6 +250,40 @@ def validate_metadata(metadata, task, array_job_id, job_id):
     require(metadata.get("resources", {}).get("required_ray_cpus") == 289, "Ray CPU demand mismatch")
     require(metadata.get("resources", {}).get("required_slurm_cpus") == 290, "SLURM CPU demand mismatch")
     require(metadata.get("provenance", {}).get("git_dirty") is False, "run used a dirty checkout")
+    return errors
+
+
+def validate_topology_payload(topology, metadata, raw):
+    errors = []
+
+    def require(condition, message):
+        if not condition:
+            errors.append(message)
+
+    require(topology.get("name") == TOPOLOGY, "topology file name mismatch")
+    require(topology.get("islands") == 144, "topology file island count mismatch")
+    if TOPOLOGY == "torus":
+        require(topology.get("torus_shape", {}).get("rows") == 12, "topology rows mismatch")
+        require(topology.get("torus_shape", {}).get("columns") == 12, "topology columns mismatch")
+    else:
+        require(topology.get("parameters") == WS3_PARAMETERS,
+                "WS3 topology file parameters/provenance mismatch")
+        require((raw / "topology.png").is_file(), "WS3 topology image is missing")
+        adjacency = topology.get("adjacency")
+        if isinstance(adjacency, dict):
+            canonical = json.dumps(adjacency, sort_keys=True, separators=(",", ":"),
+                                   allow_nan=False).encode("utf-8")
+            require(hashlib.sha256(canonical).hexdigest() == WS3_ADJACENCY_SHA256,
+                    "WS3 topology file adjacency differs from the approved graph")
+        else:
+            errors.append("WS3 topology file adjacency is missing")
+        require(topology.get("graph_metrics", {}).get("adjacency_sha256")
+                == WS3_ADJACENCY_SHA256, "WS3 topology metrics hash mismatch")
+    require(
+        topology.get("graph_metrics", {}).get("adjacency_sha256")
+        == metadata.get("scientific_configuration", {}).get("topology", {}).get("adjacency_sha256"),
+        "topology adjacency hash mismatch",
+    )
     return errors
 
 
@@ -254,15 +348,7 @@ def validate_run(campaign_dir, plan_path, task_id, array_job_id, job_id,
         require(manifest.get("islands_completed") == 144, "experiment did not complete 144 islands")
         require(benchmark.get("name") == task["benchmark"], "benchmark manifest name mismatch")
         require(benchmark.get("dimension") == DIMENSION, "benchmark manifest dimension mismatch")
-        require(topology.get("name") == "torus", "topology file name mismatch")
-        require(topology.get("islands") == 144, "topology file island count mismatch")
-        require(topology.get("torus_shape", {}).get("rows") == 12, "topology rows mismatch")
-        require(topology.get("torus_shape", {}).get("columns") == 12, "topology columns mismatch")
-        require(
-            topology.get("graph_metrics", {}).get("adjacency_sha256")
-            == metadata.get("scientific_configuration", {}).get("topology", {}).get("adjacency_sha256"),
-            "topology adjacency hash mismatch",
-        )
+        errors.extend(validate_topology_payload(topology, metadata, raw))
         contract = json_file(raw / "metrics" / "data_contract.json")
         require(contract.get("schema_version") == 1, "metrics data contract is missing")
         run_id = metadata.get("run_id")
@@ -498,7 +584,7 @@ def finalize(campaign_dir, array_job_id):
         if len(keys) != 1:
             errors.append(f"{benchmark}: expected one experiment_key across three repeats, got {len(keys)}")
     for label, hashes in (("runtime", runtime_hashes), ("benchmark code", benchmark_code_hashes),
-                          ("torus adjacency", topology_hashes)):
+                          (f"{TOPOLOGY} adjacency", topology_hashes)):
         if len(hashes) != 1 or not next(iter(hashes), None):
             errors.append(f"expected one nonempty {label} hash across all 120 runs")
     if len(entries) != 120:
@@ -556,7 +642,7 @@ def finalize(campaign_dir, array_job_id):
             temporary.unlink()
     digest = sha256(archive)
     checksum.write_text(f"{digest}  {archive.name}\n", encoding="ascii")
-    marker = f"TORUS_{STRATEGY.upper()}"
+    marker = f"{TOPOLOGY.upper()}_{STRATEGY.upper()}"
     print(f"{marker}_VALID_RUNS={len(entries)}")
     print(f"{marker}_SUMMARY={summary_path}")
     print(f"{marker}_ARCHIVE={archive}")
