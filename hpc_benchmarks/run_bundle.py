@@ -98,7 +98,7 @@ def identifier(metadata, job_id, platform, validation, complete, mode=None):
     benchmark = config.get("benchmark", {})
     migration = config.get("migration", {})
     topology = config.get("topology", {})
-    parameters = topology.get("parameters", {})
+    parameters = topology.get("parameters") or {}
     if mode not in ("canary", "full", "diagnostic"):
         job_name = metadata.get("resources", {}).get("slurm", {}).get("SLURM_JOB_NAME", "") or ""
         mode = ("canary" if str(job_name).endswith("canary") else

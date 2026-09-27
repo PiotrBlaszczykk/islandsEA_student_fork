@@ -675,7 +675,7 @@ def finalize(campaign_dir, array_job_id):
         benchmark_code_hashes.add(metadata.get("scientific_configuration", {}).get("benchmark", {}).get("implementation_sha256"))
         topology_hashes.add(metadata.get("scientific_configuration", {}).get("topology", {}).get("adjacency_sha256"))
         total_archive_bytes += archive.stat().st_size
-        entries.append({
+        entry = {
             **task,
             "job_id": job_id,
             "execution_array_job_id": execution_array_job_id,
@@ -687,7 +687,11 @@ def finalize(campaign_dir, array_job_id):
             "bundle_files": verification.get("files"),
             "scientific_counts": validation.get("scientific_counts"),
             "final_fitness": validation.get("final_fitness"),
-        })
+        }
+        if record.get("recovery_job_id"):
+            entry["recovery_job_id"] = record["recovery_job_id"]
+            entry["original_job_exit_code"] = record.get("original_job_exit_code")
+        entries.append(entry)
 
     for benchmark in BENCHMARKS:
         keys = keys_by_benchmark.get(benchmark, set())
@@ -709,6 +713,7 @@ def finalize(campaign_dir, array_job_id):
         "errors": errors,
         "expected_runs": 120,
         "valid_runs": len(entries),
+        "recovered_runs": sum("recovery_job_id" in entry for entry in entries),
         "benchmark_count": len({entry["benchmark"] for entry in entries}),
         "unique_run_ids": len(run_ids),
         "runtime_sha256": next(iter(runtime_hashes)) if len(runtime_hashes) == 1 else None,
@@ -731,7 +736,8 @@ def finalize(campaign_dir, array_job_id):
         with tarfile.open(temporary, "w:gz", compresslevel=1) as stream:
             stream.add(plan_path, arcname=f"{CAMPAIGN}/campaign_plan.json")
             stream.add(summary_path, arcname=f"{CAMPAIGN}/campaign_summary.json")
-            for optional in (campaign / "submission.json", campaign / "sacct.txt"):
+            for optional in (campaign / "submission.json", campaign / "recovery_submission.json",
+                             campaign / "sacct.txt"):
                 if optional.is_file():
                     stream.add(optional, arcname=f"{CAMPAIGN}/{optional.name}")
             for source in sorted((campaign / "logs").glob("*")):

@@ -537,12 +537,15 @@ class CampaignToolsTests(unittest.TestCase):
                     "execution_array_job_id": execution_array_job_id,
                     "scientific_counts": {"islands": 144},
                 })
-                campaign.write_json(task_dir / "task.json", {
+                record = {
                     **task, "status": "completed", "exit_code": 0,
                     "array_job_id": "9000", "job_id": str(job_id),
                     "execution_array_job_id": execution_array_job_id,
                     "archive": str(archive.resolve()),
-                })
+                }
+                if task["task_id"] == 1:
+                    record.update(recovery_job_id="9101", original_job_exit_code=74)
+                campaign.write_json(task_dir / "task.json", record)
             missing = root / "tasks/task-120/task.json"
             saved = missing.read_bytes()
             missing.unlink()
@@ -557,6 +560,9 @@ class CampaignToolsTests(unittest.TestCase):
             summary = campaign.read_json(root / "campaign_summary.json")
             self.assertTrue(summary["valid"])
             self.assertEqual(120, summary["valid_runs"])
+            self.assertEqual(1, summary["recovered_runs"])
+            self.assertEqual("9101", summary["runs"][0]["recovery_job_id"])
+            self.assertEqual(74, summary["runs"][0]["original_job_exit_code"])
             self.assertTrue((root / f"{campaign.CAMPAIGN}.tar.gz.sha256").is_file())
             with tarfile.open(root / f"{campaign.CAMPAIGN}.tar.gz", "r:gz") as stream:
                 names = set(stream.getnames())

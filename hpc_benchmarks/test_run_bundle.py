@@ -132,6 +132,19 @@ class BundleTests(unittest.TestCase):
         result = self.export(replace=True)
         self.assertIn("mode=canary\n", (Path(result["directory"]) / "identifier.txt").read_text())
 
+    def test_complete_topology_with_null_parameters_exports(self):
+        self.metadata["scientific_configuration"]["topology"] = {
+            "name": "complete", "parameters": None,
+        }
+        self.save_metadata()
+        result = self.export(exit_code=74)
+        target = Path(result["directory"])
+        self.assertIn("topology_shape=not_applicable\n", (target / "identifier.txt").read_text())
+        self.assertTrue(bundle.verify_archive(result["archive"])["verified"])
+        manifest = bundle.read_json(target / "results/bundle_manifest.json")
+        self.assertEqual(74, manifest["job_exit_code"])
+        self.assertTrue(manifest["complete"])
+
     def test_wrong_job_or_pointer_identity_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "job ID mismatch"):
             self.export(job_id="124")

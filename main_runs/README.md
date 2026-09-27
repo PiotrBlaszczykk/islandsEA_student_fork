@@ -41,6 +41,31 @@ W razie pojedynczej porażki po diagnozie użyj odpowiednio
 
 ## Complete / best, random, maxDistance
 
+### Odzyskanie Complete/best z 27 września 2026
+
+Array `21111388` policzył wyniki naukowe, ale wszystkie taski zakończyły się
+kodem 74 podczas eksportu: `identifier()` nie obsługiwał `parameters: null`
+grafu Complete. Oryginalny finalizer `21111389` słusznie odrzucił kampanię.
+Po poprawce eksportera **nie uruchamiaj ponownie obliczeń Ray**. Zachowaj
+`$SCRATCH/complete_best` i po commicie/pushu oraz `git pull --ff-only` uruchom
+na węźle login:
+
+```bash
+bash main_runs/launch_recover_complete_best.sh
+```
+
+Preflight wymaga 120 oryginalnych tasków z kodem 74, 120 pozytywnych
+walidacji naukowych, zgodnego planu i surowych metadanych. Recovery array
+tylko kopiuje, pakuje i weryfikuje istniejące dane; jego taski zajmują po
+jednym CPU i maksymalnie trzy działają równolegle. Nowy finalizer uruchomi
+się po array. Każdy manifest zachowuje oryginalny kod wrappera 74, a rekord
+tasku zapisuje osobno oryginalny job ID, `original_job_exit_code=74` i
+`recovery_job_id`. Oczekiwane: 120 recovery tasków i nowy finalizer
+`COMPLETED|0:0`, `COMPLETE_BEST_VALID_RUNS=120` oraz
+`COMPLETE_BEST_FINALIZATION_OK`. Oryginalne 120 wpisów `FAILED|74:0`
+pozostanie w historii Slurma. W razie błędu recovery zachowaj scratch i logi;
+finalizer nie zbuduje kompletnego archiwum z niepełnych danych.
+
 Trzy kampanie `complete` obejmują po 120 niezależnych runów: 144 wyspy,
 40 benchmarków przy D=200 i trzy powtórzenia. Każda zachowuje 8000 ewaluacji
 na wyspę, populację 16, offspring 4, pięciu migrantów co pięć ewaluacji,
