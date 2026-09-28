@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Index ER4/best or ER4/random arrays without changing per-run bundles."""
+"""Index ER4 production arrays without changing per-run bundles."""
 from __future__ import annotations
 
 import argparse
@@ -30,9 +30,9 @@ DIMENSION = 200
 
 
 def er4_campaign_name(strategy: str) -> str:
-    if strategy not in ("best", "random"):
+    if strategy not in ("best", "random", "maxDistance"):
         raise ValueError(f"Unsupported ER4 production strategy: {strategy}")
-    return f"er4_{strategy}"
+    return f"er4_{strategy.lower()}"
 
 
 def campaign_schema(strategy: str) -> str:
@@ -365,7 +365,7 @@ def finalize_campaign(campaign_dir: Path, array_job_id: str, results_root: Path,
         ))
         task_logs = []
         for suffix in ("out", "err"):
-            name = f"athena-er4-{strategy}-120-{array_job_id}_{task_id}.{suffix}"
+            name = f"athena-er4-{strategy.lower()}-120-{array_job_id}_{task_id}.{suffix}"
             source = logs_root / name
             if source.is_file() and not source.is_symlink():
                 files_to_archive.append((source, f"{campaign_name}/logs/{name}"))
@@ -468,7 +468,7 @@ def main() -> int:
     final.add_argument("--logs-root", type=Path, required=True)
     final.add_argument("--sacct-file", type=Path, required=True)
     for action in (plan, record, final):
-        action.add_argument("--strategy", choices=("best", "random"), default="best")
+        action.add_argument("--strategy", choices=("best", "random", "maxDistance"), default="best")
     args = parser.parse_args()
     marker = f"ATHENA_ER4_{args.strategy.upper()}"
     if args.command == "plan":

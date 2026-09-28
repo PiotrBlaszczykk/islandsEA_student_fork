@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Frozen task map for ER4/best and ER4/random Athena batches."""
+"""Frozen task map for ER4/best, random and maxDistance Athena batches."""
 from __future__ import annotations
 
 import argparse
@@ -51,7 +51,7 @@ def main() -> int:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--check", action="store_true")
     group.add_argument("--task-id", type=int)
-    parser.add_argument("--strategy", choices=("best", "random"), default="best")
+    parser.add_argument("--strategy", choices=("best", "random", "maxDistance"), default="best")
     args = parser.parse_args()
     check_contract()
     if args.check:

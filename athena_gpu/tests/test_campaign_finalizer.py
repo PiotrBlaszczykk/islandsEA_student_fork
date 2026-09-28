@@ -127,6 +127,22 @@ class CampaignFinalizerTests(unittest.TestCase):
             self.assertTrue(all(name.startswith("er4_random_123/") for name in stream.getnames()))
             self.assertEqual(120, sum(name.endswith(".tar.gz") for name in stream.getnames()))
 
+    def test_maxdistance_finalizer_keeps_lowercase_paths_and_exact_strategy(self):
+        fixture = create_campaign(Path(self.temporary.name) / "maxdistance", strategy="maxDistance")
+        with patch("athena_gpu.campaign_er4_best.verify_archive", side_effect=fake_verify):
+            result = finalize_campaign(fixture["campaign"], "123", fixture["results"],
+                                       fixture["logs"], fixture["sacct"], "maxDistance")
+        archive = Path(result["archive"])
+        self.assertEqual("er4_maxdistance_123.tar.gz", archive.name)
+        summary = json.loads(Path(result["summary"]).read_text(encoding="utf-8"))
+        self.assertEqual("er4_maxdistance", summary["campaign"])
+        self.assertEqual(["athena-er4-maxdistance-120-123_1.out"], summary["available_logs"])
+        with tarfile.open(archive, "r:gz") as stream:
+            self.assertTrue(all(name.startswith("er4_maxdistance_123/") for name in stream.getnames()))
+            self.assertEqual(120, sum(name.endswith(".tar.gz") for name in stream.getnames()))
+            validation = json.load(stream.extractfile("er4_maxdistance_123/validations/task-001.json"))
+            self.assertEqual("maxDistance", validation["migrant_selection"])
+
 
 if __name__ == "__main__":
     unittest.main()

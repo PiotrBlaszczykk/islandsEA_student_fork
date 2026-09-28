@@ -93,6 +93,22 @@ class ProductionER4BestTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_plan(random, "124", "best")
 
+    def test_maxdistance_plan_keeps_task_matrix_and_exact_strategy(self):
+        best = plan_document("123", "a" * 40)
+        maximum = plan_document("125", "a" * 40, "maxDistance")
+        self.assertEqual("er4_maxdistance", maximum["campaign"])
+        self.assertEqual("islandsea-er4-maxdistance-athena-campaign-v1", maximum["schema"])
+        self.assertEqual("maxDistance", maximum["configuration"]["migration"]["selection"])
+        self.assertEqual(best["tasks"], maximum["tasks"])
+        for key in ("dimension", "islands", "evaluations_per_island", "population",
+                    "offspring", "topology", "base_seed", "benchmark_instance_seed"):
+            self.assertEqual(best["configuration"][key], maximum["configuration"][key])
+        self.assertEqual("maxDistance", _spec("full", 3, BENCHMARKS[-1], "er4",
+                                               "maxDistance")["migrant_selection"])
+        validate_plan(maximum, "125", "maxDistance")
+        with self.assertRaises(ValueError):
+            validate_plan(maximum, "125", "random")
+
     def test_campaign_record_indexes_one_verified_portable_bundle(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -210,6 +226,58 @@ class ProductionER4BestTests(unittest.TestCase):
             self.assertEqual("random", made["migrant_selection"])
             self.assertEqual("islandsea-er4-random-athena-campaign-v1", made["schema"])
             self.assertEqual(archive.read_bytes(), (campaign / made["archive"]).read_bytes())
+
+    def test_maxdistance_record_requires_exact_case_and_verified_bundle(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fixture = create_campaign(root, strategy="maxDistance")
+            campaign, plan = fixture["campaign"], fixture["plan"]
+            (campaign / "tasks/task-001.json").unlink()
+            old_bundle = campaign / "runs/r01_elliptic/repeat-1/run_501.tar.gz"
+            archive = root / "exports/run_501.tar.gz"
+            archive.parent.mkdir()
+            archive.write_bytes(old_bundle.read_bytes())
+            archive.with_name(archive.name + ".sha256").write_bytes(
+                old_bundle.with_name(old_bundle.name + ".sha256").read_bytes())
+            old_bundle.unlink()
+            old_bundle.with_name(old_bundle.name + ".sha256").unlink()
+            old_bundle.parent.rmdir()
+            run_dir = fixture["results"] / "501"
+            raw = root / "raw"
+            raw.mkdir()
+            (run_dir / "result_pointer.json").write_text(
+                json.dumps({"run_directory": str(raw)}), encoding="utf-8")
+            (raw / "run_metadata.json").write_text(json.dumps({
+                "scientific_configuration": {
+                    "benchmark": {"name": plan["tasks"][0]["benchmark"]},
+                    "dimension": 200, "islands": 144, "evaluations_per_island": 8000,
+                    "population": 16, "offspring": 4, "repeat": 1,
+                    "migration": plan["configuration"]["migration"],
+                    "topology": plan["configuration"]["topology"],
+                    "seed": {"requested_base": 20260912, "repeat_base": 20260912,
+                             "benchmark_instance_seed": 20260511},
+                    "metrics": {"profile": "research-v1-full-buffered"},
+                },
+                "resources": {"slurm": {"SLURM_JOB_ID": "501",
+                                        "SLURM_ARRAY_JOB_ID": "123",
+                                        "SLURM_ARRAY_TASK_ID": "1"}},
+                "provenance": {"git_commit": "b" * 40},
+            }), encoding="utf-8")
+            validation_path = run_dir / "validation.json"
+            validation = json.loads(validation_path.read_text(encoding="utf-8"))
+            validation["migrant_selection"] = "maxdistance"
+            validation_path.write_text(json.dumps(validation), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "migrant_selection"):
+                record_task(campaign, "123", 1, "501", run_dir, archive, "maxDistance")
+            validation["migrant_selection"] = "maxDistance"
+            validation_path.write_text(json.dumps(validation), encoding="utf-8")
+            with patch("athena_gpu.campaign_er4_best.verify_archive", return_value={
+                "job_id": "501", "complete": True, "validation": "passed",
+            }):
+                made = record_task(campaign, "123", 1, "501", run_dir, archive, "maxDistance")
+            self.assertEqual("maxDistance", made["migrant_selection"])
+            self.assertEqual("islandsea-er4-maxdistance-athena-campaign-v1", made["schema"])
+            self.assertTrue((campaign / made["archive"]).is_file())
 
 
 if __name__ == "__main__":

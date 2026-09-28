@@ -33,6 +33,10 @@ workspace `artifacts/run_wyniki_przyklad/{run_123456,run_3174577}`.
   The ER4/random 120-task launcher submits only the GPU array and records
   verified per-run bundles; its complete aggregate is built locally after a
   one-connection campaign download, without inventing a CPU partition on Athena.
+  The ER4/maxDistance launcher follows the same pattern: scientific selection
+  remains `maxDistance`, while campaign paths use lowercase `maxdistance`.
+  Do not update the Athena checkout until the active ER4/random array 3205860
+  has finished, because later tasks read code from that checkout.
 - The automatic archive contains a final-wrapper log snapshot. For SLURM's
   subsequent epilogue messages, refresh after job termination with `export
   --replace`. Hard-killed jobs may require manual `--allow-incomplete` export.

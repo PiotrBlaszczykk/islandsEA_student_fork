@@ -61,7 +61,7 @@ def create_portable_bundles(fixture):
             "metrics/data_contract.json": b"{}\n",
             "results/run_metadata.json": metadata_bytes,
             "results/validation.json": json.dumps(validation).encode(),
-            f"logs/athena-er4-{strategy}-120-123_{task_id}.out": b"available snapshot\n",
+            f"logs/athena-er4-{strategy.lower()}-120-123_{task_id}.out": b"available snapshot\n",
         }
         manifest = {
             "schema": "islandsea-run-bundle-v1", "job_id": job_id,
@@ -159,6 +159,26 @@ class LocalFinalizerTests(unittest.TestCase):
             self.assertEqual(120, sum(name.endswith(".tar.gz") for name in names))
             plan = json.load(stream.extractfile("er4_random/campaign_plan.json"))
             self.assertEqual("random", plan["configuration"]["migration"]["selection"])
+
+    def test_maxdistance_campaign_uses_ares_style_lowercase_archive_name(self):
+        other = Path(self.temporary.name) / "maxdistance"
+        fixture = create_campaign(other, strategy="maxDistance")
+        create_portable_bundles(fixture)
+        summary, entries, captured = audit_downloaded(fixture["campaign"], "123", "maxDistance")
+        self.assertEqual("er4_maxdistance", summary["campaign"])
+        self.assertEqual(120, summary["valid_runs"])
+        self.assertEqual(120, len(entries))
+        self.assertIn("logs/athena-er4-maxdistance-120-123_1.out", captured)
+        with self.assertRaises(ValueError):
+            audit_downloaded(fixture["campaign"], "123", "random")
+        result = finalize_downloaded(fixture["campaign"], "123", other, "maxDistance")
+        self.assertEqual("er4_maxdistance.tar.gz", Path(result["archive"]).name)
+        with tarfile.open(result["archive"], "r:gz") as stream:
+            names = stream.getnames()
+            self.assertTrue(all(name.startswith("er4_maxdistance/") for name in names))
+            self.assertEqual(120, sum(name.endswith(".tar.gz") for name in names))
+            plan = json.load(stream.extractfile("er4_maxdistance/campaign_plan.json"))
+            self.assertEqual("maxDistance", plan["configuration"]["migration"]["selection"])
 
 
 if __name__ == "__main__":

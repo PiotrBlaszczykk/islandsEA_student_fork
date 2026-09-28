@@ -31,12 +31,17 @@ module load Python/3.10.4
 STUDY_PROBLEM=r01_elliptic
 STUDY_TOPOLOGY=torus
 STUDY_STRATEGY=best
-if [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" == 1 && "${ATHENA_PRODUCTION_ER4_RANDOM:-0}" == 1 ]]; then
+PRODUCTION_MODES=0
+for PRODUCTION_FLAG in ATHENA_PRODUCTION_ER4_BEST ATHENA_PRODUCTION_ER4_RANDOM ATHENA_PRODUCTION_ER4_MAXDISTANCE; do
+    if [[ "${!PRODUCTION_FLAG:-0}" == 1 ]]; then ((PRODUCTION_MODES += 1)); fi
+done
+if (( PRODUCTION_MODES > 1 )); then
     echo "Conflicting ER4 production strategies" >&2
     exit 2
 fi
-if [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" == 1 || "${ATHENA_PRODUCTION_ER4_RANDOM:-0}" == 1 ]]; then
+if (( PRODUCTION_MODES == 1 )); then
     if [[ "${ATHENA_PRODUCTION_ER4_RANDOM:-0}" == 1 ]]; then STUDY_STRATEGY=random; fi
+    if [[ "${ATHENA_PRODUCTION_ER4_MAXDISTANCE:-0}" == 1 ]]; then STUDY_STRATEGY=maxDistance; fi
     [[ "$ATHENA_STUDY_MODE" == full ]] || {
         echo "ER4 production array requires ATHENA_STUDY_MODE=full" >&2
         exit 2
@@ -69,7 +74,7 @@ case "$STUDY_REPEAT" in
     1|2|3) ;;
     *) echo "Invalid Athena study repeat: $STUDY_REPEAT" >&2; exit 2 ;;
 esac
-if [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" != 1 && "${ATHENA_PRODUCTION_ER4_RANDOM:-0}" != 1 && -n "${SLURM_ARRAY_TASK_ID:-}" && "$STUDY_REPEAT" != "$SLURM_ARRAY_TASK_ID" ]]; then
+if (( PRODUCTION_MODES == 0 )) && [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "$STUDY_REPEAT" != "$SLURM_ARRAY_TASK_ID" ]]; then
     echo "Repeat $STUDY_REPEAT differs from SLURM array task $SLURM_ARRAY_TASK_ID" >&2
     exit 2
 fi
@@ -112,10 +117,10 @@ cleanup() {
         islandsea_bundle_finish "$status"
         local bundle_status=$?
         if (( status == 0 && bundle_status != 0 )); then status=$bundle_status; fi
-        if (( status == 0 )) && [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" == 1 || "${ATHENA_PRODUCTION_ER4_RANDOM:-0}" == 1 ]]; then
+        if (( status == 0 && PRODUCTION_MODES == 1 )); then
             "$VENV_DIR/bin/python" "$PROJECT_DIR/athena_gpu/campaign_er4_best.py" record \
                 --strategy "$STUDY_STRATEGY" \
-                --campaign-dir "$ISLANDS_STORAGE_ROOT/campaigns/er4_${STUDY_STRATEGY}_${SLURM_ARRAY_JOB_ID}" \
+                --campaign-dir "$ISLANDS_STORAGE_ROOT/campaigns/er4_${STUDY_STRATEGY,,}_${SLURM_ARRAY_JOB_ID}" \
                 --array-job-id "$SLURM_ARRAY_JOB_ID" \
                 --task-id "$SLURM_ARRAY_TASK_ID" \
                 --job-id "$SLURM_JOB_ID" \

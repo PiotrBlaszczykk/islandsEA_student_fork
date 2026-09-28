@@ -42,7 +42,7 @@ done
 mkdir -p "$RESULT_ROOT" "$LOG_ROOT" "$CAMPAIGN_ROOT"
 # Prevent stale interactive-session gates and mode variables from crossing
 # sbatch --export=ALL. The production task map is sourced only from array ID.
-unset ATHENA_EXPECTED_COMMIT ATHENA_STUDY_CANARY_JOB_ID ATHENA_STUDY_REPEAT ATHENA_FROZEN_ARRAY ATHENA_PRODUCTION_ER4_RANDOM
+unset ATHENA_EXPECTED_COMMIT ATHENA_STUDY_CANARY_JOB_ID ATHENA_STUDY_REPEAT ATHENA_FROZEN_ARRAY ATHENA_PRODUCTION_ER4_RANDOM ATHENA_PRODUCTION_ER4_MAXDISTANCE
 # Keep the shared per-run contract at $ISLANDS_STORAGE_ROOT/exports even if an
 # old login session exported a one-off bundle destination.
 unset ISLANDS_EXPORT_ROOT

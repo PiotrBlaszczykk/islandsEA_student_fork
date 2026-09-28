@@ -178,7 +178,7 @@ def audit_downloaded(campaign_dir: Path, array_job_id: str,
             captured[f"validations/task-{task_id:03d}.json"] = validation_bytes
             task_logs = []
             for suffix in ("out", "err"):
-                log_name = f"athena-er4-{strategy}-120-{array_job_id}_{task_id}.{suffix}"
+                log_name = f"athena-er4-{strategy.lower()}-120-{array_job_id}_{task_id}.{suffix}"
                 member = f"{root}/logs/{log_name}"
                 if member in names:
                     captured[f"logs/{log_name}"] = stream.extractfile(member).read()
@@ -310,7 +310,7 @@ def main() -> int:
     parser.add_argument("--campaign-dir", type=Path, required=True)
     parser.add_argument("--array-job-id", required=True)
     parser.add_argument("--destination", type=Path)
-    parser.add_argument("--strategy", choices=("best", "random"), default="best")
+    parser.add_argument("--strategy", choices=("best", "random", "maxDistance"), default="best")
     args = parser.parse_args()
     target = args.destination or args.campaign_dir.parent
     if not target.is_dir():

@@ -212,6 +212,50 @@ wolnego miejsca na drugi zestaw ~22 GB danych; rozmiar rzeczywisty zależy od
 wyników. Nie dopisuje nieobecnego `sacct` ani logów. Oryginalne archiwa i
 metryki pozostają niezmienione.
 
+## Przygotowana partia ER4 / maxDistance / 40 × 3
+
+Wariant `maxDistance` zachowuje zamrożony graf ER4, tę samą kolejność 40
+benchmarków, D=200, 144 wyspy, budżet 8000 ewaluacji na wyspę, populację
+16/4, migrację 5/5, `plain`, seedy i trzy powtórzenia. Zmienia wyłącznie
+strategię **wyboru** migrantów. Naukowa nazwa jest dokładnie `maxDistance`;
+w nazwach katalogów i logów używamy `maxdistance`, zgodnie z Ares.
+
+Launcher `athena_gpu/submit_production_er4_maxdistance_120.sh` zgłasza jeden
+array GPU `1-120%3` (A100, 16 CPU, 2 godziny na element, maksymalnie 240 GPUh),
+zapisuje plan `campaigns/er4_maxdistance_<ARRAY_ID>/campaign_plan.json` przed
+zwolnieniem arraya i nie zgłasza canary, retry ani dodatkowego finalizera.
+Każdy element ma własny rzeczywisty `SLURM_JOB_ID`, walidację w
+`results/athena_production_er4_maxdistance_120/<JOB_ID>/validation.json`,
+archiwum `exports/run_<JOB_ID>.tar.gz[.sha256]` i rekord kampanii. Żaden
+element nie przepisuje naukowych metryk.
+
+**Nie wdrażać nowego kodu na Athenie, dopóki aktywny array ER4/random
+`3205860` się nie zakończy**: późniejsze taski korzystają z bieżącego checkoutu.
+Po zakończeniu, sprawdzeniu wszystkich statusów i ręcznym przygotowaniu
+nowego commita przez użytkownika, komenda na login node będzie:
+
+```bash
+bash athena_gpu/submit_production_er4_maxdistance_120.sh
+```
+
+Po zakończeniu kampanii sprawdzić `sacct -X -j <ARRAY_ID> -P
+--format=JobID,State,ExitCode,Elapsed,NodeList`. Pobieranie na laptopie:
+
+```powershell
+.\athena_gpu\download_production_er4_maxdistance_120.ps1 -ArrayJobId <ARRAY_ID>
+python -m athena_gpu.finalize_downloaded_er4 `
+  --campaign-dir 'C:\Users\piotr\UMISI\IslandsEA_summer\artifacts\run_wyniki\athena\er4_maxdistance_<ARRAY_ID>' `
+  --array-job-id <ARRAY_ID> --strategy maxDistance
+```
+
+Downloader korzysta z jednego `scp -r`, nie nadpisuje pobranego katalogu i
+sprawdza SHA-256 wszystkich 120 wewnętrznych archiwów. Lokalny finalizer
+wymaga kompletnego planu, rekordów, walidacji i bundle; po sukcesie tworzy
+`artifacts/run_wyniki/athena/er4_maxdistance.tar.gz` oraz `.sha256` z jednym
+katalogiem `er4_maxdistance/`. Nie deklaruje brakujących logów jako obecnych.
+Do pobrania i finalizacji potrzebne jest odpowiednie wolne miejsce lokalne;
+można wskazać większy dysk przez `-Destination`.
+
 Ten dokument utrwala działającą procedurę dla Atheny, wyniki wykonanych
 walidacji oraz znane ograniczenia. Dotyczy kodu z `athena_gpu/`. Nie jest instrukcją dla
 Aresa i nie wolno przenosić tutaj profilu CPU Aresa.

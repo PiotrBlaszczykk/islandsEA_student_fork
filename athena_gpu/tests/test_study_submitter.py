@@ -81,6 +81,7 @@ fi
             "ATHENA_FROZEN_ARRAY",
             "ATHENA_PRODUCTION_ER4_BEST",
             "ATHENA_PRODUCTION_ER4_RANDOM",
+            "ATHENA_PRODUCTION_ER4_MAXDISTANCE",
             "ATHENA_STUDY_REPEAT",
         ):
             self.env.pop(key, None)
@@ -264,6 +265,26 @@ fi
         self.assertIn("ATHENA_ER4_RANDOM_ARRAY_JOB_ID=7654321", result.stdout)
         self.assertIn("No automatic retry, resubmission, or follow-up job", result.stdout)
 
+    def test_er4_maxdistance_submits_only_one_held_gpu_array(self):
+        result = self.submit("", script="submit_production_er4_maxdistance_120.sh")
+        self.assertEqual(0, result.returncode, result.stderr)
+        arguments = self.capture.read_text(encoding="utf-8").splitlines()
+        for value in ("--array=1-120%3", "--hold", "--cpus-per-task=16",
+                      "--gres=gpu:1", "--time=02:00:00", "--account=plgintobl-gpu-a100"):
+            self.assertIn(value, arguments)
+        exported = "\n".join(arguments)
+        self.assertIn("ATHENA_PRODUCTION_ER4_MAXDISTANCE=1", exported)
+        self.assertNotIn("ATHENA_PRODUCTION_ER4_RANDOM", exported)
+        self.assertNotIn("ATHENA_PRODUCTION_ER4_BEST", exported)
+        self.assertNotIn("ATHENA_EXPECTED_COMMIT", exported)
+        self.assertEqual(["sbatch", "scontrol release 7654321"],
+                         self.calls.read_text(encoding="utf-8").splitlines())
+        invoked = self.python_capture.read_text(encoding="utf-8")
+        self.assertIn("production_er4_best.py --check --strategy maxDistance", invoked)
+        self.assertIn("campaign_er4_best.py plan --strategy maxDistance", invoked)
+        self.assertIn("ATHENA_ER4_MAXDISTANCE_ARRAY_JOB_ID=7654321", result.stdout)
+        self.assertIn("No automatic retry, resubmission, or follow-up job", result.stdout)
+
     def test_existing_array_submits_only_cpu_finalizer_without_dependency(self):
         plan = self.root / "scratch" / "islandsEA" / "campaigns" / "er4_best_7654321" / "campaign_plan.json"
         plan.parent.mkdir(parents=True)
@@ -285,6 +306,7 @@ fi
         for script in ("run_study_job.sh", "submit_frozen_torus3.sh",
                        "submit_production_er4_best_120.sh",
                        "submit_production_er4_random_120.sh",
+                       "submit_production_er4_maxdistance_120.sh",
                        "submit_finalize_production_er4_best_120.sh",
                        "run_finalize_production_er4_best_120.sh"):
             with self.subTest(script=script):

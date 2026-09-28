@@ -9,7 +9,7 @@ from athena_gpu.campaign_er4_best import plan_document
 
 
 def create_campaign(root: Path, array_id: str = "123", strategy: str = "best") -> dict:
-    campaign = root / "campaigns" / f"er4_{strategy}_{array_id}"
+    campaign = root / "campaigns" / f"er4_{strategy.lower()}_{array_id}"
     campaign.mkdir(parents=True)
     results = root / "results"
     logs = root / "logs"
@@ -53,7 +53,7 @@ def create_campaign(root: Path, array_id: str = "123", strategy: str = "best") -
         accounting.append(f"{job_id}|{array_id}_{task_id}|COMPLETED|0:0")
     sacct = campaign / "sacct.txt"
     sacct.write_text("\n".join(accounting) + "\n", encoding="utf-8")
-    (logs / f"athena-er4-{strategy}-120-{array_id}_1.out").write_text(
+    (logs / f"athena-er4-{strategy.lower()}-120-{array_id}_1.out").write_text(
         f"ATHENA_ER4_{strategy.upper()}_TASK_OK=1\n", encoding="utf-8"
     )
     return {"campaign": campaign, "results": results, "logs": logs,

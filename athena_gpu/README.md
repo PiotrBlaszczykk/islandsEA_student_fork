@@ -139,6 +139,14 @@ można pobrać jednym `scp -r` przez `download_production_er4_random_120.ps1`,
 a lokalny `finalize_downloaded_er4.py --strategy random` tworzy `er4_random.tar.gz` z 120
 niezmienionymi runami. Szczegóły i kontrolki: [runbook](../athena-info/ATHENA_HOW_TO_RUN.md).
 
+Analogiczny, lokalnie przygotowany wariant `ER4/maxDistance/plain` ma
+`submit_production_er4_maxdistance_120.sh` i
+`download_production_er4_maxdistance_120.ps1`. Strategia naukowa to dokładnie
+`maxDistance`, natomiast katalog i archiwum końcowe to `er4_maxdistance`.
+Nie aktualizować checkoutu na Athenie podczas trwania arraya ER4/random
+`3205860`. Instrukcja uruchomienia i finalizacji jest w
+[runbooku](../athena-info/ATHENA_HOW_TO_RUN.md).
+
 Lokalnie po poprawce przechodzi 32 testy kontraktu, a jeden test real-Ray jest
 domyślnie opt-in. Uruchomiony jawnie smoke wykonał pełny
 cykl 4 logicznych wysp na 2 shardach (20 requestów, 128 wierszy), migracje i
