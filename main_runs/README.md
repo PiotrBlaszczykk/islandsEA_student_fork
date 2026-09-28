@@ -1,5 +1,39 @@
 # Kampanie Ares / 40 benchmarków / 3 powtórzenia
 
+## Krótki test BA przed kampaniami
+
+`launch_ba_smoke.sh` wysyła **jeden** diagnostyczny run `r01_elliptic` na
+zatwierdzonym grafie BA (144 wyspy, D=200, `best/plain`). Ma tylko 128
+ewaluacji na wyspę, więc **nie jest** jednym z 120 runów kampanii badawczej
+z budżetem 8000. Zachowuje docelową alokację 7×48 CPU i pełny profil metryk,
+ale ma limit czasu 10 minut (sufit 56 CPUh). Sprawdza dokładny graf,
+parametry, 144 końcowe rozwiązania, surowe metryki i eksport do przenośnego
+`run_<JOB_ID>.tar.gz` wraz z SHA-256. Wyniki trafiają do osobnego
+`$SCRATCH/ba_smoke`; skrypt nie uruchamia kampanii 120 zadań.
+
+Po lokalnym commicie i pushu gałęzi `summer_ares_blaszczyk`, na Aresie:
+
+```bash
+cd "$HOME/islandsEA_student_fork"
+git pull --ff-only
+bash main_runs/launch_ba_smoke.sh
+```
+
+Launcher wypisze `BA_SMOKE_JOB_ID`. Po opuszczeniu kolejki sprawdź go
+komendą, która wymaga `COMPLETED|0:0`, poprawnego archiwum i znacznika
+`BA_SMOKE_OK` w logu:
+
+```bash
+bash main_runs/check_ba_smoke.sh <BA_SMOKE_JOB_ID>
+```
+
+Sukces to `BA_SMOKE_CONFIRMED=<BA_SMOKE_JOB_ID>`. W razie błędu zachowaj
+`$SCRATCH/ba_smoke` i prześlij `logs/slurm/ba-smoke-<ID>.out` oraz `.err`;
+nie uruchamiaj jeszcze 120-elementowego array. Po sukcesie możemy osobno
+uruchomić `ba_best`, a następnie `ba_random` i `ba_maxdistance`. Powtórzenie
+testu wymaga jawnego zwolnienia starego `$SCRATCH/ba_smoke` po przejrzeniu
+wyników; launcher nie nadpisuje istniejącego katalogu.
+
 ## BA / best, random, maxDistance
 
 Trzy kampanie `ba` używają dokładnej instancji Barabásiego-Alberta z

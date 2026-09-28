@@ -145,6 +145,23 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(74, manifest["job_exit_code"])
         self.assertTrue(manifest["complete"])
 
+    def test_ba_diagnostic_exports_with_fixed_graph_parameters(self):
+        self.metadata["scientific_configuration"]["study"] = "diagnostic"
+        self.metadata["scientific_configuration"]["topology"] = {
+            "name": "ba", "parameters": {"family": "Barabasi-Albert", "m0": 30, "m": 30},
+        }
+        self.save_metadata()
+        bundle.write_json(self.job / "validation.json", {
+            "valid": True, "status": "passed", "mode": "diagnostic",
+        })
+        result = self.export(exit_code=0)
+        target = Path(result["directory"])
+        identifier = (target / "identifier.txt").read_text()
+        self.assertIn("mode=diagnostic\n", identifier)
+        self.assertIn("topology=ba\n", identifier)
+        self.assertIn("validation=passed\n", identifier)
+        self.assertEqual("passed", bundle.verify_archive(result["archive"])["validation"])
+
     def test_wrong_job_or_pointer_identity_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "job ID mismatch"):
             self.export(job_id="124")

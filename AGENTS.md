@@ -153,8 +153,13 @@ not override current study instructions; preserve their measured job records.
   the committed source provenance and ordered adjacency SHA-256. Strategies
   are `best`, `random`, `maxDistance` with `plain` acceptance. Scratch trees,
   retry helpers and single-download archives are `ba_best`, `ba_random`,
-  `ba_maxdistance`. Run sequentially and free the previous verified scratch
-  tree between campaigns.
+  `ba_maxdistance`. Before the first BA campaign, run the isolated
+  `main_runs/launch_ba_smoke.sh` diagnostic (one BA/best/r01 run, 128
+  evaluations per island, full 7x48 CPU profile), then verify its scientific
+  outputs and portable bundle with `main_runs/check_ba_smoke.sh JOB_ID`.
+  This is not one of the 120 full-budget study runs and does not launch a
+  campaign. Run the three full campaigns sequentially only after the smoke
+  succeeds, freeing each previously verified scratch tree between campaigns.
 - Old `*_ares_200.sh`, `run*-hpc.sh`, `run_delay_experiment.sh`, `run_local_venv_plgrid.sh` and `submit_all_topologies.sh` are retired/fail closed. Do not use them as campaign templates. Job paths use ISLANDS_PROJECT_DIR/SLURM_SUBMIT_DIR, not the SLURM spool copy's BASH_SOURCE.
 - The sibling Athena checkout now has a sharded144-island GPU runner (12 shards, batcher, router, A100 evaluator;15 Ray CPUs plus driver), still requiring target canary certification. Do not submit the Ares CPU profile there. Current graph data and metric definitions remain shared.
 - Historical 144-island migration evidence: `../../artifacts/study144/validation.json`, 33 tests per repo (66 total), real CLI dry-runs and exact attachment checks; `../../artifacts/study144/parity.json`, 170 instances / 5946 inputs per comparison, no unexpected source differences. This is CPU evidence, not a 144-island HPC run or validation of the complete 40-function backend on A100.
