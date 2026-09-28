@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Submit 40 refined benchmarks x three repeats, ER4/random/plain, D=200.
+# One GPU array; packaging/finalization of the 120 existing bundles is separate.
+set -euo pipefail
+
+[[ "$#" -eq 0 ]] || { echo "Usage: $0" >&2; exit 2; }
+[[ -z "${SLURM_JOB_ID:-}" ]] || {
+    echo "Submit from an Athena login node, not inside an allocation" >&2
+    exit 2
+}
+command -v sbatch >/dev/null || { echo "sbatch is unavailable" >&2; exit 2; }
+command -v scontrol >/dev/null || { echo "scontrol is unavailable" >&2; exit 2; }
+: "${SCRATCH:?SCRATCH is required}"
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
+VENV_DIR="${ISLANDS_VENV_DIR:-${HOME}/venvs/islands-ray}"
+[[ -x "$VENV_DIR/bin/python" ]] || { echo "Missing Athena venv: $VENV_DIR" >&2; exit 2; }
+
+cd "$PROJECT_DIR"
+module load Python/3.10.4
+"$VENV_DIR/bin/python" "$SCRIPT_DIR/production_er4_best.py" --check --strategy random
+LOCAL_COMMIT=$(git rev-parse HEAD)
+
+STORAGE_ROOT="${ISLANDS_STORAGE_ROOT:-$SCRATCH/islandsEA}"
+RESULT_ROOT="$STORAGE_ROOT/results/athena_production_er4_random_120"
+LOG_ROOT="${ISLANDS_SLURM_LOG_DIR:-$STORAGE_ROOT/logs/slurm}"
+CAMPAIGN_ROOT="$STORAGE_ROOT/campaigns"
+SCRATCH_REAL=$(realpath -m -- "$SCRATCH")
+for path in "$STORAGE_ROOT" "$RESULT_ROOT" "$LOG_ROOT" "$CAMPAIGN_ROOT"; do
+    case "$(realpath -m -- "$path")/" in
+        "$SCRATCH_REAL"/*) ;;
+        *) echo "Output path must remain below SCRATCH: $path" >&2; exit 2 ;;
+    esac
+done
+
+mkdir -p "$RESULT_ROOT" "$LOG_ROOT" "$CAMPAIGN_ROOT"
+# Do not inherit gates or another production mode from an interactive shell.
+unset ATHENA_EXPECTED_COMMIT ATHENA_STUDY_CANARY_JOB_ID ATHENA_STUDY_REPEAT
+unset ATHENA_FROZEN_ARRAY ATHENA_PRODUCTION_ER4_BEST ISLANDS_EXPORT_ROOT
+
+SUBMISSION=$(sbatch --parsable --hold \
+    --array=1-120%3 \
+    --job-name=islandsea-athena-er4-random-120 \
+    --nodes=1 --ntasks=1 --cpus-per-task=16 --mem=128000M \
+    --time=02:00:00 \
+    --partition=plgrid-gpu-a100 --account=plgintobl-gpu-a100 --gres=gpu:1 \
+    --output="$LOG_ROOT/athena-er4-random-120-%A_%a.out" \
+    --error="$LOG_ROOT/athena-er4-random-120-%A_%a.err" \
+    --export="ALL,ISLANDS_PROJECT_DIR=${PROJECT_DIR},ISLANDS_VENV_DIR=${VENV_DIR},ISLANDS_STORAGE_ROOT=${STORAGE_ROOT},ISLANDS_SLURM_LOG_DIR=${LOG_ROOT},ATHENA_STUDY_MODE=full,ATHENA_STUDY_RESULT_ROOT=${RESULT_ROOT},ATHENA_PRODUCTION_ER4_RANDOM=1" \
+    "$SCRIPT_DIR/run_study_job.sh")
+ARRAY_JOB_ID="${SUBMISSION%%;*}"
+[[ "$ARRAY_JOB_ID" =~ ^[0-9]+$ ]] || { echo "Invalid sbatch response: $SUBMISSION" >&2; exit 1; }
+
+CAMPAIGN_DIR="$CAMPAIGN_ROOT/er4_random_${ARRAY_JOB_ID}"
+if ! "$VENV_DIR/bin/python" "$SCRIPT_DIR/campaign_er4_best.py" plan \
+    --strategy random \
+    --campaign-dir "$CAMPAIGN_DIR" \
+    --array-job-id "$ARRAY_JOB_ID" \
+    --git-commit "$LOCAL_COMMIT"; then
+    scancel "$ARRAY_JOB_ID" || true
+    echo "Campaign plan failed; array $ARRAY_JOB_ID cancellation requested" >&2
+    exit 1
+fi
+if ! scontrol release "$ARRAY_JOB_ID"; then
+    scancel "$ARRAY_JOB_ID" || true
+    echo "Could not release held array $ARRAY_JOB_ID; cancellation requested" >&2
+    exit 1
+fi
+
+echo "ATHENA_ER4_RANDOM_ARRAY_JOB_ID=$ARRAY_JOB_ID"
+echo "ATHENA_ER4_RANDOM_CONFIGURATIONS=40x3=120"
+echo "ATHENA_ER4_RANDOM_DIMENSION=200"
+echo "ATHENA_ER4_RANDOM_BASE_SEED=20260912"
+echo "ATHENA_ER4_RANDOM_COMMIT=$LOCAL_COMMIT"
+echo "ATHENA_ER4_RANDOM_RESULT_ROOT=$RESULT_ROOT"
+echo "ATHENA_ER4_RANDOM_CAMPAIGN_DIR=$CAMPAIGN_DIR"
+echo "ATHENA_ER4_RANDOM_STDOUT_PATTERN=$LOG_ROOT/athena-er4-random-120-${ARRAY_JOB_ID}_<task>.out"
+echo "ATHENA_ER4_RANDOM_STDERR_PATTERN=$LOG_ROOT/athena-er4-random-120-${ARRAY_JOB_ID}_<task>.err"
+echo "ATHENA_ER4_RANDOM_BUNDLE_PATTERN=$STORAGE_ROOT/exports/run_<element_SLURM_JOB_ID>.tar.gz"
+echo "MAX_GPU_HOURS_PER_TASK=2.0"
+echo "MAX_TOTAL_GPU_HOURS=240.0"
+echo "No automatic retry, resubmission, or follow-up job"
+echo "Monitor: squeue -j $ARRAY_JOB_ID"
+echo "Accounting: sacct -X -j $ARRAY_JOB_ID -P --format=JobID,State,ExitCode,Elapsed,NodeList"

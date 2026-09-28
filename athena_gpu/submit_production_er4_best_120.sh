@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Submit all 40 refined benchmarks x three repeats, ER4/best/plain, D=200.
-# One manual SLURM array; no canary, commit gate, retry or follow-up submission.
+# One manual command submits the GPU array plus a dependent CPU-only finalizer.
 set -euo pipefail
 
 [[ "$#" -eq 0 ]] || { echo "Usage: $0" >&2; exit 2; }
@@ -10,6 +10,12 @@ set -euo pipefail
 }
 command -v sbatch >/dev/null || { echo "sbatch is unavailable" >&2; exit 2; }
 : "${SCRATCH:?SCRATCH is required}"
+: "${ATHENA_FINALIZER_PARTITION:?Set an authorized CPU-only finalizer partition before submission}"
+: "${ATHENA_FINALIZER_ACCOUNT:?Set an authorized CPU-only finalizer account before submission}"
+[[ "$ATHENA_FINALIZER_PARTITION" != *gpu* && "$ATHENA_FINALIZER_ACCOUNT" != *gpu* ]] || {
+    echo "Refusing a GPU resource for CPU-only finalization" >&2
+    exit 2
+}
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
@@ -36,7 +42,7 @@ done
 mkdir -p "$RESULT_ROOT" "$LOG_ROOT" "$CAMPAIGN_ROOT"
 # Prevent stale interactive-session gates and mode variables from crossing
 # sbatch --export=ALL. The production task map is sourced only from array ID.
-unset ATHENA_EXPECTED_COMMIT ATHENA_STUDY_CANARY_JOB_ID ATHENA_STUDY_REPEAT ATHENA_FROZEN_ARRAY
+unset ATHENA_EXPECTED_COMMIT ATHENA_STUDY_CANARY_JOB_ID ATHENA_STUDY_REPEAT ATHENA_FROZEN_ARRAY ATHENA_PRODUCTION_ER4_RANDOM
 # Keep the shared per-run contract at $ISLANDS_STORAGE_ROOT/exports even if an
 # old login session exported a one-off bundle destination.
 unset ISLANDS_EXPORT_ROOT
@@ -69,6 +75,17 @@ if ! "$VENV_DIR/bin/python" "$SCRIPT_DIR/campaign_er4_best.py" plan \
     exit 1
 fi
 
+# Do not cancel an already-running scientific array if the CPU finalizer
+# submission fails; print its ID so it can be finalized explicitly later.
+if ! FINALIZER_OUTPUT=$(bash "$SCRIPT_DIR/submit_finalize_production_er4_best_120.sh" \
+    --afterany "$ARRAY_JOB_ID"); then
+    echo "Array $ARRAY_JOB_ID remains submitted, but CPU finalizer submission failed" >&2
+    echo "Do not resubmit the 120 GPU tasks; submit only the finalizer later" >&2
+    echo "ATHENA_ER4_BEST_ARRAY_JOB_ID=$ARRAY_JOB_ID"
+    exit 1
+fi
+echo "$FINALIZER_OUTPUT"
+
 echo "ATHENA_ER4_BEST_ARRAY_JOB_ID=$ARRAY_JOB_ID"
 echo "ATHENA_ER4_BEST_CONFIGURATIONS=40x3=120"
 echo "ATHENA_ER4_BEST_DIMENSION=200"
@@ -81,6 +98,6 @@ echo "ATHENA_ER4_BEST_STDERR_PATTERN=$LOG_ROOT/athena-er4-best-120-${ARRAY_JOB_I
 echo "ATHENA_ER4_BEST_BUNDLE_PATTERN=$STORAGE_ROOT/exports/run_<element_SLURM_JOB_ID>.tar.gz"
 echo "MAX_GPU_HOURS_PER_TASK=2.0"
 echo "MAX_TOTAL_GPU_HOURS=240.0"
-echo "No automatic retry, resubmission, or follow-up job"
+echo "No automatic retry or GPU resubmission; one CPU-only afterany finalizer"
 echo "Monitor: squeue -j $ARRAY_JOB_ID"
-echo "Accounting: sacct -j $ARRAY_JOB_ID -P --format=JobIDRaw,ArrayJobID,ArrayTaskID,State,ExitCode,Elapsed,AllocCPUS,AllocTRES,MaxRSS,NodeList"
+echo "Accounting: sacct -X -j $ARRAY_JOB_ID -P --format=JobID,State,ExitCode,Elapsed,NodeList"

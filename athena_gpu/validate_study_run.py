@@ -34,6 +34,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--expected-repeat", type=int, choices=(1, 2, 3), default=1)
     result.add_argument("--expected-problem", choices=BENCHMARKS, default="r01_elliptic")
     result.add_argument("--expected-topology", choices=("torus", "er4"), default="torus")
+    result.add_argument("--expected-strategy", choices=("best", "random", "maxDistance"), default="best")
     return result
 
 
@@ -46,6 +47,7 @@ def _spec(
     repeat: int = 1,
     problem: str = "r01_elliptic",
     topology: str = "torus",
+    strategy: str = "best",
 ) -> dict:
     full = mode == "full"
     if not full and repeat != 1:
@@ -54,6 +56,8 @@ def _spec(
         raise ValueError(f"Unknown refined benchmark: {problem}")
     if topology not in ("torus", "er4") or (not full and topology != "torus"):
         raise ValueError("Athena canary uses torus; full study supports torus or er4")
+    if strategy not in ("best", "random", "maxDistance") or (not full and strategy != "best"):
+        raise ValueError("Athena canary uses best; full study supports best, random or maxDistance")
     islands = 144 if full else 12
     evaluations = 8000 if full else 128
     population = 16
@@ -70,7 +74,7 @@ def _spec(
         "topology": topology,
         "torus_rows": (12 if full else 3) if topology == "torus" else None,
         "torus_columns": (12 if full else 4) if topology == "torus" else None,
-        "migrant_selection": "best",
+        "migrant_selection": strategy,
         "migrant_acceptance": "plain",
         "base_seed": 20260912,
         "benchmark_instance_seed": 20260511,
@@ -537,7 +541,8 @@ def _check_athena_metrics(raw: Path, spec: dict, mode: str, errors: list[str]) -
 
 def validate(args) -> dict:
     errors: list[str] = []
-    spec = _spec(args.mode, args.expected_repeat, args.expected_problem, args.expected_topology)
+    spec = _spec(args.mode, args.expected_repeat, args.expected_problem,
+                 args.expected_topology, args.expected_strategy)
     _require(args.pointer.is_file(), "result pointer is missing", errors)
     raw = None
     pointer = {}

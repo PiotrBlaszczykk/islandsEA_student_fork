@@ -30,16 +30,22 @@ module load Python/3.10.4
 
 STUDY_PROBLEM=r01_elliptic
 STUDY_TOPOLOGY=torus
-if [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" == 1 ]]; then
+STUDY_STRATEGY=best
+if [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" == 1 && "${ATHENA_PRODUCTION_ER4_RANDOM:-0}" == 1 ]]; then
+    echo "Conflicting ER4 production strategies" >&2
+    exit 2
+fi
+if [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" == 1 || "${ATHENA_PRODUCTION_ER4_RANDOM:-0}" == 1 ]]; then
+    if [[ "${ATHENA_PRODUCTION_ER4_RANDOM:-0}" == 1 ]]; then STUDY_STRATEGY=random; fi
     [[ "$ATHENA_STUDY_MODE" == full ]] || {
-        echo "ER4/best production array requires ATHENA_STUDY_MODE=full" >&2
+        echo "ER4 production array requires ATHENA_STUDY_MODE=full" >&2
         exit 2
     }
-    : "${SLURM_ARRAY_JOB_ID:?ER4/best production run requires a SLURM array}"
-    : "${SLURM_ARRAY_TASK_ID:?ER4/best production run requires a SLURM array task}"
+    : "${SLURM_ARRAY_JOB_ID:?ER4 production run requires a SLURM array}"
+    : "${SLURM_ARRAY_TASK_ID:?ER4 production run requires a SLURM array task}"
     TASK_CONFIGURATION=$("$ISLANDS_VENV_DIR/bin/python" \
         "$ISLANDS_PROJECT_DIR/athena_gpu/production_er4_best.py" \
-        --task-id "$SLURM_ARRAY_TASK_ID")
+        --task-id "$SLURM_ARRAY_TASK_ID" --strategy "$STUDY_STRATEGY")
     IFS=$'\t' read -r STUDY_PROBLEM STUDY_REPEAT <<< "$TASK_CONFIGURATION"
     [[ -n "$STUDY_PROBLEM" && -n "$STUDY_REPEAT" ]] || {
         echo "Invalid production task mapping: $TASK_CONFIGURATION" >&2
@@ -63,7 +69,7 @@ case "$STUDY_REPEAT" in
     1|2|3) ;;
     *) echo "Invalid Athena study repeat: $STUDY_REPEAT" >&2; exit 2 ;;
 esac
-if [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" != 1 && -n "${SLURM_ARRAY_TASK_ID:-}" && "$STUDY_REPEAT" != "$SLURM_ARRAY_TASK_ID" ]]; then
+if [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" != 1 && "${ATHENA_PRODUCTION_ER4_RANDOM:-0}" != 1 && -n "${SLURM_ARRAY_TASK_ID:-}" && "$STUDY_REPEAT" != "$SLURM_ARRAY_TASK_ID" ]]; then
     echo "Repeat $STUDY_REPEAT differs from SLURM array task $SLURM_ARRAY_TASK_ID" >&2
     exit 2
 fi
@@ -106,9 +112,10 @@ cleanup() {
         islandsea_bundle_finish "$status"
         local bundle_status=$?
         if (( status == 0 && bundle_status != 0 )); then status=$bundle_status; fi
-        if (( status == 0 )) && [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" == 1 ]]; then
+        if (( status == 0 )) && [[ "${ATHENA_PRODUCTION_ER4_BEST:-0}" == 1 || "${ATHENA_PRODUCTION_ER4_RANDOM:-0}" == 1 ]]; then
             "$VENV_DIR/bin/python" "$PROJECT_DIR/athena_gpu/campaign_er4_best.py" record \
-                --campaign-dir "$ISLANDS_STORAGE_ROOT/campaigns/er4_best_${SLURM_ARRAY_JOB_ID}" \
+                --strategy "$STUDY_STRATEGY" \
+                --campaign-dir "$ISLANDS_STORAGE_ROOT/campaigns/er4_${STUDY_STRATEGY}_${SLURM_ARRAY_JOB_ID}" \
                 --array-job-id "$SLURM_ARRAY_JOB_ID" \
                 --task-id "$SLURM_ARRAY_TASK_ID" \
                 --job-id "$SLURM_JOB_ID" \
@@ -116,7 +123,7 @@ cleanup() {
                 --archive "$ISLANDS_EXPORT_ROOT/run_${SLURM_JOB_ID}.tar.gz"
             local campaign_status=$?
             if (( campaign_status != 0 )); then
-                echo "ATHENA_ER4_BEST_RECORD_FAILED=$SLURM_ARRAY_TASK_ID; per-run archive retained" >&2
+                echo "ATHENA_ER4_${STUDY_STRATEGY^^}_RECORD_FAILED=$SLURM_ARRAY_TASK_ID; per-run archive retained" >&2
                 status=74
             fi
         fi
@@ -189,7 +196,7 @@ COMMON_ARGS=(
     --migrants 5
     --interval 5
     --topology "$STUDY_TOPOLOGY"
-    --strategy best
+    --strategy "$STUDY_STRATEGY"
     --acceptance plain
     --repeat "$STUDY_REPEAT"
     --seed 20260912
@@ -238,6 +245,7 @@ echo "array_job_id=${SLURM_ARRAY_JOB_ID:-none}"
 echo "repeat=$STUDY_REPEAT"
 echo "problem=$STUDY_PROBLEM"
 echo "topology=$STUDY_TOPOLOGY"
+echo "strategy=$STUDY_STRATEGY"
 echo "host=$(hostname -f)"
 echo "commit=$ACTUAL_COMMIT"
 echo "result_dir=$RUN_DIR"
@@ -258,7 +266,8 @@ PYTHON_JOB_PID=""
     --expected-commit "$ACTUAL_COMMIT" \
     --expected-repeat "$STUDY_REPEAT" \
     --expected-problem "$STUDY_PROBLEM" \
-    --expected-topology "$STUDY_TOPOLOGY"
+    --expected-topology "$STUDY_TOPOLOGY" \
+    --expected-strategy "$STUDY_STRATEGY"
 
 echo "ATHENA_STUDY_RESULT=$RUN_DIR"
 echo "ATHENA_STUDY_JOB_OK=1"

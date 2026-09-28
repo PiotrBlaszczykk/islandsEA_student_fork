@@ -107,17 +107,37 @@ Produkcyjny launcher dla całej czterdziestki z `er4` i `best/plain` jest
 `submit_production_er4_best_120.sh`. Jedno ręczne wywołanie zgłasza array
 `1-120%3`: 40 benchmarków × powtórzenia 1–3, D=200, 144 wyspy,
 8000 ewaluacji/wyspę. Limit to 2 GPUh na element, maksymalnie 240 GPUh.
+
+Już pobraną kampanię `er4_best_3201770` można zfinalizować **lokalnie**, bez
+SSH ani nowego joba, przez `python -m athena_gpu.finalize_downloaded_er4_best
+--campaign-dir <ścieżka-do-er4_best_3201770> --array-job-id 3201770`.
+Powstaje `er4_best.tar.gz` z jednym katalogiem `er4_best/` i oryginalnymi
+120 archiwami runów. Szczegóły kontroli i ograniczenia dowodów opisuje
+[runbook](../athena-info/ATHENA_HOW_TO_RUN.md).
 Stałą mapę tasków i hash zatwierdzonego grafu sprawdza
 `production_er4_best.py`; każdy element przechodzi pełny walidator i tworzy
 osobne archiwum `run_<SLURM_JOB_ID>.tar.gz`. Nie ma canary ani bramki commita.
 Plan kampanii i zweryfikowane paczki trafiają też do
-`$SCRATCH/islandsEA/campaigns/er4_best_<ARRAY_ID>/`, skąd jeden helper
-`download_production_er4_best_120.ps1 -ArrayJobId <ARRAY_ID>` pobiera je pod
-`artifacts/run_wyniki/athena/` i sprawdza 120 rekordów oraz 120 sum SHA-256.
-Kampania nie uruchamia dodatkowego finalizera na A100 i nie tworzy drugiej
-kopii danych na SCRATCH; pojedyncze bundle pozostają w formacie wspólnym z
-Aresem.
+`$SCRATCH/islandsEA/campaigns/er4_best_<ARRAY_ID>/`. Polecenie
+`campaign_er4_best.py finalize` kontroluje 120 rzeczywistych statusów Slurma,
+walidacji i sum SHA-256, a następnie tworzy jeden tar i checksum. Finalizer
+jest osobnym zadaniem **CPU-only** zgłaszanym z login node z `afterany`, tylko
+po wskazaniu przydzielonej partycji i konta CPU z dostępem do tego samego
+SCRATCH. Zakończona kampania `3201770` została już zfinalizowana lokalnie z
+pobranych runów; nie ponawiać arraya ani nie zgłaszać zdalnego finalizera.
+Downloader dla przyszłych zdalnych agregatów pobiera tylko tar i checksum w jednym `scp`;
+`-Extract` sprawdza wszystkie 120 wewnętrznych archiwów. Pojedyncze bundle
+pozostają w formacie wspólnym z Aresem.
 Zobacz [runbook produkcyjny](../athena-info/ATHENA_HOW_TO_RUN.md).
+
+Wariant `ER4/random/plain` ma osobny, uruchamiany na login node
+`submit_production_er4_random_120.sh`. Zgłasza jeden array `1-120%3` z tymi
+samymi stałymi, benchmarkami, seedami i zasobami co ER4/best; zmienia wyłącznie
+strategię wyboru migrantów. Przed zwolnieniem arraya zapisuje plan kampanii.
+Nie zgłasza CPU-only finalizera ani kolejnego GPU joba. Po zakończeniu dane
+można pobrać jednym `scp -r` przez `download_production_er4_random_120.ps1`,
+a lokalny `finalize_downloaded_er4.py --strategy random` tworzy `er4_random.tar.gz` z 120
+niezmienionymi runami. Szczegóły i kontrolki: [runbook](../athena-info/ATHENA_HOW_TO_RUN.md).
 
 Lokalnie po poprawce przechodzi 32 testy kontraktu, a jeden test real-Ray jest
 domyślnie opt-in. Uruchomiony jawnie smoke wykonał pełny

@@ -7,7 +7,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from athena_gpu.campaign_er4_best import plan_document, record_task, task_matrix
+from athena_gpu.campaign_er4_best import plan_document, record_task, task_matrix, validate_plan
+from athena_gpu.tests.campaign_fixture import create_campaign
 from athena_gpu.production_er4_best import (
     TASK_COUNT,
     check_contract,
@@ -76,6 +77,22 @@ class ProductionER4BestTests(unittest.TestCase):
             plan["configuration"]["topology"]["adjacency_sha256"],
         )
 
+    def test_random_plan_changes_only_selection_and_campaign_identity(self):
+        best = plan_document("123", "a" * 40)
+        random = plan_document("124", "a" * 40, "random")
+        self.assertEqual("er4_random", random["campaign"])
+        self.assertEqual("islandsea-er4-random-athena-campaign-v1", random["schema"])
+        self.assertEqual("random", random["configuration"]["migration"]["selection"])
+        self.assertEqual(best["tasks"], random["tasks"])
+        for key in ("dimension", "islands", "evaluations_per_island", "population",
+                    "offspring", "topology", "base_seed", "benchmark_instance_seed"):
+            self.assertEqual(best["configuration"][key], random["configuration"][key])
+        self.assertEqual(_spec("full", 3, BENCHMARKS[-1], "er4", "random")["migrant_selection"],
+                         "random")
+        validate_plan(random, "124", "random")
+        with self.assertRaises(ValueError):
+            validate_plan(random, "124", "best")
+
     def test_campaign_record_indexes_one_verified_portable_bundle(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -139,6 +156,60 @@ class ProductionER4BestTests(unittest.TestCase):
                 (campaign / record["archive"]).read_bytes(),
             )
             self.assertTrue((campaign / "tasks" / "task-001.json").is_file())
+
+    def test_random_record_accepts_random_and_rejects_best_validation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fixture = create_campaign(root, strategy="random")
+            campaign, plan = fixture["campaign"], fixture["plan"]
+            task = plan["tasks"][0]
+            record = campaign / "tasks/task-001.json"
+            record.unlink()
+            old_bundle = campaign / "runs/r01_elliptic/repeat-1/run_501.tar.gz"
+            old_checksum = old_bundle.with_name(old_bundle.name + ".sha256")
+            archive = root / "exports/run_501.tar.gz"
+            archive.parent.mkdir()
+            archive.write_bytes(old_bundle.read_bytes())
+            archive.with_name(archive.name + ".sha256").write_bytes(old_checksum.read_bytes())
+            old_bundle.unlink()
+            old_checksum.unlink()
+            old_bundle.parent.rmdir()
+            run_dir = fixture["results"] / "501"
+            raw = root / "raw"
+            raw.mkdir()
+            (run_dir / "result_pointer.json").write_text(
+                json.dumps({"run_directory": str(raw)}), encoding="utf-8")
+            (raw / "run_metadata.json").write_text(json.dumps({
+                "scientific_configuration": {
+                    "benchmark": {"name": task["benchmark"]},
+                    "dimension": 200, "islands": 144, "evaluations_per_island": 8000,
+                    "population": 16, "offspring": 4, "repeat": 1,
+                    "migration": plan["configuration"]["migration"],
+                    "topology": plan["configuration"]["topology"],
+                    "seed": {"requested_base": 20260912, "repeat_base": 20260912,
+                             "benchmark_instance_seed": 20260511},
+                    "metrics": {"profile": "research-v1-full-buffered"},
+                },
+                "resources": {"slurm": {"SLURM_JOB_ID": "501",
+                                        "SLURM_ARRAY_JOB_ID": "123",
+                                        "SLURM_ARRAY_TASK_ID": "1"}},
+                "provenance": {"git_commit": "b" * 40},
+            }), encoding="utf-8")
+            validation_path = run_dir / "validation.json"
+            validation = json.loads(validation_path.read_text(encoding="utf-8"))
+            validation["migrant_selection"] = "best"
+            validation_path.write_text(json.dumps(validation), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "migrant_selection"):
+                record_task(campaign, "123", 1, "501", run_dir, archive, "random")
+            validation["migrant_selection"] = "random"
+            validation_path.write_text(json.dumps(validation), encoding="utf-8")
+            with patch("athena_gpu.campaign_er4_best.verify_archive", return_value={
+                "job_id": "501", "complete": True, "validation": "passed",
+            }):
+                made = record_task(campaign, "123", 1, "501", run_dir, archive, "random")
+            self.assertEqual("random", made["migrant_selection"])
+            self.assertEqual("islandsea-er4-random-athena-campaign-v1", made["schema"])
+            self.assertEqual(archive.read_bytes(), (campaign / made["archive"]).read_bytes())
 
 
 if __name__ == "__main__":

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Frozen task map for the 40-benchmark, three-repeat ER4/best Athena batch."""
+"""Frozen task map for ER4/best and ER4/random Athena batches."""
 from __future__ import annotations
 
 import argparse
+import hashlib
 from pathlib import Path
 import sys
 
@@ -22,6 +23,7 @@ from islands_desync.islands.topologies.fixed_graph import load_graph
 REPEATS = (1, 2, 3)
 TASK_COUNT = 120
 ER4_SHA256 = "469cc283543dcc60d5bf8f07db2eabfb12cab34637f4a6d26bca51d07f85cccc"
+BENCHMARK_ORDER_SHA256 = "52bba92358d7462897dd81f5d64df0ab645339cf10dba6e6ba2fde404b925c16"
 
 
 def check_contract() -> None:
@@ -29,6 +31,9 @@ def check_contract() -> None:
         raise ValueError("The approved 30+10 benchmark suite changed")
     if len(BENCHMARKS) * len(REPEATS) != TASK_COUNT or len(set(BENCHMARKS)) != 40:
         raise ValueError("The production array must contain exactly 120 unique configurations")
+    ordered_names = ("\n".join(BENCHMARKS) + "\n").encode("utf-8")
+    if hashlib.sha256(ordered_names).hexdigest() != BENCHMARK_ORDER_SHA256:
+        raise ValueError("The benchmark order differs from the completed ER4/best comparison campaign")
     graph = load_graph("er4")
     if graph["nodes"] != 144 or graph["provenance"]["adjacency_sha256"] != ER4_SHA256:
         raise ValueError("The approved 144-node ER4 graph changed")
@@ -46,6 +51,7 @@ def main() -> int:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--check", action="store_true")
     group.add_argument("--task-id", type=int)
+    parser.add_argument("--strategy", choices=("best", "random"), default="best")
     args = parser.parse_args()
     check_contract()
     if args.check:
@@ -53,8 +59,9 @@ def main() -> int:
         # fixed CEC data file is unavailable in the current checkout.
         for benchmark in BENCHMARKS:
             create_evaluator(benchmark, 200)
-        print(f"ATHENA_ER4_BEST_TASKS={TASK_COUNT}")
+        print(f"ATHENA_ER4_{args.strategy.upper()}_TASKS={TASK_COUNT}")
         print(f"ATHENA_ER4_SHA256={ER4_SHA256}")
+        print(f"ATHENA_ER4_BENCHMARK_ORDER_SHA256={BENCHMARK_ORDER_SHA256}")
     else:
         print("\t".join(map(str, configuration(args.task_id))))
     return 0

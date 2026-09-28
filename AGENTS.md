@@ -26,8 +26,13 @@ workspace `artifacts/run_wyniki_przyklad/{run_123456,run_3174577}`.
 - Ares run wrapper packages ordinary/canary jobs; array wrapper first closes
   attempt.json, then packages; pilot finalizer refreshes after verification.
   Each array element uses its actual SLURM_JOB_ID, not the shared parent ID.
-  Athena study wrapper packages after its validation/cleanup. No new jobs,
-  dependencies, retries or submissions are introduced by export.
+  Athena study wrapper packages after its validation/cleanup. The separate
+  ER4/best campaign aggregate is a CPU-only post-array finalizer; it adds no
+  GPU run, retry or scientific-data rewrite. Never submit it as a CPU-only
+  workload to Athena's A100 partition.
+  The ER4/random 120-task launcher submits only the GPU array and records
+  verified per-run bundles; its complete aggregate is built locally after a
+  one-connection campaign download, without inventing a CPU partition on Athena.
 - The automatic archive contains a final-wrapper log snapshot. For SLURM's
   subsequent epilogue messages, refresh after job termination with `export
   --replace`. Hard-killed jobs may require manual `--allow-incomplete` export.

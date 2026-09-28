@@ -6,12 +6,48 @@
 
 # Athena GPU: sprawdzony runbook uruchomieniowy i zapis walidacji
 
-Aktualizacja **2026-09-27**: przygotowano produkcyjny launcher ER4/best;
-ostatnia targetowa walidacja runnera na A100 to canary `3181809` i full `3185051`.
+Aktualizacja **2026-09-28**: array ER4/best `3201770` ma według przekazanego
+`sacct` **120/120 `COMPLETED 0:0`**. Finalizacja z już pobranych bundle
+przeszła **lokalnie**, bez ponownego uruchamiania benchmarków; zdalny finalizer
+i nowy downloader nie zostały uruchomione na Athenie. Wcześniejsze walidacje
+A100: canary `3181809` i full `3185051`.
+
+### Lokalny agregat z już pobranych 120 runów
+
+Katalog `artifacts/run_wyniki/athena/er4_best_3201770/` zawiera już plan,
+120 rekordów tasków i 120 przenośnych archiwów runów wraz z SHA-256. Nie trzeba
+ponownie uruchamiać benchmarków ani zgłaszać finalizera na Athenie, aby
+otrzymać agregat w formule Aresa. Na laptopie, z katalogu tego repozytorium:
+
+```powershell
+python -m athena_gpu.finalize_downloaded_er4_best `
+  --campaign-dir 'C:\Users\piotr\UMISI\IslandsEA_summer\artifacts\run_wyniki\athena\er4_best_3201770' `
+  --array-job-id 3201770
+```
+
+Skrypt najpierw sprawdza plan, dokładnie 40×3 rekordów, statusy i proweniencję
+runów, walidacje **rzeczywiście obecne wewnątrz** każdego bundle, manifesty
+ukończenia oraz SHA-256 każdego archiwum. Potem zapisuje obok katalogu
+`er4_best.tar.gz` i `er4_best.tar.gz.sha256`; niczego nie nadpisuje. W tarze
+jest jeden katalog `er4_best/` z planem, summary, oryginalnym summary pobrania,
+`task_records/`, skopiowanymi z bundle walidacjami, dostępnymi logami oraz
+`runs/<benchmark>/repeat-<n>/run_<rzeczywisty_JOB_ID>.tar.gz[.sha256]`.
+Wszystkie 120 wewnętrznych tarów jest przenoszone bajt w bajt, bez zmiany
+metryk naukowych. Summary rozróżnia dowód zakończenia z manifestów runów od
+nieobecnego w lokalnym źródle, niezależnego zrzutu `sacct`; brakujące logi
+wymienia jawnie. Oryginalny katalog pobrania pozostaje bez zmian.
+
+Wykonana lokalna finalizacja `3201770`: **120/120 valid**, 120 archiwów + 120
+checksumów, 120 rekordów, 120 walidacji i 240 dostępnych snapshotów logów
+w jednym katalogu `er4_best/`. Plik wynikowy:
+`artifacts/run_wyniki/athena/er4_best.tar.gz` (21 925 958 201 bajtów),
+SHA-256 `5def55dcf6d3e7b05f95c1fb3f5d9a82e4548be46ea39f01615aa4bed220b90c`.
+Zewnętrzny hash, lista członków tara i SHA-256 wszystkich 120 wewnętrznych
+archiwów względem ich checksumów zostały sprawdzone po zapisaniu.
 
 ## Produkcyjna partia ER4 / best / 40 × 3
 
-Przygotowany, lecz **jeszcze nieuruchomiony** launcher zgłasza dokładnie jeden
+Launcher zgłasza dokładnie jeden
 array SLURM `1-120%3`. Każdy element jest niezależnym pełnym runem: jedna A100,
 16 CPU, 144 logiczne wyspy na 12 shardach, 8000 ewaluacji/wyspę, populacja 16,
 potomkowie 4, pięciu migrantów co 5 ewaluacji, `er4`, `best/plain`, D=200,
@@ -27,15 +63,23 @@ kontroluje liczbę funkcji i hash zatwierdzonego grafu ER4
 Nie generuje grafu i nie zmienia seeda w zależności od pozycji w arrayu:
 powtórzenia używają repeat-base 20260912, 21260912, 22260912.
 
-Po wykonanym przez użytkownika commit/push i pull na Athenie użytkownik
-ręcznie uruchamia:
+W przyszłych kampaniach, po commit/push i pull wykonanych przez użytkownika,
+trzeba najpierw wskazać **rzeczywiście przydzieloną partycję i konto CPU-only
+z dostępem do tego samego SCRATCH** (nie zgadywać nazw):
 
 ```bash
+export ATHENA_FINALIZER_PARTITION='<zatwierdzona-partycja-CPU>'
+export ATHENA_FINALIZER_ACCOUNT='<zatwierdzone-konto-CPU>'
 cd "$HOME/islandsEA_student_fork"
 bash athena_gpu/submit_production_er4_best_120.sh
 ```
 
-Nie ma canary, bramki określonego commita, retry ani jobów następczych.
+Submitter na login node zgłasza array GPU oraz **jeden CPU-only finalizer** z
+`--dependency=afterany:<ARRAY_ID>`. Nie ma canary, bramki określonego commita,
+retry ani dodatkowego joba GPU. Athena jest według dokumentacji Cyfronetu
+klastrem GPU-only; nie kierować ciężkiego pakowania na A100 bez GPU ani nie
+wykonywać go na login node. Bez uprawnionego zasobu CPU nowy submitter
+zatrzymuje się **przed** zgłoszeniem arraya.
 Commit i stan Git są zapisywane jako proweniencja. Nie robić `git pull` ani
 lokalnych zmian w checkoutcie na Athenie, dopóki cały array nie zakończy
 pracy: kolejne elementy startują później i mogłyby odczytać inny kod.
@@ -63,30 +107,110 @@ $SCRATCH/islandsEA/campaigns/er4_best_<ARRAY_ID>/
 └── runs/<benchmark>/repeat-<1|2|3>/run_<JOB_ID>.tar.gz[.sha256]
 ```
 
-To ten sam pojedynczy format `run_<JOB_ID>` co na Aresie, z podobnym układem
-kampanii `tasks/` i `runs/`. Athena **nie tworzy dodatkowego zbiorczego tara**:
-nie potrzeba 121. joba na A100 ani drugiej kopii 120 dużych archiwów na
-SCRATCH. Dowiązania dotyczą tylko plików na tym samym SCRATCH; kanoniczne
+Dowiązania dotyczą tylko plików na tym samym SCRATCH; kanoniczne
 `$SCRATCH/islandsEA/exports/run_<JOB_ID>.tar.gz` pozostają dostępne dla
 wspólnego `download_run.ps1`.
 
-Po zakończeniu sprawdzić array przez `sacct -j <ARRAY_ID> -P
---format=JobIDRaw,ArrayJobID,ArrayTaskID,State,ExitCode,Elapsed,AllocTRES`.
-Na laptopie jedno polecenie pobiera katalog kampanii i weryfikuje dokładnie
-120 rekordów, 40×3 powtórzeń oraz SHA-256 każdego archiwum. Dopiero po
-zaliczeniu całej kontroli zapisuje lokalne `campaign_summary.json` z
-`valid_runs=120` i listą zaobserwowanych commitów (proweniencja, nie bramka):
+Finalizer czyta faktyczny `sacct` (`JobIDRaw`, `JobID`, `State`, `ExitCode`),
+plan, dokładnie 120 rekordów, osobny `validation.json` dla każdego runa,
+głęboko weryfikuje bundle i jego SHA-256. Nie uzupełnia brakujących walidacji
+ani logów. Dostępne logi włącza do agregatu, brakujące wymienia w
+`campaign_summary.json`. Dopiero po pełnym sukcesie tworzy w katalogu kampanii
+`er4_best_<ARRAY_ID>.tar.gz` i `.tar.gz.sha256`. Jedynym katalogiem w środku
+jest `er4_best_<ARRAY_ID>/` z planem, podsumowaniem, `sacct.txt`, rekordami,
+kopiami 120 rzeczywistych walidacji, dostępnymi logami oraz 120 niezmienionymi
+archiwami `runs/<benchmark>/repeat-<n>/run_<rzeczywisty_JOB_ID>.tar.gz[.sha256]`.
+To jest dodatkowy duży plik na SCRATCH, więc finalizer sprawdza wolne miejsce.
+Pojedynczy bundle zachowuje wspólny z Aresem kontrakt `logs/`, `metrics/`,
+`results/`, `identifier.txt`, `metadata.json`.
 
-```powershell
-.\athena_gpu\download_production_er4_best_120.ps1 -ArrayJobId <ARRAY_ID>
+Dla **już obliczonego** `3201770` nie zgłaszać ponownie 120 benchmarków.
+Po potwierdzeniu dozwolonego zasobu CPU użytkownik może z login node zgłosić
+sam finalizer (bez zależności do historycznie zakończonego arraya):
+
+```bash
+export ATHENA_FINALIZER_PARTITION='<zatwierdzona-partycja-CPU>'
+export ATHENA_FINALIZER_ACCOUNT='<zatwierdzone-konto-CPU>'
+bash athena_gpu/submit_finalize_production_er4_best_120.sh --existing 3201770
 ```
 
-Domyślny lokalny katalog to
-`artifacts/run_wyniki/athena/er4_best_<ARRAY_ID>/`; skrypt nie nadpisuje
-wcześniejszego pobrania. Nie mieszać go z Ares. Przy brakującym albo błędnym
-tasku kontrola kończy się błędem; surowe dane i paczki pozostają na SCRATCH.
-Nie zgłaszać ponownie całej partii po pojedynczym błędzie: najpierw ustalić,
-które elementy ukończyły się poprawnie. ID arraya nie jest ID każdego runa.
+Gdyby CPU-only na współdzielonym SCRATCH nie było dostępne, zatrzymać się i
+uzgodnić zasób z administracją; **nie** odpalać 120 runów ponownie ani nie
+uruchamiać kilkudziesięciogigabajtowej kompresji na login node. Dla
+przyszłego arraya osobne zgłoszenie finalizera, gdyby było potrzebne, to
+`bash athena_gpu/submit_finalize_production_er4_best_120.sh --afterany
+<ARRAY_ID>`. Normalnie nowy launcher zgłasza go automatycznie.
+
+Po zakończeniu sprawdzić oba joby przez `sacct -X -j <ID> -P
+--format=JobID,State,ExitCode,Elapsed,NodeList` (wersja Slurma na Athenie nie
+obsługuje pól `ArrayJobID`/`ArrayTaskID`). Na laptopie wybrać **jedno** z
+poniższych poleceń:
+
+```powershell
+.\athena_gpu\download_production_er4_best_120.ps1 -ArrayJobId 3201770
+# Albo od razu pobrać, rozpakować i sprawdzić 120 wewnętrznych sum:
+.\athena_gpu\download_production_er4_best_120.ps1 -ArrayJobId 3201770 -Extract
+```
+
+Jeden `scp` pobiera **tylko** `er4_best_3201770.tar.gz` i `.sha256` obok siebie
+w `artifacts/run_wyniki/athena/`; kontrola zewnętrznego SHA-256 jest zawsze
+obowiązkowa. `-Extract` dodatkowo sprawdza plan, summary, 120 rekordów,
+walidacji, archiwów i ich SHA-256 w
+`artifacts/run_wyniki/athena/er4_best_3201770/`. Skrypt nie nadpisuje
+istniejących dwóch plików ani katalogu; bez `-Extract` może pobrać tar obok
+wcześniejszego katalogu bez jego zmiany. Po pierwszym pobraniu samo
+`-Extract` przez ten downloader nie jest trybem „rozpakuj lokalny plik”:
+użyć go przy pierwszym pobraniu albo wskazać inny `-Destination`. Nie mieszać
+wyników z Aresem. ID arraya nie jest ID każdego runa.
+
+## Produkcyjna partia ER4 / random / 40 × 3
+
+Wariant `random` zmienia **wyłącznie wybór migrantów** względem ER4/best.
+Zostają te same: zamrożony graf ER4 i hash adjacencji, kolejność 40 benchmarków,
+D=200, 144 wyspy, 8000 ewaluacji/wyspę, populacja 16, potomkowie 4, grupa i
+interwał migracji 5/5, akceptacja `plain`, powtórzenia 1–3 i seed bazowy
+20260912. Preflight porównuje SHA-256 kolejności benchmarków z kampanią
+ER4/best `3201770`. Bez canary, bramki commita i automatycznego retry. Z repo
+na login node użytkownik uruchamia **jedno polecenie** (nie uruchamiać go lokalnie):
+
+```bash
+bash athena_gpu/submit_production_er4_random_120.sh
+```
+
+Nie zmieniać checkoutu na Athenie (`git pull` ani edycji plików) do zakończenia
+całego arraya: późniejsze taski korzystają z tego samego katalogu kodu.
+
+Submitter sprawdza graf i wszystkie 40 instancji, zgłasza jeden array GPU
+`1-120%3` (A100 + 16 CPU, maksymalnie 2 godziny i 2 GPUh na element; górna
+granica 240 GPUh), tworzy plan `campaigns/er4_random_<ARRAY_ID>/campaign_plan.json`
+przy zatrzymanym arrayu, po czym go zwalnia. Każdy task ma osobny
+`SLURM_JOB_ID`, `results/athena_production_er4_random_120/<JOB_ID>/validation.json`,
+log `logs/slurm/athena-er4-random-120-<ARRAY_ID>_<TASK_ID>.{out,err}` i
+`exports/run_<JOB_ID>.tar.gz[.sha256]`; w katalogu kampanii pojawia się rekord
+tasku i dowiązanie do tego samego bundle. Zgodność strategii `random` jest
+sprawdzana w aktywnym wywołaniu GA, efektywnych metadanych, walidacji i planie.
+
+Ten launcher **nie** zgłasza dodatkowego finalizera: nie zakłada niepotwierdzonej
+partycji CPU-only na Athenie ani nie pakuje dziesiątek GB na login node. Po
+zakończeniu sprawdzić `sacct -X -j <ARRAY_ID> -P
+--format=JobID,State,ExitCode,Elapsed,NodeList`. Dopiero dla kompletnej kampanii
+na laptopie, z katalogu tego repozytorium:
+
+```powershell
+.\athena_gpu\download_production_er4_random_120.ps1 -ArrayJobId <ARRAY_ID>
+python -m athena_gpu.finalize_downloaded_er4 `
+  --campaign-dir 'C:\Users\piotr\UMISI\IslandsEA_summer\artifacts\run_wyniki\athena\er4_random_<ARRAY_ID>' `
+  --array-job-id <ARRAY_ID> --strategy random
+```
+
+Downloader używa jednego połączenia `scp -r`, nie nadpisuje istniejącego
+katalogu i weryfikuje 120 pobranych SHA-256. Lokalny finalizer dodatkowo
+sprawdza plan, rekordy, walidacje i zawartość każdego bundle; dopiero po
+pełnym sukcesie tworzy `artifacts/run_wyniki/athena/er4_random.tar.gz` i
+`.tar.gz.sha256`, z jednym katalogiem `er4_random/` w formule Aresa. Wymaga
+wolnego miejsca na drugi zestaw ~22 GB danych; rozmiar rzeczywisty zależy od
+wyników. Nie dopisuje nieobecnego `sacct` ani logów. Oryginalne archiwa i
+metryki pozostają niezmienione.
 
 Ten dokument utrwala działającą procedurę dla Atheny, wyniki wykonanych
 walidacji oraz znane ograniczenia. Dotyczy kodu z `athena_gpu/`. Nie jest instrukcją dla

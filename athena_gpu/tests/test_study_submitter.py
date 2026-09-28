@@ -41,9 +41,13 @@ esac
         self.write_executable(
             bin_dir / "sbatch",
             '''#!/usr/bin/env bash
-printf '%s\n' "$@" > "$MOCK_CAPTURE"
+printf '%s\n' "$@" >> "$MOCK_CAPTURE"
 printf 'sbatch\n' >> "$MOCK_CALLS"
-echo 7654321
+if [[ "$*" == *"--dependency=afterany:7654321"* ]]; then
+    echo 7654322
+else
+    echo 7654321
+fi
 ''',
         )
         # The Codex Windows sandbox grants native Python access to the
@@ -52,6 +56,10 @@ echo 7654321
         # captured sbatch arguments are.
         self.write_executable(bin_dir / "mkdir", "#!/usr/bin/env bash\nexit 0\n")
         self.write_executable(bin_dir / "module", "#!/usr/bin/env bash\nexit 0\n")
+        self.write_executable(
+            bin_dir / "scontrol",
+            "#!/usr/bin/env bash\nprintf 'scontrol %s\\n' \"$*\" >> \"$MOCK_CALLS\"\n",
+        )
         venv_bin = self.root / "venv" / "bin"
         venv_bin.mkdir(parents=True)
         self.write_executable(
@@ -72,6 +80,7 @@ echo 7654321
             "ATHENA_FROZEN_RUN_ROOT",
             "ATHENA_FROZEN_ARRAY",
             "ATHENA_PRODUCTION_ER4_BEST",
+            "ATHENA_PRODUCTION_ER4_RANDOM",
             "ATHENA_STUDY_REPEAT",
         ):
             self.env.pop(key, None)
@@ -186,10 +195,15 @@ echo 7654321
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(self.capture.exists())
 
-    def test_er4_best_production_submits_exactly_one_bounded_array(self):
+    def test_er4_best_production_submits_gpu_array_and_cpu_afterany_finalizer(self):
+        plan = self.root / "scratch" / "islandsEA" / "campaigns" / "er4_best_7654321" / "campaign_plan.json"
+        plan.parent.mkdir(parents=True)
+        plan.write_text("{}\n", encoding="utf-8")
         result = self.submit(
             "",
-            {"ATHENA_EXPECTED_COMMIT": "stale", "ATHENA_STUDY_CANARY_JOB_ID": "999"},
+            {"ATHENA_EXPECTED_COMMIT": "stale", "ATHENA_STUDY_CANARY_JOB_ID": "999",
+             "ATHENA_FINALIZER_PARTITION": "plgrid",
+             "ATHENA_FINALIZER_ACCOUNT": "plgintobl-cpu"},
             script="submit_production_er4_best_120.sh",
         )
         self.assertEqual(0, result.returncode, result.stderr)
@@ -206,13 +220,73 @@ echo 7654321
         self.assertNotIn("ATHENA_STUDY_CANARY_JOB_ID", exported)
         self.assertIn("MAX_TOTAL_GPU_HOURS=240.0", result.stdout)
         self.assertIn("No automatic retry", result.stdout)
-        self.assertEqual(["sbatch"], self.calls.read_text(encoding="utf-8").splitlines())
+        self.assertEqual(["sbatch", "sbatch"], self.calls.read_text(encoding="utf-8").splitlines())
+        self.assertIn("--dependency=afterany:7654321", arguments)
+        self.assertIn("--partition=plgrid", arguments)
+        self.assertIn("--account=plgintobl-cpu", arguments)
+        submissions = [i for i, argument in enumerate(arguments) if argument == "--parsable"]
+        self.assertEqual(2, len(submissions))
+        self.assertNotIn("--gres=gpu:1", arguments[submissions[1]:])
+        self.assertIn("ATHENA_ER4_BEST_FINALIZER_JOB_ID=7654322", result.stdout)
         invoked = self.python_capture.read_text(encoding="utf-8")
         self.assertIn("production_er4_best.py --check", invoked)
         self.assertIn("campaign_er4_best.py plan", invoked)
 
+    def test_er4_best_requires_explicit_cpu_finalizer_resources_before_gpu_submit(self):
+        result = self.submit("", script="submit_production_er4_best_120.sh")
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(self.calls.exists())
+        gpu_only = self.submit(
+            "", {"ATHENA_FINALIZER_PARTITION": "plgrid-gpu-a100",
+                 "ATHENA_FINALIZER_ACCOUNT": "plgintobl-gpu-a100"},
+            script="submit_production_er4_best_120.sh",
+        )
+        self.assertNotEqual(0, gpu_only.returncode)
+        self.assertFalse(self.calls.exists())
+
+    def test_er4_random_submits_one_held_array_then_releases_after_plan(self):
+        result = self.submit("", script="submit_production_er4_random_120.sh")
+        self.assertEqual(0, result.returncode, result.stderr)
+        arguments = self.capture.read_text(encoding="utf-8").splitlines()
+        for value in ("--array=1-120%3", "--hold", "--nodes=1", "--cpus-per-task=16",
+                      "--gres=gpu:1", "--time=02:00:00", "--account=plgintobl-gpu-a100"):
+            self.assertIn(value, arguments)
+        exported = "\n".join(arguments)
+        self.assertIn("ATHENA_PRODUCTION_ER4_RANDOM=1", exported)
+        self.assertNotIn("ATHENA_PRODUCTION_ER4_BEST", exported)
+        self.assertNotIn("ATHENA_EXPECTED_COMMIT", exported)
+        self.assertEqual(["sbatch", "scontrol release 7654321"],
+                         self.calls.read_text(encoding="utf-8").splitlines())
+        self.assertIn("production_er4_best.py --check --strategy random",
+                      self.python_capture.read_text(encoding="utf-8"))
+        self.assertIn("campaign_er4_best.py plan --strategy random",
+                      self.python_capture.read_text(encoding="utf-8"))
+        self.assertIn("ATHENA_ER4_RANDOM_ARRAY_JOB_ID=7654321", result.stdout)
+        self.assertIn("No automatic retry, resubmission, or follow-up job", result.stdout)
+
+    def test_existing_array_submits_only_cpu_finalizer_without_dependency(self):
+        plan = self.root / "scratch" / "islandsEA" / "campaigns" / "er4_best_7654321" / "campaign_plan.json"
+        plan.parent.mkdir(parents=True)
+        plan.write_text("{}\n", encoding="utf-8")
+        result = self.submit(
+            "--existing 7654321",
+            {"ATHENA_FINALIZER_PARTITION": "plgrid",
+             "ATHENA_FINALIZER_ACCOUNT": "plgintobl-cpu"},
+            script="submit_finalize_production_er4_best_120.sh",
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        arguments = self.capture.read_text(encoding="utf-8").splitlines()
+        self.assertNotIn("--gres=gpu:1", arguments)
+        self.assertFalse(any(argument.startswith("--dependency=") for argument in arguments))
+        self.assertIn("run_finalize_production_er4_best_120.sh", "\n".join(arguments))
+        self.assertEqual(["sbatch"], self.calls.read_text(encoding="utf-8").splitlines())
+
     def test_job_wrapper_has_valid_bash_syntax(self):
-        for script in ("run_study_job.sh", "submit_frozen_torus3.sh", "submit_production_er4_best_120.sh"):
+        for script in ("run_study_job.sh", "submit_frozen_torus3.sh",
+                       "submit_production_er4_best_120.sh",
+                       "submit_production_er4_random_120.sh",
+                       "submit_finalize_production_er4_best_120.sh",
+                       "run_finalize_production_er4_best_120.sh"):
             with self.subTest(script=script):
                 result = subprocess.run(
                     [self.bash, "-n", str(self.scripts / script)],
@@ -239,7 +313,9 @@ echo 7654321
             "--torus-rows 12",
             "--torus-columns 12",
             "STUDY_TOPOLOGY=torus",
-            "--strategy best",
+            "STUDY_STRATEGY=best",
+            '--strategy "$STUDY_STRATEGY"',
+            '--expected-strategy "$STUDY_STRATEGY"',
             "--acceptance plain",
             "--seed 20260912",
             "--instance-seed 20260511",
