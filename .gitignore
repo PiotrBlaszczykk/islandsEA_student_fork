@@ -10,3 +10,9 @@ logs
 log_archives
 *.out
 .venv
+
+# Local, regenerable analysis data and reports from downloaded run bundles.
+analysis_database/
+outputs/
+
+*.tar.gz

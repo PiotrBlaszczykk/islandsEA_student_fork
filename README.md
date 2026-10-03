@@ -61,6 +61,14 @@ second is a two-island diagnostic outside the study. Production runs require
 
 ## Generate Delay Plots
 
+For incremental, plot-ready CSV extraction across complete downloaded campaigns
+(including per-island convergence, final outcome statistics, convergence speed,
+and signed-delay data for the final top/bottom 10 islands), see
+[analysis/README.md](analysis/README.md). The extractor reads portable archives
+in place. Optional commands generate separate PNG files for frequent delay
+patterns and repeat-aggregated fitness comparisons; they never create one giant
+montage or any JPG files.
+
 After a run finishes, the output directory will be under `islands_desync/logs/...`.
 
 Historical example from an earlier local run (paths are archival):
